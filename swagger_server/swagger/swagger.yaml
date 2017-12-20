@@ -1,0 +1,297 @@
+swagger: '2.0'
+info:
+  title: Adversarial Autoencoder
+  version: "0.1"
+consumes:
+  - application/json
+produces:
+  - application/json
+security:
+  # enable OAuth protection for all REST endpoints
+  # (only active if the TOKENINFO_URL environment variable is set)
+  - oauth2: [uid]
+paths:
+  /Load/load_data:
+    get:
+      tags: [Load]
+      operationId: swagger_operations.load_data
+      summary: load the data
+      parameters:
+        - name: path_to_data_dir
+          in: query
+          type: string
+      responses:
+        200:
+          description: Return whether load was successfull
+          schema:
+            type: boolean
+
+  /Load/load_single_image:
+    get:
+      tags: [Load]
+      operationId: swagger_operations.load_single_image
+      summary: load the data
+      parameters:
+        - name: image_id
+          in: query
+          type: integer
+        - name: train_test_or_validation
+          in: query
+          type: string
+          enum: [train, test, validation]
+          description: whether to return a train image, a test image or a validation image
+      responses:
+        200:
+          description: Return whether load was successfull
+          schema:
+            type: boolean
+
+  /Load/load_single_label:
+    get:
+      tags: [Load]
+      operationId: swagger_operations.load_single_label
+      summary: load the data
+      parameters:
+        - name: label_id
+          in: query
+          type: integer
+        - name: train_test_or_validation
+          in: query
+          type: string
+          enum: [train, test, validation]
+          description: whether to return a train label, a test label or a validation label
+      responses:
+        200:
+          description: Return whether load was successfull
+          schema:
+            type: boolean
+
+  /Load:
+    get:
+      tags: [Load]
+      operationId: swagger_operations.load
+      summary: Get all test
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+
+  /Build:
+    get:
+      tags: [Build]
+      operationId: swagger_operations.build
+      summary: Get all test
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+
+  /Train:
+    get:
+      tags: [Train]
+      operationId: swagger_operations.train
+      summary: Get all test
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+
+  /Visualize:
+    get:
+      tags: [Visualize]
+      operationId: swagger_operations.visualize
+      summary: Get all test
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+
+  /Tune:
+    get:
+      tags: [Test]
+      operationId: swagger_operations.tune
+      summary: Get all test
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+
+  /pets:
+    get:
+      tags: [Pets]
+      operationId: swagger_operations.get_pets
+      summary: Get all pets
+      parameters:
+        - name: animal_type
+          in: query
+          type: string
+          pattern: "^[a-zA-Z0-9]*$"
+        - name: limit
+          in: query
+          type: integer
+          minimum: 0
+          default: 100
+      responses:
+        200:
+          description: Return pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+  /pets/{pet_id}:
+    get:
+      tags: [Pets]
+      operationId: swagger_operations.get_pet
+      summary: Get a single pet
+      parameters:
+        - $ref: '#/parameters/pet_id'
+      responses:
+        200:
+          description: Return pet
+          schema:
+            $ref: '#/definitions/Pet'
+        404:
+          description: Pet does not exist
+    put:
+      tags: [Pets]
+      operationId: swagger_operations.put_pet
+      summary: Create or update a pet
+      parameters:
+        - $ref: '#/parameters/pet_id'
+        - name: pet
+          in: body
+          schema:
+            $ref: '#/definitions/Pet'
+      responses:
+        200:
+          description: Pet updated
+        201:
+          description: New pet created
+    delete:
+      tags: [Pets]
+      operationId: swagger_operations.delete_pet
+      summary: Remove a pet
+      parameters:
+        - $ref: '#/parameters/pet_id'
+      responses:
+        204:
+          description: Pet was deleted
+        404:
+          description: Pet does not exist
+
+
+parameters:
+  pet_id:
+    name: pet_id
+    description: Pet's Unique identifier
+    in: path
+    type: string
+    required: true
+    pattern: "^[a-zA-Z0-9-]+$"
+
+definitions:
+  Pet:
+    type: object
+    required:
+      - name
+      - animal_type
+    properties:
+      id:
+        type: string
+        description: Unique identifier
+        example: "123"
+        readOnly: true
+      name:
+        type: string
+        description: Pet's name
+        example: "Susie"
+        minLength: 1
+        maxLength: 100
+      animal_type:
+        type: string
+        description: Kind of animal
+        example: "cat"
+        minLength: 1
+      tags:
+        type: object
+        description: Custom tags
+      created:
+        type: string
+        format: date-time
+        description: Creation time
+        example: "2015-07-07T15:49:51.230+02:00"
+        readOnly: true
+
+
+securityDefinitions:
+  oauth2:
+    type: oauth2
+    flow: implicit
+    authorizationUrl: https://example.com/oauth2/dialog
+    scopes:
+      uid: Unique identifier of the user accessing the service.
