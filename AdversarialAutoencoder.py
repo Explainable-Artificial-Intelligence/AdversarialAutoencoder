@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 import collections
+import DataLoading
 
 
 # def get_predictions(logits):
@@ -21,35 +22,98 @@ import collections
 
 
 class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
-    def __init__(self, input_dim: int, n_neurons_of_hidden_layer_x_autoencoder: [],
-                 n_neurons_of_hidden_layer_x_discriminator: [], z_dim: int, batch_size: int, n_epochs: int,
-                 learning_rate=0.001, beta1=0.9, loss_function_discriminator="sigmoid_cross_entropy",
-                 loss_function_generator="sigmoid_cross_entropy", results_path='./Results/AdvAutoencoder'):
+    def __init__(self,
+                 input_dim: int,
+                 z_dim: int,
+                 batch_size: int,
+                 n_epochs: int,
+                 n_neurons_of_hidden_layer_x_autoencoder: [],
+                 n_neurons_of_hidden_layer_x_discriminator: [],
+                 bias_init_value_of_hidden_layer_x_autoencoder: [],
+                 bias_init_value_of_hidden_layer_x_discriminator: [],
+                 learning_rate_autoencoder=0.001, learning_rate_discriminator=0.001, learning_rate_generator=0.001,
+                 beta1_autoencoder=0.9, beta1_discriminator=0.9, beta1_generator=0.9,
+                 beta2_autoencoder=0.9, beta2_discriminator=0.9, beta2_generator=0.9,
+                 loss_function_discriminator="sigmoid_cross_entropy",
+                 loss_function_generator="sigmoid_cross_entropy",
+                 results_path='./Results/AdvAutoencoder'):
         """
         constructor
         :param input_dim: input dimension of the data
-        :param n_neurons_of_hidden_layer_x_autoencoder: array holding the number of neurons for the layers of the
-        autoencoder; position x in array corresponds to layer x+1
-        :param n_neurons_of_hidden_layer_x_autoencoder: array holding the number of neurons for the layers of the
-        discriminator; position x in array corresponds to layer x+1
         :param z_dim: dimension of the latent reprensentation
         :param batch_size: number of training examples in one forward/backward pass
-        :param n_epochs:
-        :param learning_rate: learning rate of the Optimizers
-        :param beta1: exponential decay rate of the Optimizers
+        :param n_epochs: number of epochs for training
+        :param n_neurons_of_hidden_layer_x_autoencoder: array holding the number of neurons for the layers of the
+        autoencoder; position x in array corresponds to layer x+1
+        :param n_neurons_of_hidden_layer_x_discriminator: array holding the number of neurons for the layers of the
+        discriminator; position x in array corresponds to layer x+1
+        :param bias_init_value_of_hidden_layer_x_autoencoder: array holding the initial bias values for the layers of
+        the autoencoder; position x in array corresponds to layer x+1
+        :param bias_init_value_of_hidden_layer_x_discriminator: array holding the initial bias values for the layers of
+        the discriminator; position x in array corresponds to layer x+1
+        :param learning_rate_autoencoder: learning rate of the autoencoder optimizer
+        :param learning_rate_discriminator: learning rate of the discriminator optimizer
+        :param learning_rate_generator: learning rate of the generator optimizer
+        :param beta1_autoencoder: exponential decay rate for the 1st moment estimates for the adam optimizer for the
+        autoencoder.
+        :param beta1_discriminator: exponential decay rate for the 1st moment estimates for the adam optimizer for the
+        discriminator.
+        :param beta1_generator: exponential decay rate for the 1st moment estimates for the adam optimizer for the
+        generator.
+        :param beta2_autoencoder: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
+        autoencoder.
+        :param beta2_discriminator: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
+        discriminator.
+        :param beta2_generator: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
+        generator.
         :param results_path: path where to store the log, the saved models and the tensorboard event file
         """
 
         self.input_dim = input_dim
+        self.z_dim = z_dim
+
+        """
+        params for network topology
+        """
+
+        # number of neurons of the hidden layers
         self.n_neurons_of_hidden_layer_x_autoencoder = n_neurons_of_hidden_layer_x_autoencoder
         self.n_neurons_of_hidden_layer_x_discriminator = n_neurons_of_hidden_layer_x_discriminator
-        self.z_dim = z_dim
-        self.batch_size = batch_size
+
+        # initial bias values of the hidden layers
+        self.bias_init_value_of_hidden_layer_x_autoencoder = bias_init_value_of_hidden_layer_x_autoencoder
+        self.bias_init_value_of_hidden_layer_x_discriminator = bias_init_value_of_hidden_layer_x_discriminator
+
+        """
+        params for learning
+        """
+
+        # number of epochs for training
         self.n_epochs = n_epochs
-        self.learning_rate = learning_rate
-        self.beta1 = beta1
+
+        # number of training examples in one forward/backward pass
+        self.batch_size = batch_size
+
+        # learning rate for the different parts of the network
+        self.learning_rate_autoencoder = learning_rate_autoencoder
+        self.learning_rate_discriminator = learning_rate_discriminator
+        self.learning_rate_generator = learning_rate_generator
+
+        # exponential decay rate for the 1st moment estimates for the adam optimizer.
+        self.beta1_autoencoder = beta1_autoencoder
+        self.beta1_discriminator = beta1_discriminator
+        self.beta1_generator = beta1_generator
+
+        # exponential decay rate for the 2nd moment estimates for the adam optimizer.
+        self.beta2_autoencoder = beta2_autoencoder
+        self.beta2_discriminator = beta2_discriminator
+        self.beta2_generator = beta2_generator
+
+        # loss function
         self.loss_function_discriminator = loss_function_discriminator
         self.loss_function_generator = loss_function_generator
+
+        # path for the results
         self.results_path = results_path
 
         # holds the input data
@@ -68,16 +132,21 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # init autoencoder
         with tf.variable_scope(tf.get_variable_scope()):
             # encoder part of the autoencoder and also the generator
-            encoder_output = self.encoder(self.X)
+            encoder_output = self.encoder(self.X, bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
             # decoder part of the autoencoder
-            decoder_output = self.decoder(encoder_output)
+            decoder_output = self.decoder(encoder_output,
+                                          bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
 
         # init discriminator
         with tf.variable_scope(tf.get_variable_scope()):
             # discriminator for the positive samples p(z) (from a real data distribution)
-            discriminator_pos_samples = self.discriminator(self.real_distribution)
+            discriminator_pos_samples = \
+                self.discriminator(self.real_distribution,
+                                   bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
             # discriminator for the negative samples q(z) (generated by the generator)
-            discriminator_neg_samples = self.discriminator(encoder_output, reuse=True)
+            discriminator_neg_samples = \
+                self.discriminator(encoder_output, reuse=True,
+                                   bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
 
         # TODO: only for testing
         self.discriminator_neg_samples_ = discriminator_neg_samples
@@ -86,7 +155,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # output of the decoder
         with tf.variable_scope(tf.get_variable_scope()):
             # decoder output: only used for generating the images for tensorboard
-            self.decoder_output = self.decoder(self.decoder_input, reuse=True)
+            self.decoder_output = self.decoder(self.decoder_input, reuse=True,
+                                               bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
 
         """
         Init the loss functions
@@ -97,10 +167,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(
-            self.get_loss_function(loss_function=self.loss_function_discriminator, labels=tf.ones_like(discriminator_pos_samples),
+            self.get_loss_function(loss_function=self.loss_function_discriminator,
+                                   labels=tf.ones_like(discriminator_pos_samples),
                                    logits=discriminator_pos_samples))
         discriminator_loss_neg_samples = tf.reduce_mean(
-            self.get_loss_function(loss_function=self.loss_function_discriminator, labels=tf.zeros_like(discriminator_neg_samples),
+            self.get_loss_function(loss_function=self.loss_function_discriminator,
+                                   labels=tf.zeros_like(discriminator_neg_samples),
                                    logits=discriminator_neg_samples))
         self.discriminator_loss = discriminator_loss_neg_samples + discriminator_loss_pos_samples
 
@@ -118,14 +190,20 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         encoder_vars = [var for var in all_variables if 'encoder_' in var.name]
 
         # Optimizers
-        self.autoencoder_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate,
-                                                            beta1=self.beta1).minimize(self.autoencoder_loss)
-        self.discriminator_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate,
-                                                              beta1=self.beta1).minimize(self.discriminator_loss,
-                                                                                         var_list=discriminator_vars)
-        self.generator_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate,
-                                                          beta1=self.beta1).minimize(self.generator_loss,
-                                                                                     var_list=encoder_vars)
+        self.autoencoder_optimizer = \
+            tf.train.AdamOptimizer(learning_rate=self.learning_rate_autoencoder,
+                                   beta1=self.beta1_autoencoder,
+                                   beta2=self.beta2_autoencoder).minimize(self.autoencoder_loss)
+        self.discriminator_optimizer = \
+            tf.train.AdamOptimizer(learning_rate=self.learning_rate_discriminator,
+                                   beta1=self.beta1_discriminator,
+                                   beta2=self.beta2_discriminator).minimize(self.discriminator_loss,
+                                                                            var_list=discriminator_vars)
+        self.generator_optimizer = \
+            tf.train.AdamOptimizer(learning_rate=self.learning_rate_generator,
+                                   beta1=self.beta1_generator,
+                                   beta2=self.beta2_generator).minimize(self.generator_loss,
+                                                                        var_list=encoder_vars)
 
         """
         Create the tensorboard summary
@@ -164,7 +242,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             #     labels=labels, predictions=logits),
             "mean_squared_error": tf.losses.mean_squared_error(
                 labels=labels, predictions=logits),
-            "sigmoid_cross_entropy":  tf.nn.sigmoid_cross_entropy_with_logits(
+            "sigmoid_cross_entropy": tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=labels, logits=logits),
             "softmax_cross_entropy": tf.losses.softmax_cross_entropy(
                 onehot_labels=labels, logits=logits),
@@ -189,17 +267,19 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             out = tf.add(tf.matmul(X, weights), bias, name='matmul')
             return out
 
-    def encoder(self, X, bias_init_value=0.0, reuse=False):
+    def encoder(self, X, bias_init_values, reuse=False):
         """
         Encoder of the autoencoder.
         :param X: input to the autoencoder
-        :param bias_init_value: the initial value for the bias
+        :param bias_init_values: the initial value for the bias
         :param reuse: True -> Reuse the encoder variables, False -> Create or search of variables before creating
         :return: tensor which is the hidden latent variable of the autoencoder.
         """
 
         # number of hidden layers
         n_hidden_layers = len(self.n_neurons_of_hidden_layer_x_autoencoder)
+
+        assert n_hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -211,42 +291,48 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # todo: reasonable default values
             if n_hidden_layers == 0:
                 latent_variable = self.create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
-                                                          bias_init_value=bias_init_value)
+                                                          bias_init_value=bias_init_values[0])
                 return latent_variable
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
                     self.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                            'encoder_dense_layer_1', bias_init_value=bias_init_value))
-                latent_variable = self.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                                          self.z_dim, 'encoder_output', bias_init_value=bias_init_value)
+                                            'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
+                latent_variable = self.create_dense_layer(dense_layer_1,
+                                                          self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                          self.z_dim, 'encoder_output',
+                                                          bias_init_value=bias_init_values[1])
                 return latent_variable
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
                     self.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                            'encoder_dense_layer_1', bias_init_value=bias_init_value))
+                                            'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n_hidden_layers):
                     dense_layer_i = tf.nn.relu(
                         self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                 self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                 'encoder_dense_layer_' + str(i + 1),
-                                                bias_init_value=bias_init_value))
-                latent_variable = self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                                          self.z_dim, 'encoder_output', bias_init_value=bias_init_value)
+                                                bias_init_value=bias_init_values[i]))
+                latent_variable = self.create_dense_layer(dense_layer_i,
+                                                          self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                                                          self.z_dim, 'encoder_output',
+                                                          bias_init_value=bias_init_values[-1])
                 return latent_variable
 
-    def decoder(self, X, bias_init_value=0.0, reuse=False):
+    def decoder(self, X, bias_init_values, reuse=False):
         """
         Decoder of the autoencoder.
         :param X: input to the decoder
-        :param bias_init_value: the initial value for the bias
+        :param bias_init_values: the initial values for the bias
         :param reuse: True -> Reuse the decoder variables, False -> Create or search of variables before creating
         :return: tensor which should ideally be the input given to the encoder.
         """
 
         # number of hidden layers
-        n__hidden_layers = len(self.n_neurons_of_hidden_layer_x_autoencoder)
+        n_hidden_layers = len(self.n_neurons_of_hidden_layer_x_autoencoder)
+
+        assert n_hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -255,41 +341,44 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # create the variables in the variable scope 'Decoder'
         with tf.name_scope('Decoder'):
             # there is no hidden layer
-            if n__hidden_layers == 0:
+            if n_hidden_layers == 0:
                 decoder_output = tf.nn.sigmoid(
                     self.create_dense_layer(X, self.z_dim, self.input_dim, 'decoder_output',
-                                            bias_init_value=bias_init_value))
+                                            bias_init_value=bias_init_values[0]))
                 return decoder_output
             # there is only one hidden layer
-            elif n__hidden_layers == 1:
+            elif n_hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
-                    self.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0], 'decoder_dense_layer_1',
-                                            bias_init_value=bias_init_value))
+                    self.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                            'decoder_dense_layer_1',
+                                            bias_init_value=bias_init_values[0]))
                 decoder_output = tf.nn.sigmoid(
-                    self.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0], self.input_dim,
-                                            'decoder_output', bias_init_value=bias_init_value))
+                    self.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                            self.input_dim,
+                                            'decoder_output', bias_init_value=bias_init_values[1]))
                 return decoder_output
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
                     self.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                            'decoder_dense_layer_1', bias_init_value=bias_init_value))
-                for i in range(n__hidden_layers - 1, 0, -1):
+                                            'decoder_dense_layer_1', bias_init_value=bias_init_values[0]))
+                for i in range(n_hidden_layers - 1, 0, -1):
                     dense_layer_i = tf.nn.relu(
                         self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                 self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
-                                                'decoder_dense_layer_' + str(n__hidden_layers - i + 1),
-                                                bias_init_value=bias_init_value))
+                                                'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
+                                                bias_init_value=bias_init_values[i]))
                 decoder_output = tf.nn.sigmoid(
-                    self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0], self.input_dim,
-                                            'decoder_output', bias_init_value=bias_init_value))
+                    self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                            self.input_dim,
+                                            'decoder_output', bias_init_value=bias_init_values[-1]))
                 return decoder_output
 
-    def discriminator(self, X, bias_init_value=0.0, reuse=False):
+    def discriminator(self, X, bias_init_values, reuse=False):
         """
         Discriminator that is used to match the posterior distribution with a given prior distribution.
         :param X: tensor of shape [batch_size, z_dim]
-        :param bias_init_value: the initial value for the bias
+        :param bias_init_values: the initial value for the bias
         :param reuse: True -> Reuse the discriminator variables,
                       False -> Create or search of variables before creating
         :return: tensor of shape [batch_size, 1]
@@ -297,6 +386,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # number of hidden layers
         n__hidden_layers = len(self.n_neurons_of_hidden_layer_x_discriminator)
+
+        assert n__hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -307,28 +398,34 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is no hidden layer
             if n__hidden_layers == 0:
                 discriminator_output = self.create_dense_layer(X, self.z_dim, 1, 'discriminator_output',
-                                                               bias_init_value=bias_init_value)
+                                                               bias_init_value=bias_init_values[0])
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
                     self.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
-                                            'discriminator_dense_layer_1', bias_init_value=bias_init_value))
-                discriminator_output = self.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
-                                                               'discriminator_output', bias_init_value=bias_init_value)
+                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
+                discriminator_output = self.create_dense_layer(dense_layer_1,
+                                                               self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
+                                                               'discriminator_output',
+                                                               bias_init_value=bias_init_values[1])
                 return discriminator_output
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
                     self.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
-                                            'discriminator_dense_layer_1', bias_init_value=bias_init_value))
+                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n__hidden_layers):
                     dense_layer_i = tf.nn.relu(
                         self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
-                                                self.n_neurons_of_hidden_layer_x_discriminator[i], 'discriminator_dense_layer_' +
-                                                str(i + 1), bias_init_value=bias_init_value))
-                discriminator_output = self.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
-                                                               'discriminator_output', bias_init_value=bias_init_value)
+                                                self.n_neurons_of_hidden_layer_x_discriminator[i],
+                                                'discriminator_dense_layer_' +
+                                                str(i + 1),
+                                                bias_init_value=bias_init_values[i]))
+                discriminator_output = self.create_dense_layer(dense_layer_i,
+                                                               self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
+                                                               'discriminator_output',
+                                                               bias_init_value=bias_init_values[-1])
                 return discriminator_output
 
     def create_tensorboard_summary(self, decoder_output, encoder_output, autoencoder_loss, discriminator_loss,
@@ -367,7 +464,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             replace(" ", ":").replace(":", "_")
 
         folder_name = "/{0}_{1}_{2}_{3}_{4}_{5}_{6}_Adversarial_Autoencoder". \
-            format(date, self.loss_function_discriminator, self.z_dim, self.learning_rate, self.batch_size, self.n_epochs, self.beta1)
+            format(date, self.loss_function_discriminator, self.z_dim, self.learning_rate_autoencoder, self.batch_size,
+                   self.n_epochs, self.beta1_autoencoder)
         tensorboard_path = self.results_path + folder_name + '/Tensorboard'
         saved_model_path = self.results_path + folder_name + '/Saved_models/'
         log_path = self.results_path + folder_name + '/log'
@@ -396,7 +494,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
 
         for i, g in enumerate(gs):
-            # create a data point from the x_piints and y_points array as input for the decoder
+            # create a data point from the x_points and y_points array as input for the decoder
             z = np.concatenate(([x_points[int(i / ny)]], [y_points[int(i % nx)]]))
             z = np.reshape(z, (1, 2))
 
@@ -420,7 +518,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Get the MNIST data
         # todo: no more hard coded input
-        mnist = input_data.read_data_sets('./Data', one_hot=True)
+        mnist = input_data.read_data_sets('./data', one_hot=True)
 
         # options = dict(dtype=dtype, reshape=reshape, seed=seed)
         #
@@ -463,6 +561,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # get the batch from the training data
                         batch_x, batch_labels = mnist.train.next_batch(self.batch_size)
+                        # print(batch_x)
 
                         """
                         Reconstruction phase: the autoencoder updates the encoder and the decoder to minimize the
@@ -487,15 +586,15 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # every 50 steps: write a summary
                         if b % 50 == 0:
-
                             a_loss, d_loss, g_loss, summary, discriminator_neg_samples_, discriminator_pos_samples_ = sess.run(
                                 [self.autoencoder_loss, self.discriminator_loss, self.generator_loss,
-                                 self.tensorboard_summary, self.discriminator_neg_samples_, self.discriminator_pos_samples_],
+                                 self.tensorboard_summary, self.discriminator_neg_samples_,
+                                 self.discriminator_pos_samples_],
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
                                            self.real_distribution: z_real_dist})
                             writer.add_summary(summary, global_step=step)
                             print("Epoch: {}, iteration: {}".format(i, b))
-                            print("summed losses:", a_loss+d_loss+g_loss)
+                            print("summed losses:", a_loss + d_loss + g_loss)
                             # print(discriminator_neg_samples_)
                             # print(discriminator_pos_samples_)
                             print("Autoencoder Loss: {}".format(a_loss))
@@ -508,7 +607,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 log.write("Generator Loss: {}\n".format(g_loss))
                         step += 1
 
-                    # saver.save(sess, save_path=saved_model_path, global_step=step)
+                        # saver.save(sess, save_path=saved_model_path, global_step=step)
 
             # display the generated images of the latest trained autoencoder
             else:

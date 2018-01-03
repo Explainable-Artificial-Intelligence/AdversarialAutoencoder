@@ -14,7 +14,6 @@ import timeit
 
 """
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/datasets/mnist.py
-
 """
 
 DEFAULT_SOURCE_URL = 'https://storage.googleapis.com/cvdf-datasets/mnist/'
@@ -166,18 +165,11 @@ def read_csv_data_set(train_dir, one_hot=False, num_classes=10, dtype=dtypes.flo
     TRAIN_IMAGES = 'mnist_train.csv'
     TEST_IMAGES = 'mnist_test.csv'
 
-    start = timeit.default_timer()
-
     train_images, train_labels = read_image_and_labels(train_dir + '/' + TRAIN_IMAGES)
     test_images, test_labels = read_image_and_labels(train_dir + '/' + TEST_IMAGES)
 
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
-
-    stop = timeit.default_timer()
-
-    print("creating dataset")
-    print(stop - start)
 
     return base.Datasets(train=train, validation=validation, test=test)
 
@@ -254,50 +246,55 @@ def testing():
     """
 
     start = timeit.default_timer()
+    print("read ubyte")
 
     mnist = read_data_sets('./data', one_hot=True)
     ubyte_first_img, _ = mnist.train.next_batch(1)
-    # print(mnist.train.images)
-    # print(type(mnist.train.images))
-    # print(mnist.train.images[0])
-
-    # first_image = ubyte_first_img.reshape([28, 28])
-    # plt.gray()
-    # plt.imshow(first_image)
-    # plt.show()
 
     stop = timeit.default_timer()
-
     print(stop - start)
+
+    first_image = ubyte_first_img.reshape([28, 28])
+    plt.gray()
+    plt.imshow(first_image)
+    plt.show()
 
     """
     read csv file: The format is: label, pix-11, pix-12, pix-13, ...
     """
 
-    # start = timeit.default_timer()
+    start = timeit.default_timer()
+    print("read csv")
 
     # test reading csv files
     train_images = read_csv_data_set('./data', one_hot=True)
     csv_first_img, _ = train_images.train.next_batch(1)
+
+    stop = timeit.default_timer()
+    print(stop - start)
 
     first_image = csv_first_img.reshape([28, 28])
     plt.gray()
     plt.imshow(first_image)
     plt.show()
 
-    # stop = timeit.default_timer()
-
-    print(stop - start)
     """
     read png files:
     """
-    # mnist = read_data_in_images('./data', one_hot=True)
-    # png_first_img, _ = mnist.train.next_batch(1)
-    #
-    # first_image = ubyte_first_img.reshape([28, 28])
-    # plt.gray()
-    # plt.imshow(first_image)
-    # plt.show()
+
+    start = timeit.default_timer()
+    print("read png")
+
+    mnist = read_data_in_images('./data', one_hot=True)
+    png_first_img, _ = mnist.train.next_batch(1)
+
+    stop = timeit.default_timer()
+    print(stop - start)
+
+    first_image = ubyte_first_img.reshape([28, 28])
+    plt.gray()
+    plt.imshow(first_image)
+    plt.show()
 
 
 if __name__ == '__main__':
