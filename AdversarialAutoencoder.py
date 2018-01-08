@@ -22,23 +22,148 @@ import DataLoading
 
 
 class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
-    def __init__(self,
-                 input_dim: int,
-                 z_dim: int,
-                 batch_size: int,
-                 n_epochs: int,
+    def __init__(self, input_dim: int, z_dim: int, batch_size: int, n_epochs: int,
+
                  n_neurons_of_hidden_layer_x_autoencoder: [],
                  n_neurons_of_hidden_layer_x_discriminator: [],
                  bias_init_value_of_hidden_layer_x_autoencoder: [],
                  bias_init_value_of_hidden_layer_x_discriminator: [],
+
+                 optimizer_autoencoder,
+                 optimizer_discriminator,
+                 optimizer_generator,
+                 AdadeltaOptimizer_rho_autoencoder,
+                 AdadeltaOptimizer_epsilon_autoencoder,
+                 AdadeltaOptimizer_rho_discriminator,
+                 AdadeltaOptimizer_epsilon_discriminator,
+                 AdadeltaOptimizer_rho_generator,
+                 AdadeltaOptimizer_epsilon_generator,
+                 AdagradOptimizer_initial_accumulator_value_autoencoder,
+                 AdagradOptimizer_initial_accumulator_value_discriminator,
+                 AdagradOptimizer_initial_accumulator_value_generator,
+                 MomentumOptimizer_momentum_autoencoder,
+                 MomentumOptimizer_use_nesterov_autoencoder,
+                 MomentumOptimizer_momentum_discriminator,
+                 MomentumOptimizer_use_nesterov_discriminator,
+                 MomentumOptimizer_momentum_generator,
+                 MomentumOptimizer_use_nesterov_generator,
+                 AdamOptimizer_epsilon_autoencoder,
+                 AdamOptimizer_epsilon_discriminator,
+                 AdamOptimizer_epsilon_generator,
+                 FtrlOptimizer_learning_rate_power_autoencoder,
+                 FtrlOptimizer_initial_accumulator_value_autoencoder,
+                 FtrlOptimizer_l1_regularization_strength_autoencoder,
+                 FtrlOptimizer_l2_regularization_strength_autoencoder,
+                 FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder,
+                 FtrlOptimizer_learning_rate_power_discriminator,
+                 FtrlOptimizer_initial_accumulator_value_discriminator,
+                 FtrlOptimizer_l1_regularization_strength_discriminator,
+                 FtrlOptimizer_l2_regularization_strength_discriminator,
+                 FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator,
+                 FtrlOptimizer_learning_rate_power_generator,
+                 FtrlOptimizer_initial_accumulator_value_generator,
+                 FtrlOptimizer_l1_regularization_strength_generator,
+                 FtrlOptimizer_l2_regularization_strength_generator,
+                 FtrlOptimizer_l2_shrinkage_regularization_strength_generator,
+                 ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder,
+                 ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder,
+                 ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator,
+                 ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator,
+                 ProximalGradientDescentOptimizer_l1_regularization_strength_generator,
+                 ProximalGradientDescentOptimizer_l2_regularization_strength_generator,
+                 ProximalAdagradOptimizer_initial_accumulator_value_autoencoder,
+                 ProximalAdagradOptimizer_l1_regularization_strength_autoencoder,
+                 ProximalAdagradOptimizer_l2_regularization_strength_autoencoder,
+                 ProximalAdagradOptimizer_initial_accumulator_value_discriminator,
+                 ProximalAdagradOptimizer_l1_regularization_strength_discriminator,
+                 ProximalAdagradOptimizer_l2_regularization_strength_discriminator,
+                 ProximalAdagradOptimizer_initial_accumulator_value_generator,
+                 ProximalAdagradOptimizer_l1_regularization_strength_generator,
+                 ProximalAdagradOptimizer_l2_regularization_strength_generator,
+                 RMSPropOptimizer_decay_autoencoder,
+                 RMSPropOptimizer_momentum_autoencoder,
+                 RMSPropOptimizer_epsilon_autoencoder,
+                 RMSPropOptimizer_centered_autoencoder,
+                 RMSPropOptimizer_decay_discriminator,
+                 RMSPropOptimizer_momentum_discriminator,
+                 RMSPropOptimizer_epsilon_discriminator,
+                 RMSPropOptimizer_centered_discriminator,
+                 RMSPropOptimizer_decay_generator,
+                 RMSPropOptimizer_momentum_generator,
+                 RMSPropOptimizer_epsilon_generator,
+                 RMSPropOptimizer_centered_generator,
+
                  learning_rate_autoencoder=0.001, learning_rate_discriminator=0.001, learning_rate_generator=0.001,
-                 beta1_autoencoder=0.9, beta1_discriminator=0.9, beta1_generator=0.9,
-                 beta2_autoencoder=0.9, beta2_discriminator=0.9, beta2_generator=0.9,
-                 loss_function_discriminator="sigmoid_cross_entropy",
-                 loss_function_generator="sigmoid_cross_entropy",
+                 AdamOptimizer_beta1_autoencoder=0.9, AdamOptimizer_beta1_discriminator=0.9,
+                 AdamOptimizer_beta1_generator=0.9, AdamOptimizer_beta2_autoencoder=0.9,
+                 AdamOptimizer_beta2_discriminator=0.9, AdamOptimizer_beta2_generator=0.9,
+                 loss_function_discriminator="sigmoid_cross_entropy", loss_function_generator="sigmoid_cross_entropy",
                  results_path='./Results/AdvAutoencoder'):
         """
         constructor
+        :param optimizer_autoencoder:
+        :param optimizer_discriminator:
+        :param optimizer_generator:
+        :param AdadeltaOptimizer_rho_autoencoder:
+        :param AdadeltaOptimizer_epsilon_autoencoder:
+        :param AdadeltaOptimizer_rho_discriminator:
+        :param AdadeltaOptimizer_epsilon_discriminator:
+        :param AdadeltaOptimizer_rho_generator:
+        :param AdadeltaOptimizer_epsilon_generator:
+        :param AdagradOptimizer_initial_accumulator_value_autoencoder:
+        :param AdagradOptimizer_initial_accumulator_value_discriminator:
+        :param AdagradOptimizer_initial_accumulator_value_generator:
+        :param MomentumOptimizer_momentum_autoencoder:
+        :param MomentumOptimizer_use_nesterov_autoencoder:
+        :param MomentumOptimizer_momentum_discriminator:
+        :param MomentumOptimizer_use_nesterov_discriminator:
+        :param MomentumOptimizer_momentum_generator:
+        :param MomentumOptimizer_use_nesterov_generator:
+        :param AdamOptimizer_epsilon_autoencoder:
+        :param AdamOptimizer_epsilon_discriminator:
+        :param AdamOptimizer_epsilon_generator:
+        :param FtrlOptimizer_learning_rate_power_autoencoder:
+        :param FtrlOptimizer_initial_accumulator_value_autoencoder:
+        :param FtrlOptimizer_l1_regularization_strength_autoencoder:
+        :param FtrlOptimizer_l2_regularization_strength_autoencoder:
+        :param FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder:
+        :param FtrlOptimizer_learning_rate_power_discriminator:
+        :param FtrlOptimizer_initial_accumulator_value_discriminator:
+        :param FtrlOptimizer_l1_regularization_strength_discriminator:
+        :param FtrlOptimizer_l2_regularization_strength_discriminator:
+        :param FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator:
+        :param FtrlOptimizer_learning_rate_power_generator:
+        :param FtrlOptimizer_initial_accumulator_value_generator:
+        :param FtrlOptimizer_l1_regularization_strength_generator:
+        :param FtrlOptimizer_l2_regularization_strength_generator:
+        :param FtrlOptimizer_l2_shrinkage_regularization_strength_generator:
+        :param ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder:
+        :param ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder:
+        :param ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator:
+        :param ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator:
+        :param ProximalGradientDescentOptimizer_l1_regularization_strength_generator:
+        :param ProximalGradientDescentOptimizer_l2_regularization_strength_generator:
+        :param ProximalAdagradOptimizer_initial_accumulator_value_autoencoder:
+        :param ProximalAdagradOptimizer_l1_regularization_strength_autoencoder:
+        :param ProximalAdagradOptimizer_l2_regularization_strength_autoencoder:
+        :param ProximalAdagradOptimizer_initial_accumulator_value_discriminator:
+        :param ProximalAdagradOptimizer_l1_regularization_strength_discriminator:
+        :param ProximalAdagradOptimizer_l2_regularization_strength_discriminator:
+        :param ProximalAdagradOptimizer_initial_accumulator_value_generator:
+        :param ProximalAdagradOptimizer_l1_regularization_strength_generator:
+        :param ProximalAdagradOptimizer_l2_regularization_strength_generator:
+        :param RMSPropOptimizer_decay_autoencoder:
+        :param RMSPropOptimizer_momentum_autoencoder:
+        :param RMSPropOptimizer_epsilon_autoencoder:
+        :param RMSPropOptimizer_centered_autoencoder:
+        :param RMSPropOptimizer_decay_discriminator:
+        :param RMSPropOptimizer_momentum_discriminator:
+        :param RMSPropOptimizer_epsilon_discriminator:
+        :param RMSPropOptimizer_centered_discriminator:
+        :param RMSPropOptimizer_decay_generator:
+        :param RMSPropOptimizer_momentum_generator:
+        :param RMSPropOptimizer_epsilon_generator:
+        :param RMSPropOptimizer_centered_generator:
         :param input_dim: input dimension of the data
         :param z_dim: dimension of the latent reprensentation
         :param batch_size: number of training examples in one forward/backward pass
@@ -54,18 +179,18 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param learning_rate_autoencoder: learning rate of the autoencoder optimizer
         :param learning_rate_discriminator: learning rate of the discriminator optimizer
         :param learning_rate_generator: learning rate of the generator optimizer
-        :param beta1_autoencoder: exponential decay rate for the 1st moment estimates for the adam optimizer for the
-        autoencoder.
-        :param beta1_discriminator: exponential decay rate for the 1st moment estimates for the adam optimizer for the
-        discriminator.
-        :param beta1_generator: exponential decay rate for the 1st moment estimates for the adam optimizer for the
-        generator.
-        :param beta2_autoencoder: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
-        autoencoder.
-        :param beta2_discriminator: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
-        discriminator.
-        :param beta2_generator: exponential decay rate for the 2nd moment estimates for the adam optimizer for the
-        generator.
+        :param AdamOptimizer_beta1_autoencoder: exponential decay rate for the 1st moment estimates for the adam
+        optimizer for the autoencoder.
+        :param AdamOptimizer_beta1_discriminator: exponential decay rate for the 1st moment estimates for the adam
+        optimizer for the discriminator.
+        :param AdamOptimizer_beta1_generator: exponential decay rate for the 1st moment estimates for the adam
+        optimizer for the generator.
+        :param AdamOptimizer_beta2_autoencoder: exponential decay rate for the 2nd moment estimates for the adam
+        optimizer for the autoencoder.
+        :param AdamOptimizer_beta2_discriminator: exponential decay rate for the 2nd moment estimates for the adam
+        optimizer for the discriminator.
+        :param AdamOptimizer_beta2_generator: exponential decay rate for the 2nd moment estimates for the adam
+        optimizer for the generator.
         :param results_path: path where to store the log, the saved models and the tensorboard event file
         """
 
@@ -99,15 +224,145 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.learning_rate_discriminator = learning_rate_discriminator
         self.learning_rate_generator = learning_rate_generator
 
+        """
+        params for optimizers
+        """
+        self.AdadeltaOptimizer_rho_autoencoder = AdadeltaOptimizer_rho_autoencoder
+        self.AdadeltaOptimizer_epsilon_autoencoder = AdadeltaOptimizer_epsilon_autoencoder
+
+        self.AdadeltaOptimizer_rho_discriminator = AdadeltaOptimizer_rho_discriminator
+        self.AdadeltaOptimizer_epsilon_discriminator = AdadeltaOptimizer_epsilon_discriminator
+
+        self.AdadeltaOptimizer_rho_generator = AdadeltaOptimizer_rho_generator
+        self.AdadeltaOptimizer_epsilon_generator = AdadeltaOptimizer_epsilon_generator
+
+        self.AdagradOptimizer_initial_accumulator_value_autoencoder = \
+            AdagradOptimizer_initial_accumulator_value_autoencoder
+
+        self.AdagradOptimizer_initial_accumulator_value_discriminator = \
+            AdagradOptimizer_initial_accumulator_value_discriminator
+
+        self.AdagradOptimizer_initial_accumulator_value_generator = \
+            AdagradOptimizer_initial_accumulator_value_generator
+
+        self.MomentumOptimizer_momentum_autoencoder = MomentumOptimizer_momentum_autoencoder
+        self.MomentumOptimizer_use_nesterov_autoencoder = MomentumOptimizer_use_nesterov_autoencoder
+
+        self.MomentumOptimizer_momentum_discriminator = MomentumOptimizer_momentum_discriminator
+        self.MomentumOptimizer_use_nesterov_discriminator = MomentumOptimizer_use_nesterov_discriminator
+
+        self.MomentumOptimizer_momentum_generator = MomentumOptimizer_momentum_generator
+        self.MomentumOptimizer_use_nesterov_generator = MomentumOptimizer_use_nesterov_generator
+
+        self.AdamOptimizer_beta1_autoencoder = AdamOptimizer_beta1_autoencoder
+        self.AdamOptimizer_beta2_autoencoder = AdamOptimizer_beta2_autoencoder
+        self.AdamOptimizer_epsilon_autoencoder = AdamOptimizer_epsilon_autoencoder
+
+        self.AdamOptimizer_beta1_discriminator = AdamOptimizer_beta1_discriminator
+        self.AdamOptimizer_beta2_discriminator = AdamOptimizer_beta2_discriminator
+        self.AdamOptimizer_epsilon_discriminator = AdamOptimizer_epsilon_discriminator
+
+        self.AdamOptimizer_beta1_generator = AdamOptimizer_beta1_generator
+        self.AdamOptimizer_beta2_generator = AdamOptimizer_beta2_generator
+        self.AdamOptimizer_epsilon_generator = AdamOptimizer_epsilon_generator
+
+        self.FtrlOptimizer_learning_rate_power_autoencoder = \
+            FtrlOptimizer_learning_rate_power_autoencoder
+        self.FtrlOptimizer_initial_accumulator_value_autoencoder = \
+            FtrlOptimizer_initial_accumulator_value_autoencoder
+        self.FtrlOptimizer_l1_regularization_strength_autoencoder = \
+            FtrlOptimizer_l1_regularization_strength_autoencoder
+        self.FtrlOptimizer_l2_regularization_strength_autoencoder = \
+            FtrlOptimizer_l2_regularization_strength_autoencoder
+        self.FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = \
+            FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder
+
+        self.FtrlOptimizer_learning_rate_power_discriminator = \
+            FtrlOptimizer_learning_rate_power_discriminator
+        self.FtrlOptimizer_initial_accumulator_value_discriminator = \
+            FtrlOptimizer_initial_accumulator_value_discriminator
+        self.FtrlOptimizer_l1_regularization_strength_discriminator = \
+            FtrlOptimizer_l1_regularization_strength_discriminator
+        self.FtrlOptimizer_l2_regularization_strength_discriminator = \
+            FtrlOptimizer_l2_regularization_strength_discriminator
+        self.FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = \
+            FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator
+
+        self.FtrlOptimizer_learning_rate_power_generator = \
+            FtrlOptimizer_learning_rate_power_generator
+        self.FtrlOptimizer_initial_accumulator_value_generator = \
+            FtrlOptimizer_initial_accumulator_value_generator
+        self.FtrlOptimizer_l1_regularization_strength_generator = \
+            FtrlOptimizer_l1_regularization_strength_generator
+        self.FtrlOptimizer_l2_regularization_strength_generator = \
+            FtrlOptimizer_l2_regularization_strength_generator
+        self.FtrlOptimizer_l2_shrinkage_regularization_strength_generator = \
+            FtrlOptimizer_l2_shrinkage_regularization_strength_generator
+
+        self.ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = \
+            ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder
+        self.ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = \
+            ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder
+
+        self.ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = \
+            ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator
+        self.ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = \
+            ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator
+
+        self.ProximalGradientDescentOptimizer_l1_regularization_strength_generator = \
+            ProximalGradientDescentOptimizer_l1_regularization_strength_generator
+        self.ProximalGradientDescentOptimizer_l2_regularization_strength_generator = \
+            ProximalGradientDescentOptimizer_l2_regularization_strength_generator
+
+        self.ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = \
+            ProximalAdagradOptimizer_initial_accumulator_value_autoencoder
+        self.ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = \
+            ProximalAdagradOptimizer_l1_regularization_strength_autoencoder
+        self.ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = \
+            ProximalAdagradOptimizer_l2_regularization_strength_autoencoder
+
+        self.ProximalAdagradOptimizer_initial_accumulator_value_discriminator = \
+            ProximalAdagradOptimizer_initial_accumulator_value_discriminator
+        self.ProximalAdagradOptimizer_l1_regularization_strength_discriminator = \
+            ProximalAdagradOptimizer_l1_regularization_strength_discriminator
+        self.ProximalAdagradOptimizer_l2_regularization_strength_discriminator = \
+            ProximalAdagradOptimizer_l2_regularization_strength_discriminator
+
+        self.ProximalAdagradOptimizer_initial_accumulator_value_generator = \
+            ProximalAdagradOptimizer_initial_accumulator_value_generator
+        self.ProximalAdagradOptimizer_l1_regularization_strength_generator = \
+            ProximalAdagradOptimizer_l1_regularization_strength_generator
+        self.ProximalAdagradOptimizer_l2_regularization_strength_generator = \
+            ProximalAdagradOptimizer_l2_regularization_strength_generator
+
+        self.RMSPropOptimizer_decay_autoencoder = RMSPropOptimizer_decay_autoencoder
+        self.RMSPropOptimizer_momentum_autoencoder = RMSPropOptimizer_momentum_autoencoder
+        self.RMSPropOptimizer_epsilon_autoencoder = RMSPropOptimizer_epsilon_autoencoder
+        self.RMSPropOptimizer_centered_autoencoder = RMSPropOptimizer_centered_autoencoder
+
+        self.RMSPropOptimizer_decay_discriminator = RMSPropOptimizer_decay_discriminator
+        self.RMSPropOptimizer_momentum_discriminator = RMSPropOptimizer_momentum_discriminator
+        self.RMSPropOptimizer_epsilon_discriminator = RMSPropOptimizer_epsilon_discriminator
+        self.RMSPropOptimizer_centered_discriminator = RMSPropOptimizer_centered_discriminator
+
+        self.RMSPropOptimizer_decay_generator = RMSPropOptimizer_decay_generator
+        self.RMSPropOptimizer_momentum_generator = RMSPropOptimizer_momentum_generator
+        self.RMSPropOptimizer_epsilon_generator = RMSPropOptimizer_epsilon_generator
+        self.RMSPropOptimizer_centered_generator = RMSPropOptimizer_centered_generator
+
         # exponential decay rate for the 1st moment estimates for the adam optimizer.
-        self.beta1_autoencoder = beta1_autoencoder
-        self.beta1_discriminator = beta1_discriminator
-        self.beta1_generator = beta1_generator
+        self.AdamOptimizer_beta1_autoencoder = AdamOptimizer_beta1_autoencoder
+        self.AdamOptimizer_beta1_discriminator = AdamOptimizer_beta1_discriminator
+        self.AdamOptimizer_beta1_generator = AdamOptimizer_beta1_generator
 
         # exponential decay rate for the 2nd moment estimates for the adam optimizer.
-        self.beta2_autoencoder = beta2_autoencoder
-        self.beta2_discriminator = beta2_discriminator
-        self.beta2_generator = beta2_generator
+        self.AdamOptimizer_beta2_autoencoder = AdamOptimizer_beta2_autoencoder
+        self.AdamOptimizer_beta2_discriminator = AdamOptimizer_beta2_discriminator
+        self.AdamOptimizer_beta2_generator = AdamOptimizer_beta2_generator
+
+        """
+        loss function
+        """
 
         # loss function
         self.loss_function_discriminator = loss_function_discriminator
@@ -191,19 +446,30 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Optimizers
         self.autoencoder_optimizer = \
-            tf.train.AdamOptimizer(learning_rate=self.learning_rate_autoencoder,
-                                   beta1=self.beta1_autoencoder,
-                                   beta2=self.beta2_autoencoder).minimize(self.autoencoder_loss)
+            self.get_optimizer_autoencoder(optimizer_autoencoder).minimize(self.autoencoder_loss)
         self.discriminator_optimizer = \
-            tf.train.AdamOptimizer(learning_rate=self.learning_rate_discriminator,
-                                   beta1=self.beta1_discriminator,
-                                   beta2=self.beta2_discriminator).minimize(self.discriminator_loss,
-                                                                            var_list=discriminator_vars)
+            self.get_optimizer_autoencoder(optimizer_discriminator).minimize(self.discriminator_loss,
+                                                                             var_list=discriminator_vars)
         self.generator_optimizer = \
-            tf.train.AdamOptimizer(learning_rate=self.learning_rate_generator,
-                                   beta1=self.beta1_generator,
-                                   beta2=self.beta2_generator).minimize(self.generator_loss,
-                                                                        var_list=encoder_vars)
+            self.get_optimizer_autoencoder(optimizer_generator).minimize(self.generator_loss,
+                                                                         var_list=encoder_vars)
+
+
+
+        # self.autoencoder_optimizer = \
+        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_autoencoder,
+        #                            beta1=self.AdamOptimizer_beta1_autoencoder,
+        #                            beta2=self.AdamOptimizer_beta2_autoencoder).minimize(self.autoencoder_loss)
+        # self.discriminator_optimizer = \
+        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_discriminator,
+        #                            beta1=self.AdamOptimizer_beta1_discriminator,
+        #                            beta2=self.AdamOptimizer_beta2_discriminator).minimize(self.discriminator_loss,
+        #                                                                                   var_list=discriminator_vars)
+        # self.generator_optimizer = \
+        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_generator,
+        #                            beta1=self.AdamOptimizer_beta1_generator,
+        #                            beta2=self.AdamOptimizer_beta2_generator).minimize(self.generator_loss,
+        #                                                                               var_list=encoder_vars)
 
         """
         Create the tensorboard summary
@@ -219,6 +485,129 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         Init all variables         
         """
         self.init = tf.global_variables_initializer()
+
+    def get_optimizer_autoencoder(self, optimizer_name):
+        return {
+            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
+                learning_rate=self.learning_rate_autoencoder),
+            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+                learning_rate=self.learning_rate_autoencoder, rho=self.AdadeltaOptimizer_rho_autoencoder,
+                epsilon=self.AdadeltaOptimizer_epsilon_autoencoder),
+            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                learning_rate=self.learning_rate_autoencoder,
+                initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_autoencoder),
+            "MomentumOptimizer": tf.train.MomentumOptimizer(
+                learning_rate=self.learning_rate_autoencoder, momentum=self.MomentumOptimizer_momentum_autoencoder,
+                use_nesterov=self.MomentumOptimizer_use_nesterov_autoencoder),
+            "AdamOptimizer": tf.train.AdamOptimizer(
+                learning_rate=self.learning_rate_autoencoder, beta1=self.AdamOptimizer_beta1_autoencoder,
+                beta2=self.AdamOptimizer_beta2_autoencoder, epsilon=self.AdamOptimizer_epsilon_autoencoder),
+            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                learning_rate=self.learning_rate_autoencoder,
+                learning_rate_power=self.FtrlOptimizer_learning_rate_power_autoencoder,
+                initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_autoencoder,
+                l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_autoencoder,
+                l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_autoencoder,
+                l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder
+            ),
+            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+                learning_rate=self.learning_rate_autoencoder,
+                l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder,
+                l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder
+            ),
+            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+                learning_rate=self.learning_rate_autoencoder,
+                initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_autoencoder,
+                l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_autoencoder,
+                l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_autoencoder
+            ),
+            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+                learning_rate=self.learning_rate_autoencoder, decay=self.RMSPropOptimizer_decay_autoencoder,
+                momentum=self.RMSPropOptimizer_momentum_autoencoder, epsilon=self.RMSPropOptimizer_epsilon_autoencoder,
+                centered=self.RMSPropOptimizer_centered_autoencoder)
+        }[optimizer_name]
+
+    def get_optimizer_discriminator(self, optimizer_name):
+        return {
+            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
+                learning_rate=self.learning_rate_discriminator),
+            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+                learning_rate=self.learning_rate_discriminator, rho=self.AdadeltaOptimizer_rho_discriminator,
+                epsilon=self.AdadeltaOptimizer_epsilon_discriminator),
+            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                learning_rate=self.learning_rate_discriminator,
+                initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_discriminator),
+            "MomentumOptimizer": tf.train.MomentumOptimizer(
+                learning_rate=self.learning_rate_discriminator, momentum=self.MomentumOptimizer_momentum_discriminator,
+                use_nesterov=self.MomentumOptimizer_use_nesterov_discriminator),
+            "AdamOptimizer": tf.train.AdamOptimizer(
+                learning_rate=self.learning_rate_discriminator, beta1=self.AdamOptimizer_beta1_discriminator,
+                beta2=self.AdamOptimizer_beta2_discriminator, epsilon=self.AdamOptimizer_epsilon_discriminator),
+            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                learning_rate=self.learning_rate_discriminator,
+                learning_rate_power=self.FtrlOptimizer_learning_rate_power_discriminator,
+                initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_discriminator,
+                l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_discriminator,
+                l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_discriminator,
+                l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator
+            ),
+            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+                learning_rate=self.learning_rate_discriminator,
+                l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator,
+                l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator
+            ),
+            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+                learning_rate=self.learning_rate_discriminator,
+                initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_discriminator,
+                l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_discriminator,
+                l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_discriminator
+            ),
+            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+                learning_rate=self.learning_rate_discriminator, decay=self.RMSPropOptimizer_decay_discriminator,
+                momentum=self.RMSPropOptimizer_momentum_discriminator, epsilon=self.RMSPropOptimizer_epsilon_discriminator,
+                centered=self.RMSPropOptimizer_centered_discriminator)
+        }[optimizer_name]
+
+    def get_optimizer_generator(self, optimizer_name):
+        return {
+            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
+                learning_rate=self.learning_rate_generator),
+            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+                learning_rate=self.learning_rate_generator, rho=self.AdadeltaOptimizer_rho_generator,
+                epsilon=self.AdadeltaOptimizer_epsilon_generator),
+            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                learning_rate=self.learning_rate_generator,
+                initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_generator),
+            "MomentumOptimizer": tf.train.MomentumOptimizer(
+                learning_rate=self.learning_rate_generator, momentum=self.MomentumOptimizer_momentum_generator,
+                use_nesterov=self.MomentumOptimizer_use_nesterov_generator),
+            "AdamOptimizer": tf.train.AdamOptimizer(
+                learning_rate=self.learning_rate_generator, beta1=self.AdamOptimizer_beta1_generator,
+                beta2=self.AdamOptimizer_beta2_generator, epsilon=self.AdamOptimizer_epsilon_generator),
+            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                learning_rate=self.learning_rate_generator,
+                learning_rate_power=self.FtrlOptimizer_learning_rate_power_generator,
+                initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_generator,
+                l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_generator,
+                l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_generator,
+                l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_generator
+            ),
+            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+                learning_rate=self.learning_rate_generator,
+                l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_generator,
+                l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_generator
+            ),
+            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+                learning_rate=self.learning_rate_generator,
+                initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_generator,
+                l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_generator,
+                l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_generator
+            ),
+            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+                learning_rate=self.learning_rate_generator, decay=self.RMSPropOptimizer_decay_generator,
+                momentum=self.RMSPropOptimizer_momentum_generator, epsilon=self.RMSPropOptimizer_epsilon_generator,
+                centered=self.RMSPropOptimizer_centered_generator)
+        }[optimizer_name]
 
     @staticmethod
     def get_loss_function(loss_function, labels, logits):
@@ -465,7 +854,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         folder_name = "/{0}_{1}_{2}_{3}_{4}_{5}_{6}_Adversarial_Autoencoder". \
             format(date, self.loss_function_discriminator, self.z_dim, self.learning_rate_autoencoder, self.batch_size,
-                   self.n_epochs, self.beta1_autoencoder)
+                   self.n_epochs, self.AdamOptimizer_beta1_autoencoder)
         tensorboard_path = self.results_path + folder_name + '/Tensorboard'
         saved_model_path = self.results_path + folder_name + '/Saved_models/'
         log_path = self.results_path + folder_name + '/log'
@@ -531,6 +920,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Saving the model
         saver = tf.train.Saver()
+        # TODO: maybe worth a try..
+        # saver = tf.train.Saver(tf.trainable_variables())
+
         step = 0
         with tf.Session() as sess:
 
