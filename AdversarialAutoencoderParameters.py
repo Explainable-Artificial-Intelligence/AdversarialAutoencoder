@@ -83,20 +83,38 @@ class AdversarialAutoencoderParameters:
                 'results_path': './Results'}
 
     def get_gridsearch_parameters(self, *args, **kwargs):
+        """
+        Performs a grid search for the provided parameters. If there are no parameters provided, it uses the hard coded
+        parameters for grid search.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        # deal with illegal input
+        if not all(isinstance(element, list) for element in kwargs.values()):
+            raise ValueError("Key worded arguments must be provided as a list: "
+                             "e.g. get_gridsearch_parameters(learning_rate=[0.5]) for single values or "
+                             "get_gridsearch_parameters(learning_rate=[0.01, 0.01]) for multiple values.")
 
         # train duration
         batch_size = 100
         n_epochs = 10
+
         # network topology
-        n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
+        # n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
+        n_neurons_of_hidden_layer_x_autoencoder = [[500, 250, 125], [1000, 750, 25]]
         n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]
+
         # initial bias values for the hidden layers
         bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0, 0.0]
         bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0, 0.0]
+
         # individual learning rates
-        learning_rate_autoencoder = 0.001
+        learning_rate_autoencoder = [0.001, 0.01, 0.1]
         learning_rate_discriminator = 0.001
         learning_rate_generator = 0.001
+
         # available optimizers:
         optimizers = ["GradientDescentOptimizer",  # autoencoder part not working
                       "AdadeltaOptimizer",  # autoencoder part not working
@@ -114,6 +132,7 @@ class AdversarialAutoencoderParameters:
             https://www.tensorflow.org/api_guides/python/train#Optimizers
             parameters for optimizers:
             """
+
         # GradientDescentOptimizer:
         #   - learning rate:
         # AdadeltaOptimizer():
@@ -126,6 +145,7 @@ class AdversarialAutoencoderParameters:
         AdadeltaOptimizer_epsilon_discriminator = 1e-08
         AdadeltaOptimizer_rho_generator = 0.95
         AdadeltaOptimizer_epsilon_generator = 1e-08
+
         # AdagradOptimizer
         #   - learning rate
         #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
@@ -133,6 +153,7 @@ class AdversarialAutoencoderParameters:
         AdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
         AdagradOptimizer_initial_accumulator_value_discriminator = 0.1
         AdagradOptimizer_initial_accumulator_value_generator = 0.1
+
         # MomentumOptimizer
         #   - learning rate
         #   - momentum: A Tensor or a floating point value. The momentum.
@@ -143,6 +164,7 @@ class AdversarialAutoencoderParameters:
         MomentumOptimizer_use_nesterov_discriminator = False
         MomentumOptimizer_momentum_generator = 0.9
         MomentumOptimizer_use_nesterov_generator = False
+
         # AdamOptimizer
         #   - learning rate; default: 0.001
         #   - beta1: A float value or a constant float tensor. The exponential decay rate for the 1st moment estimates.
@@ -159,6 +181,7 @@ class AdversarialAutoencoderParameters:
         AdamOptimizer_beta1_generator = 0.9
         AdamOptimizer_beta2_generator = 0.999
         AdamOptimizer_epsilon_generator = 1e-08
+
         # FtrlOptimizer
         #   - learning rate
         #   - learning rate power: A float value, must be less or equal to zero. default: -0.5
@@ -183,6 +206,7 @@ class AdversarialAutoencoderParameters:
         FtrlOptimizer_l1_regularization_strength_generator = 0.0
         FtrlOptimizer_l2_regularization_strength_generator = 0.0
         FtrlOptimizer_l2_shrinkage_regularization_strength_generator = 0.0
+
         # ProximalGradientDescentOptimizer
         #   - learning rate
         #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
@@ -193,6 +217,7 @@ class AdversarialAutoencoderParameters:
         ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = 0.0
         ProximalGradientDescentOptimizer_l1_regularization_strength_generator = 0.0
         ProximalGradientDescentOptimizer_l2_regularization_strength_generator = 0.0
+
         # ProximalAdagradOptimizer
         #   - learning rate
         #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
@@ -208,6 +233,7 @@ class AdversarialAutoencoderParameters:
         ProximalAdagradOptimizer_initial_accumulator_value_generator = 0.1
         ProximalAdagradOptimizer_l1_regularization_strength_generator = 0.0
         ProximalAdagradOptimizer_l2_regularization_strength_generator = 0.0
+
         # RMSPropOptimizer
         #   - learning rate
         #   - decay: Discounting factor for the history/coming gradient; default: 0.9
@@ -216,7 +242,7 @@ class AdversarialAutoencoderParameters:
         #   - centered: If True, gradients are normalized by the estimated variance of the gradient; if False, by the
         #   uncentered second moment. Setting this to True may help with training, but is slightly more expensive in terms
         #   of computation and memory. Defaults to False.
-        RMSPropOptimizer_decay_autoencoder = [1.0, 0.9]
+        RMSPropOptimizer_decay_autoencoder = 0.9
         RMSPropOptimizer_momentum_autoencoder = 0.0
         RMSPropOptimizer_epsilon_autoencoder = 1e-10
         RMSPropOptimizer_centered_autoencoder = False
@@ -228,26 +254,43 @@ class AdversarialAutoencoderParameters:
         RMSPropOptimizer_momentum_generator = 0.0
         RMSPropOptimizer_epsilon_generator = 1e-10
         RMSPropOptimizer_centered_generator = False
+
         # available loss functions
         loss_functions = ["hinge_loss",
                           "mean_squared_error",
                           "sigmoid_cross_entropy",
                           "softmax_cross_entropy"]
+
         # loss function for discriminator
         loss_function_discriminator = "sigmoid_cross_entropy"
+
         # loss function for generator
         loss_function_generator = "hinge_loss"
 
+        """
+        finding all parameter combinations and storing it in a list of dictionaries:
+        """
+
+        # use a dictionary for storing the parameters; init it with the default parameters
         param_dict = self.get_default_parameters()
+
+        # iterate over the variable names provided as parameters and set their value in the parameter dictionary as
+        # defined above
+        if args:
+            for var_name in args:
+                param_dict[var_name] = locals()[var_name]
+
+        # iterate over the variable names provided as parameters and set their value in the parameter dictionary as
+        # defined above
+        if kwargs:
+            for var_name in kwargs:
+                param_dict[var_name] = kwargs[var_name]
 
         # holds the parameters which are by default selected for gridsearch
         default_params_selected_for_gridsearch = []
 
-        # iterate over the variable names provided as parameters and set their value as defined above
-        if args:
-            for var_name in args:
-                param_dict[var_name] = locals()[var_name]
-        else:
+        # we don't have variable names provided, so we take all hard coded parameters for the grid search
+        if not args and not kwargs:
             # those vars are always lists, so we need to ignore them
             local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
                                     "local_vars_to_ignore", "args", "kwargs", "default_params_selected_for_gridsearch",
@@ -255,8 +298,8 @@ class AdversarialAutoencoderParameters:
                                     "n_neurons_of_hidden_layer_x_discriminator",
                                     "bias_init_value_of_hidden_layer_x_autoencoder",
                                     "bias_init_value_of_hidden_layer_x_discriminator"]
-            # check for hard coded grid search parameters
-            for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
+            # check for hard coded grid search parameters (they are lists)
+            for var_name in list(locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
                 # ignore the variables which are always lists
                 if var_name not in local_vars_to_ignore:
                     if type(locals()[var_name]) == list:
@@ -264,14 +307,23 @@ class AdversarialAutoencoderParameters:
                     else:
                         param_dict[var_name] = locals()[var_name]
 
-        if kwargs:
-            for var_name in kwargs:
-                param_dict[var_name] = kwargs[var_name]
-
         # get the parameters selected for gridsearch and store them in one list
         params_selected_for_gridsearch = list(args) + list(kwargs.keys())
 
-        print(default_params_selected_for_gridsearch)
+        # these parameters are by default lists; so we can't use them for itertools.product
+        params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
+                                  "n_neurons_of_hidden_layer_x_discriminator",
+                                  "bias_init_value_of_hidden_layer_x_autoencoder",
+                                  "bias_init_value_of_hidden_layer_x_discriminator"]
+
+        # check if the parameters which are by default lists are hard coded selected for gridsearch
+        for param_default_as_list in params_default_as_list:
+            # check if we have a list of lists and also whether the current parameter is already either in args or
+            # in kwargs
+            if any(isinstance(element, list) for element in locals()[param_default_as_list]) \
+                    and param_default_as_list not in (args or kwargs):
+                param_dict[param_default_as_list] = locals()[param_default_as_list]
+                params_selected_for_gridsearch.append(param_default_as_list)
 
         # get all the parameter values and store them in a list of lists e.g. [[0.1, 0.2, 0.3], [1.0, 5.0, 9.0]]
         param_values = [param_dict[param_selected_for_gridsearch] for param_selected_for_gridsearch
@@ -279,6 +331,7 @@ class AdversarialAutoencoderParameters:
 
         # add the  parameters selected for gridsearch by default
         params_selected_for_gridsearch += default_params_selected_for_gridsearch
+
         # add their values to the param_values list
         for default_param_selected_for_gridsearch in default_params_selected_for_gridsearch:
             param_values.append(locals()[default_param_selected_for_gridsearch])
@@ -286,13 +339,10 @@ class AdversarialAutoencoderParameters:
         # stores all the resulting parameter combinations
         all_final_parameter_combinations_list = []
 
+        print(param_values)
+
         # get all combinations
         parameter_value_combinations = list(itertools.product(*param_values))
-
-        # TODO: allow combinations for         # params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
-        #                           "n_neurons_of_hidden_layer_x_discriminator",
-        #                           "bias_init_value_of_hidden_layer_x_autoencoder",
-        #                           "bias_init_value_of_hidden_layer_x_discriminator"]
 
         # iterate over the combinations ..
         for parameter_value_combination in parameter_value_combinations:
@@ -505,9 +555,9 @@ class AdversarialAutoencoderParameters:
                 if var_name not in local_vars_to_ignore:
                     param_dict[var_name] = locals()[var_name]
 
+        # iterate over the variable names provided as keyword parameters and set their value accordingly
         if kwargs:
             for var_name in kwargs:
                 param_dict[var_name] = kwargs[var_name]
 
-        # print(param_dict)
         return param_dict
