@@ -1,5 +1,6 @@
+import copy
 import random
-
+import itertools
 
 class AdversarialAutoencoderParameters:
     def __init__(self, **kwargs):
@@ -80,6 +81,207 @@ class AdversarialAutoencoderParameters:
                 'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
                 'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss',
                 'results_path': './Results'}
+
+    def get_gridsearch_parameters(self, *args):
+
+        # train duration
+        batch_size = 100
+        n_epochs = 10
+        # network topology
+        n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
+        n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]
+        # initial bias values for the hidden layers
+        bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0, 0.0]
+        bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0, 0.0]
+        # individual learning rates
+        learning_rate_autoencoder = 0.001
+        learning_rate_discriminator = 0.001
+        learning_rate_generator = 0.001
+        # available optimizers:
+        optimizers = ["GradientDescentOptimizer",  # autoencoder part not working
+                      "AdadeltaOptimizer",  # autoencoder part not working
+                      "AdagradOptimizer",  # autoencoder part not working
+                      "MomentumOptimizer",  # autoencoder part not working
+                      "AdamOptimizer",
+                      "FtrlOptimizer",  # autoencoder part not working; optimizer slow + bad results
+                      "ProximalGradientDescentOptimizer",  # autoencoder part not working
+                      "ProximalAdagradOptimizer",  # autoencoder part not working
+                      "RMSPropOptimizer"]
+        optimizer_autoencoder = "AdamOptimizer"
+        optimizer_discriminator = "RMSPropOptimizer"
+        optimizer_generator = "RMSPropOptimizer"
+        """
+            https://www.tensorflow.org/api_guides/python/train#Optimizers
+            parameters for optimizers:
+            """
+        # GradientDescentOptimizer:
+        #   - learning rate:
+        # AdadeltaOptimizer():
+        #   - learning rate: default: 0.01
+        #   - rho: decay rate; default: 0.95
+        #   - epsilon: A constant epsilon used to better conditioning the grad update; default: 1e-08
+        AdadeltaOptimizer_rho_autoencoder = 0.95
+        AdadeltaOptimizer_epsilon_autoencoder = 1e-08
+        AdadeltaOptimizer_rho_discriminator = 0.95
+        AdadeltaOptimizer_epsilon_discriminator = 1e-08
+        AdadeltaOptimizer_rho_generator = 0.95
+        AdadeltaOptimizer_epsilon_generator = 1e-08
+        # AdagradOptimizer
+        #   - learning rate
+        #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
+        #   default: 0.1
+        AdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
+        AdagradOptimizer_initial_accumulator_value_discriminator = 0.1
+        AdagradOptimizer_initial_accumulator_value_generator = 0.1
+        # MomentumOptimizer
+        #   - learning rate
+        #   - momentum: A Tensor or a floating point value. The momentum.
+        #   - use_nesterov: If True use Nesterov Momentum; default: False http://proceedings.mlr.press/v28/sutskever13.pdf
+        MomentumOptimizer_momentum_autoencoder = 0.9
+        MomentumOptimizer_use_nesterov_autoencoder = False
+        MomentumOptimizer_momentum_discriminator = 0.9
+        MomentumOptimizer_use_nesterov_discriminator = False
+        MomentumOptimizer_momentum_generator = 0.9
+        MomentumOptimizer_use_nesterov_generator = False
+        # AdamOptimizer
+        #   - learning rate; default: 0.001
+        #   - beta1: A float value or a constant float tensor. The exponential decay rate for the 1st moment estimates.
+        #   default: 0.9
+        #   - beta2: A float value or a constant float tensor. The exponential decay rate for the 2nd moment estimates.
+        #   default: 0.99
+        #   - epsilon: A small constant for numerical stability. default: 1e-08
+        AdamOptimizer_beta1_autoencoder = 0.9
+        AdamOptimizer_beta2_autoencoder = 0.999
+        AdamOptimizer_epsilon_autoencoder = 1e-08
+        AdamOptimizer_beta1_discriminator = 0.9
+        AdamOptimizer_beta2_discriminator = 0.999
+        AdamOptimizer_epsilon_discriminator = 1e-08
+        AdamOptimizer_beta1_generator = 0.9
+        AdamOptimizer_beta2_generator = 0.999
+        AdamOptimizer_epsilon_generator = 1e-08
+        # FtrlOptimizer
+        #   - learning rate
+        #   - learning rate power: A float value, must be less or equal to zero. default: -0.5
+        #   - initial_accumulator_value: The starting value for accumulators. Only positive values are allowed. default: 0.1
+        #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        #   - l2_shrinkage_regularization_strength: A float value, must be greater than or equal to zero. This differs from
+        #   L2 above in that the L2 above is a stabilization penalty, whereas this L2 shrinkage is a magnitude penalty.
+        #   default: 0.0
+        FtrlOptimizer_learning_rate_power_autoencoder = -0.5
+        FtrlOptimizer_initial_accumulator_value_autoencoder = 0.1
+        FtrlOptimizer_l1_regularization_strength_autoencoder = 0.0
+        FtrlOptimizer_l2_regularization_strength_autoencoder = 0.0
+        FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = 0.0
+        FtrlOptimizer_learning_rate_power_discriminator = -0.5
+        FtrlOptimizer_initial_accumulator_value_discriminator = 0.1
+        FtrlOptimizer_l1_regularization_strength_discriminator = 0.0
+        FtrlOptimizer_l2_regularization_strength_discriminator = 0.0
+        FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = 0.0
+        FtrlOptimizer_learning_rate_power_generator = -0.5
+        FtrlOptimizer_initial_accumulator_value_generator = 0.1
+        FtrlOptimizer_l1_regularization_strength_generator = 0.0
+        FtrlOptimizer_l2_regularization_strength_generator = 0.0
+        FtrlOptimizer_l2_shrinkage_regularization_strength_generator = 0.0
+        # ProximalGradientDescentOptimizer
+        #   - learning rate
+        #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = 0.0
+        ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = 0.0
+        ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = 0.0
+        ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = 0.0
+        ProximalGradientDescentOptimizer_l1_regularization_strength_generator = 0.0
+        ProximalGradientDescentOptimizer_l2_regularization_strength_generator = 0.0
+        # ProximalAdagradOptimizer
+        #   - learning rate
+        #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
+        #   default: 0.1
+        #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
+        ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
+        ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = 0.0
+        ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = 0.0
+        ProximalAdagradOptimizer_initial_accumulator_value_discriminator = 0.1
+        ProximalAdagradOptimizer_l1_regularization_strength_discriminator = 0.0
+        ProximalAdagradOptimizer_l2_regularization_strength_discriminator = 0.0
+        ProximalAdagradOptimizer_initial_accumulator_value_generator = 0.1
+        ProximalAdagradOptimizer_l1_regularization_strength_generator = 0.0
+        ProximalAdagradOptimizer_l2_regularization_strength_generator = 0.0
+        # RMSPropOptimizer
+        #   - learning rate
+        #   - decay: Discounting factor for the history/coming gradient; default: 0.9
+        #   - momentum: A scalar tensor; default: 0.0.
+        #   - epsilon:  Small value to avoid zero denominator.; default: 1e-10
+        #   - centered: If True, gradients are normalized by the estimated variance of the gradient; if False, by the
+        #   uncentered second moment. Setting this to True may help with training, but is slightly more expensive in terms
+        #   of computation and memory. Defaults to False.
+        RMSPropOptimizer_decay_autoencoder = [1.0, 0.9, 0.8]
+        RMSPropOptimizer_momentum_autoencoder = [0.1, 0.2, 0.3]
+        RMSPropOptimizer_epsilon_autoencoder = 1e-10
+        RMSPropOptimizer_centered_autoencoder = False
+        RMSPropOptimizer_decay_discriminator = 0.9
+        RMSPropOptimizer_momentum_discriminator = 0.0
+        RMSPropOptimizer_epsilon_discriminator = 1e-10
+        RMSPropOptimizer_centered_discriminator = False
+        RMSPropOptimizer_decay_generator = 0.9
+        RMSPropOptimizer_momentum_generator = 0.0
+        RMSPropOptimizer_epsilon_generator = 1e-10
+        RMSPropOptimizer_centered_generator = False
+        # available loss functions
+        loss_functions = ["hinge_loss",
+                          "mean_squared_error",
+                          "sigmoid_cross_entropy",
+                          "softmax_cross_entropy"]
+        # loss function for discriminator
+        loss_function_discriminator = "sigmoid_cross_entropy"
+        # loss function for generator
+        loss_function_generator = "hinge_loss"
+
+        param_dict = self.get_default_parameters()
+
+        # iterate over the variable names provided as parameters and set their value as random defined above
+        if args:
+            for var_name in args:
+                param_dict[var_name] = locals()[var_name]
+        else:
+            local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
+                                    "local_vars_to_ignore"]
+            for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
+                if var_name not in local_vars_to_ignore:
+                    param_dict[var_name] = locals()[var_name]
+
+        # these parameter values are always lists, so we need to exclude them from the search for lists
+        params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
+                                  "n_neurons_of_hidden_layer_x_discriminator",
+                                  "bias_init_value_of_hidden_layer_x_autoencoder",
+                                  "bias_init_value_of_hidden_layer_x_discriminator"]
+
+        # TODO: for **kwargs implementation: check all the parameters for a list
+        # for param in param_dict:
+        #     if param not in params_default_as_list:
+        #         if type(param_dict[param]) == list:
+        #             print(param)
+        #             print(param_dict[param])
+
+        # args = selected for gridsearch
+
+        grid_search_params = []
+        for param_selected_for_gridsearch in args:
+            grid_search_params.append(param_dict[param_selected_for_gridsearch])
+
+        print(grid_search_params)
+
+        all_params = []
+
+        parameter_value_combinations = list(itertools.product(*grid_search_params))
+        for parameter_value_combination in parameter_value_combinations:
+            print(parameter_value_combination)
+            for i, param_value in enumerate(parameter_value_combination):
+                param_dict[args[i]] = param_value
+            all_params.append(copy.deepcopy(param_dict))
+
+        return all_params
 
     def get_randomized_parameters(self, *args):
         """
@@ -276,9 +478,10 @@ class AdversarialAutoencoderParameters:
             for var_name in args:
                 param_dict[var_name] = locals()[var_name]
         else:
-            local_vars_to_ignore = ["loss_functions", "param_dict", "optimizer", "autoencoder_optimizers"]
+            local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
+                                    "local_vars_to_ignore"]
             for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
-                if not var_name in local_vars_to_ignore:
+                if var_name not in local_vars_to_ignore:
                     param_dict[var_name] = locals()[var_name]
 
         # print(param_dict)
