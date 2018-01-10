@@ -22,7 +22,7 @@ class AdversarialAutoencoderParameters:
 
     @staticmethod
     def get_default_parameters():
-        return {'batch_size': 100, 'n_epochs': 10,
+        return {'batch_size': 100, 'n_epochs': 10, 'input_dim': 784, 'z_dim': 2,
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250],
                 'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0],
@@ -64,7 +64,7 @@ class AdversarialAutoencoderParameters:
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
-                'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.2,
+                'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
@@ -82,7 +82,7 @@ class AdversarialAutoencoderParameters:
                 'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss',
                 'results_path': './Results'}
 
-    def get_gridsearch_parameters(self, *args):
+    def get_gridsearch_parameters(self, *args, **kwargs):
 
         # train duration
         batch_size = 100
@@ -216,8 +216,8 @@ class AdversarialAutoencoderParameters:
         #   - centered: If True, gradients are normalized by the estimated variance of the gradient; if False, by the
         #   uncentered second moment. Setting this to True may help with training, but is slightly more expensive in terms
         #   of computation and memory. Defaults to False.
-        RMSPropOptimizer_decay_autoencoder = [1.0, 0.9, 0.8]
-        RMSPropOptimizer_momentum_autoencoder = [0.1, 0.2, 0.3]
+        RMSPropOptimizer_decay_autoencoder = [1.0, 0.9]
+        RMSPropOptimizer_momentum_autoencoder = 0.0
         RMSPropOptimizer_epsilon_autoencoder = 1e-10
         RMSPropOptimizer_centered_autoencoder = False
         RMSPropOptimizer_decay_discriminator = 0.9
@@ -240,50 +240,71 @@ class AdversarialAutoencoderParameters:
 
         param_dict = self.get_default_parameters()
 
-        # iterate over the variable names provided as parameters and set their value as random defined above
+        # holds the parameters which are by default selected for gridsearch
+        default_params_selected_for_gridsearch = []
+
+        # iterate over the variable names provided as parameters and set their value as defined above
         if args:
             for var_name in args:
                 param_dict[var_name] = locals()[var_name]
         else:
+            # those vars are always lists, so we need to ignore them
             local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
-                                    "local_vars_to_ignore"]
+                                    "local_vars_to_ignore", "args", "kwargs", "default_params_selected_for_gridsearch",
+                                    "n_neurons_of_hidden_layer_x_autoencoder",
+                                    "n_neurons_of_hidden_layer_x_discriminator",
+                                    "bias_init_value_of_hidden_layer_x_autoencoder",
+                                    "bias_init_value_of_hidden_layer_x_discriminator"]
+            # check for hard coded grid search parameters
             for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
+                # ignore the variables which are always lists
                 if var_name not in local_vars_to_ignore:
-                    param_dict[var_name] = locals()[var_name]
+                    if type(locals()[var_name]) == list:
+                        default_params_selected_for_gridsearch.append(var_name)
+                    else:
+                        param_dict[var_name] = locals()[var_name]
 
-        # these parameter values are always lists, so we need to exclude them from the search for lists
-        params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
-                                  "n_neurons_of_hidden_layer_x_discriminator",
-                                  "bias_init_value_of_hidden_layer_x_autoencoder",
-                                  "bias_init_value_of_hidden_layer_x_discriminator"]
+        if kwargs:
+            for var_name in kwargs:
+                param_dict[var_name] = kwargs[var_name]
 
-        # TODO: for **kwargs implementation: check all the parameters for a list
-        # for param in param_dict:
-        #     if param not in params_default_as_list:
-        #         if type(param_dict[param]) == list:
-        #             print(param)
-        #             print(param_dict[param])
+        # get the parameters selected for gridsearch and store them in one list
+        params_selected_for_gridsearch = list(args) + list(kwargs.keys())
 
-        # args = selected for gridsearch
+        print(default_params_selected_for_gridsearch)
 
-        grid_search_params = []
-        for param_selected_for_gridsearch in args:
-            grid_search_params.append(param_dict[param_selected_for_gridsearch])
+        # get all the parameter values and store them in a list of lists e.g. [[0.1, 0.2, 0.3], [1.0, 5.0, 9.0]]
+        param_values = [param_dict[param_selected_for_gridsearch] for param_selected_for_gridsearch
+                        in params_selected_for_gridsearch]
 
-        print(grid_search_params)
+        # add the  parameters selected for gridsearch by default
+        params_selected_for_gridsearch += default_params_selected_for_gridsearch
+        # add their values to the param_values list
+        for default_param_selected_for_gridsearch in default_params_selected_for_gridsearch:
+            param_values.append(locals()[default_param_selected_for_gridsearch])
 
-        all_params = []
+        # stores all the resulting parameter combinations
+        all_final_parameter_combinations_list = []
 
-        parameter_value_combinations = list(itertools.product(*grid_search_params))
+        # get all combinations
+        parameter_value_combinations = list(itertools.product(*param_values))
+
+        # TODO: allow combinations for         # params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
+        #                           "n_neurons_of_hidden_layer_x_discriminator",
+        #                           "bias_init_value_of_hidden_layer_x_autoencoder",
+        #                           "bias_init_value_of_hidden_layer_x_discriminator"]
+
+        # iterate over the combinations ..
         for parameter_value_combination in parameter_value_combinations:
-            print(parameter_value_combination)
             for i, param_value in enumerate(parameter_value_combination):
-                param_dict[args[i]] = param_value
-            all_params.append(copy.deepcopy(param_dict))
+                # .. set the param_dict accordingly ..
+                param_dict[params_selected_for_gridsearch[i]] = param_value
+            # .. and add them to the list
+            all_final_parameter_combinations_list.append(copy.deepcopy(param_dict))
 
-        return all_params
+        return all_final_parameter_combinations_list
 
-    def get_randomized_parameters(self, *args):
+    def get_randomized_parameters(self, *args, **kwargs):
         """
         returns randomized values for the specified parameters; otherwise the default values
         :param args: string or list of strings with the parameters which should be randomized; if empty randomizes
@@ -479,10 +500,14 @@ class AdversarialAutoencoderParameters:
                 param_dict[var_name] = locals()[var_name]
         else:
             local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
-                                    "local_vars_to_ignore"]
+                                    "local_vars_to_ignore", "args", "kwargs"]
             for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
                 if var_name not in local_vars_to_ignore:
                     param_dict[var_name] = locals()[var_name]
+
+        if kwargs:
+            for var_name in kwargs:
+                param_dict[var_name] = kwargs[var_name]
 
         # print(param_dict)
         return param_dict
