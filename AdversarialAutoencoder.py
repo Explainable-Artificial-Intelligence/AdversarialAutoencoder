@@ -388,23 +388,6 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.get_optimizer_autoencoder(optimizer_generator).minimize(self.generator_loss,
                                                                          var_list=encoder_vars)
 
-
-
-        # self.autoencoder_optimizer = \
-        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_autoencoder,
-        #                            beta1=self.AdamOptimizer_beta1_autoencoder,
-        #                            beta2=self.AdamOptimizer_beta2_autoencoder).minimize(self.autoencoder_loss)
-        # self.discriminator_optimizer = \
-        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_discriminator,
-        #                            beta1=self.AdamOptimizer_beta1_discriminator,
-        #                            beta2=self.AdamOptimizer_beta2_discriminator).minimize(self.discriminator_loss,
-        #                                                                                   var_list=discriminator_vars)
-        # self.generator_optimizer = \
-        #     tf.train.AdamOptimizer(learning_rate=self.learning_rate_generator,
-        #                            beta1=self.AdamOptimizer_beta1_generator,
-        #                            beta2=self.AdamOptimizer_beta2_generator).minimize(self.generator_loss,
-        #                                                                               var_list=encoder_vars)
-
         """
         Create the tensorboard summary
         """
@@ -424,127 +407,149 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         return self.performance
 
     def get_optimizer_autoencoder(self, optimizer_name):
-        return {
-            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
-                learning_rate=self.learning_rate_autoencoder),
-            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+
+        if optimizer_name == "GradientDescentOptimizer":
+            return tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate_autoencoder)
+        elif optimizer_name == "AdadeltaOptimizer":
+            return tf.train.AdadeltaOptimizer(
                 learning_rate=self.learning_rate_autoencoder, rho=self.AdadeltaOptimizer_rho_autoencoder,
-                epsilon=self.AdadeltaOptimizer_epsilon_autoencoder),
-            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                epsilon=self.AdadeltaOptimizer_epsilon_autoencoder)
+        elif optimizer_name == "AdagradOptimizer":
+            return tf.train.AdagradOptimizer(
                 learning_rate=self.learning_rate_autoencoder,
                 initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_autoencoder),
-            "MomentumOptimizer": tf.train.MomentumOptimizer(
+        elif optimizer_name == "MomentumOptimizer":
+            return tf.train.MomentumOptimizer(
                 learning_rate=self.learning_rate_autoencoder, momentum=self.MomentumOptimizer_momentum_autoencoder,
-                use_nesterov=self.MomentumOptimizer_use_nesterov_autoencoder),
-            "AdamOptimizer": tf.train.AdamOptimizer(
+                use_nesterov=self.MomentumOptimizer_use_nesterov_autoencoder)
+        elif optimizer_name == "AdamOptimizer":
+            return tf.train.AdamOptimizer(
                 learning_rate=self.learning_rate_autoencoder, beta1=self.AdamOptimizer_beta1_autoencoder,
-                beta2=self.AdamOptimizer_beta2_autoencoder, epsilon=self.AdamOptimizer_epsilon_autoencoder),
-            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                beta2=self.AdamOptimizer_beta2_autoencoder, epsilon=self.AdamOptimizer_epsilon_autoencoder)
+        elif optimizer_name == "FtrlOptimizer":
+            return tf.train.FtrlOptimizer(
                 learning_rate=self.learning_rate_autoencoder,
                 learning_rate_power=self.FtrlOptimizer_learning_rate_power_autoencoder,
                 initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_autoencoder,
                 l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_autoencoder,
                 l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_autoencoder,
                 l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder
-            ),
-            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+            )
+        elif optimizer_name == "ProximalGradientDescentOptimizer":
+            return tf.train.ProximalGradientDescentOptimizer(
                 learning_rate=self.learning_rate_autoencoder,
                 l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder,
                 l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder
-            ),
-            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+            )
+        elif optimizer_name == "ProximalAdagradOptimizer":
+            return tf.train.ProximalAdagradOptimizer(
                 learning_rate=self.learning_rate_autoencoder,
                 initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_autoencoder,
                 l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_autoencoder,
                 l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_autoencoder
-            ),
-            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+            )
+        elif optimizer_name == "RMSPropOptimizer":
+            return tf.train.RMSPropOptimizer(
                 learning_rate=self.learning_rate_autoencoder, decay=self.RMSPropOptimizer_decay_autoencoder,
                 momentum=self.RMSPropOptimizer_momentum_autoencoder, epsilon=self.RMSPropOptimizer_epsilon_autoencoder,
                 centered=self.RMSPropOptimizer_centered_autoencoder)
-        }[optimizer_name]
 
     def get_optimizer_discriminator(self, optimizer_name):
-        return {
-            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
-                learning_rate=self.learning_rate_discriminator),
-            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+
+        if optimizer_name == "GradientDescentOptimizer":
+            return tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate_discriminator)
+        elif optimizer_name == "AdadeltaOptimizer":
+            return tf.train.AdadeltaOptimizer(
                 learning_rate=self.learning_rate_discriminator, rho=self.AdadeltaOptimizer_rho_discriminator,
-                epsilon=self.AdadeltaOptimizer_epsilon_discriminator),
-            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                epsilon=self.AdadeltaOptimizer_epsilon_discriminator)
+        elif optimizer_name == "AdagradOptimizer":
+            return tf.train.AdagradOptimizer(
                 learning_rate=self.learning_rate_discriminator,
                 initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_discriminator),
-            "MomentumOptimizer": tf.train.MomentumOptimizer(
+        elif optimizer_name == "MomentumOptimizer":
+            return tf.train.MomentumOptimizer(
                 learning_rate=self.learning_rate_discriminator, momentum=self.MomentumOptimizer_momentum_discriminator,
-                use_nesterov=self.MomentumOptimizer_use_nesterov_discriminator),
-            "AdamOptimizer": tf.train.AdamOptimizer(
+                use_nesterov=self.MomentumOptimizer_use_nesterov_discriminator)
+        elif optimizer_name == "AdamOptimizer":
+            return tf.train.AdamOptimizer(
                 learning_rate=self.learning_rate_discriminator, beta1=self.AdamOptimizer_beta1_discriminator,
-                beta2=self.AdamOptimizer_beta2_discriminator, epsilon=self.AdamOptimizer_epsilon_discriminator),
-            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                beta2=self.AdamOptimizer_beta2_discriminator, epsilon=self.AdamOptimizer_epsilon_discriminator)
+        elif optimizer_name == "FtrlOptimizer":
+            return tf.train.FtrlOptimizer(
                 learning_rate=self.learning_rate_discriminator,
                 learning_rate_power=self.FtrlOptimizer_learning_rate_power_discriminator,
                 initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_discriminator,
                 l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_discriminator,
                 l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_discriminator,
                 l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator
-            ),
-            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+            )
+        elif optimizer_name == "ProximalGradientDescentOptimizer":
+            return tf.train.ProximalGradientDescentOptimizer(
                 learning_rate=self.learning_rate_discriminator,
                 l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator,
                 l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator
-            ),
-            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+            )
+        elif optimizer_name == "ProximalAdagradOptimizer":
+            return tf.train.ProximalAdagradOptimizer(
                 learning_rate=self.learning_rate_discriminator,
                 initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_discriminator,
                 l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_discriminator,
                 l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_discriminator
-            ),
-            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+            )
+        elif optimizer_name == "RMSPropOptimizer":
+            return tf.train.RMSPropOptimizer(
                 learning_rate=self.learning_rate_discriminator, decay=self.RMSPropOptimizer_decay_discriminator,
-                momentum=self.RMSPropOptimizer_momentum_discriminator, epsilon=self.RMSPropOptimizer_epsilon_discriminator,
+                momentum=self.RMSPropOptimizer_momentum_discriminator,
+                epsilon=self.RMSPropOptimizer_epsilon_discriminator,
                 centered=self.RMSPropOptimizer_centered_discriminator)
-        }[optimizer_name]
 
     def get_optimizer_generator(self, optimizer_name):
-        return {
-            "GradientDescentOptimizer": tf.train.GradientDescentOptimizer(
-                learning_rate=self.learning_rate_generator),
-            "AdadeltaOptimizer": tf.train.AdadeltaOptimizer(
+
+        if optimizer_name == "GradientDescentOptimizer":
+            return tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate_generator)
+        elif optimizer_name == "AdadeltaOptimizer":
+            return tf.train.AdadeltaOptimizer(
                 learning_rate=self.learning_rate_generator, rho=self.AdadeltaOptimizer_rho_generator,
-                epsilon=self.AdadeltaOptimizer_epsilon_generator),
-            "AdagradOptimizer": tf.train.AdagradOptimizer(
+                epsilon=self.AdadeltaOptimizer_epsilon_generator)
+        elif optimizer_name == "AdagradOptimizer":
+            return tf.train.AdagradOptimizer(
                 learning_rate=self.learning_rate_generator,
                 initial_accumulator_value=self.AdagradOptimizer_initial_accumulator_value_generator),
-            "MomentumOptimizer": tf.train.MomentumOptimizer(
+        elif optimizer_name == "MomentumOptimizer":
+            return tf.train.MomentumOptimizer(
                 learning_rate=self.learning_rate_generator, momentum=self.MomentumOptimizer_momentum_generator,
-                use_nesterov=self.MomentumOptimizer_use_nesterov_generator),
-            "AdamOptimizer": tf.train.AdamOptimizer(
+                use_nesterov=self.MomentumOptimizer_use_nesterov_generator)
+        elif optimizer_name == "AdamOptimizer":
+            return tf.train.AdamOptimizer(
                 learning_rate=self.learning_rate_generator, beta1=self.AdamOptimizer_beta1_generator,
-                beta2=self.AdamOptimizer_beta2_generator, epsilon=self.AdamOptimizer_epsilon_generator),
-            "FtrlOptimizer": tf.train.FtrlOptimizer(
+                beta2=self.AdamOptimizer_beta2_generator, epsilon=self.AdamOptimizer_epsilon_generator)
+        elif optimizer_name == "FtrlOptimizer":
+            return tf.train.FtrlOptimizer(
                 learning_rate=self.learning_rate_generator,
                 learning_rate_power=self.FtrlOptimizer_learning_rate_power_generator,
                 initial_accumulator_value=self.FtrlOptimizer_initial_accumulator_value_generator,
                 l1_regularization_strength=self.FtrlOptimizer_l1_regularization_strength_generator,
                 l2_regularization_strength=self.FtrlOptimizer_l2_regularization_strength_generator,
                 l2_shrinkage_regularization_strength=self.FtrlOptimizer_l2_shrinkage_regularization_strength_generator
-            ),
-            "ProximalGradientDescentOptimizer": tf.train.ProximalGradientDescentOptimizer(
+            )
+        elif optimizer_name == "ProximalGradientDescentOptimizer":
+            return tf.train.ProximalGradientDescentOptimizer(
                 learning_rate=self.learning_rate_generator,
                 l1_regularization_strength=self.ProximalGradientDescentOptimizer_l1_regularization_strength_generator,
                 l2_regularization_strength=self.ProximalGradientDescentOptimizer_l2_regularization_strength_generator
-            ),
-            "ProximalAdagradOptimizer": tf.train.ProximalAdagradOptimizer(
+            )
+        elif optimizer_name == "ProximalAdagradOptimizer":
+            return tf.train.ProximalAdagradOptimizer(
                 learning_rate=self.learning_rate_generator,
                 initial_accumulator_value=self.ProximalAdagradOptimizer_initial_accumulator_value_generator,
                 l1_regularization_strength=self.ProximalAdagradOptimizer_l1_regularization_strength_generator,
                 l2_regularization_strength=self.ProximalAdagradOptimizer_l2_regularization_strength_generator
-            ),
-            "RMSPropOptimizer": tf.train.RMSPropOptimizer(
+            )
+        elif optimizer_name == "RMSPropOptimizer":
+            return tf.train.RMSPropOptimizer(
                 learning_rate=self.learning_rate_generator, decay=self.RMSPropOptimizer_decay_generator,
                 momentum=self.RMSPropOptimizer_momentum_generator, epsilon=self.RMSPropOptimizer_epsilon_generator,
                 centered=self.RMSPropOptimizer_centered_generator)
-        }[optimizer_name]
 
     @staticmethod
     def get_loss_function(loss_function, labels, logits):
@@ -557,22 +562,14 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        return {
-            # "absolute_difference": tf.losses.absolute_difference(
-            #     labels=labels, predictions=logits),
-            "hinge_loss": tf.losses.hinge_loss(
-                labels=labels, logits=logits),
-            # "log_loss": tf.losses.log_loss(
-            #     labels=labels, predictions=logits),#get_predictions(logits)),
-            # "mean_pairwise_squared_error": tf.losses.mean_pairwise_squared_error(
-            #     labels=labels, predictions=logits),
-            "mean_squared_error": tf.losses.mean_squared_error(
-                labels=labels, predictions=logits),
-            "sigmoid_cross_entropy": tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=labels, logits=logits),
-            "softmax_cross_entropy": tf.losses.softmax_cross_entropy(
-                onehot_labels=labels, logits=logits),
-        }[loss_function]
+        if loss_function == "hinge_loss":
+            return tf.losses.hinge_loss(labels=labels, logits=logits)
+        elif loss_function == "mean_squared_error":
+            return tf.losses.mean_squared_error(labels=labels, predictions=logits)
+        elif loss_function == "sigmoid_cross_entropy":
+            return tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+        elif loss_function == "softmax_cross_entropy":
+            return tf.losses.softmax_cross_entropy(onehot_labels=labels, logits=logits),
 
     @staticmethod
     def create_dense_layer(X, n_input_neurons, n_output_neurons, variable_scope_name, bias_init_value=0.0):

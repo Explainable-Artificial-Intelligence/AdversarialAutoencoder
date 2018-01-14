@@ -1,24 +1,159 @@
 import copy
 import random
 import itertools
+import numpy as np
+
 
 class AdversarialAutoencoderParameters:
     def __init__(self, **kwargs):
         self.parameters = kwargs
 
-    def update_parameter(self, parameter_name, parameter_value):
-        if parameter_name in self.parameters:
-            self.parameters[parameter_name] = parameter_value
-            print(self.parameters[parameter_name])
+    # def update_parameter(self, parameter_name, parameter_value):
+    #     if parameter_name in self.parameters:
+    #         self.parameters[parameter_name] = parameter_value
+    #         print(self.parameters[parameter_name])
+    #
+    # def get_single_parameter(self, parameter_name):
+    #     if parameter_name in self.parameters:
+    #         print(self.parameters[parameter_name])
+    #         return self.parameters[parameter_name]
+    #
+    # def get_all_parameters(self):
+    #     print(self.parameters)
+    #     return self.parameters
 
-    def get_single_parameter(self, parameter_name):
-        if parameter_name in self.parameters:
-            print(self.parameters[parameter_name])
-            return self.parameters[parameter_name]
+    # TODO: move this to some helper class (distributions would be probably best)
 
-    def get_all_parameters(self):
-        print(self.parameters)
-        return self.parameters
+    @staticmethod
+    def draw_from_distribution(distribution_name, n_samples=1, **distribution_parameters):
+
+        # set n_samples to None, so the np.random functions return a single value
+        if n_samples == 1:
+            n_samples = None
+
+        if distribution_name == "beta":
+            # a: alpha, float, non-negative; b: beta, float, non-negative
+            return np.random.beta(a=distribution_parameters["a"], b=distribution_parameters["b"], size=n_samples)
+        elif distribution_name == "binomial":
+            # n: int, >= 0; p: float, 0<=p<=1
+            return np.random.binomial(n=distribution_parameters["n"], p=distribution_parameters["p"],
+                                      size=n_samples)
+        elif distribution_name == "chisquare":
+            # df: degrees of freedom, int
+            return np.random.chisquare(df=distribution_parameters["df"], size=n_samples)
+        elif distribution_name == "dirichlet":
+            # alpha: array, e.g. (10, 5, 3)
+            return np.random.dirichlet(alpha=distribution_parameters["alpha"], size=n_samples)
+        elif distribution_name == "exponential":
+            # scale: float
+            return np.random.exponential(scale=distribution_parameters["scale"], size=n_samples)
+        elif distribution_name == "f":
+            # dfnum: int, >0; dfden, int, >0
+            return np.random.f(dfnum=distribution_parameters["dfnum"], dfden=distribution_parameters["dfden"],
+                               size=n_samples)
+        elif distribution_name == "gamma":
+            # shape: float, >0; scale: float, >0, default=1
+            return np.random.gamma(shape=distribution_parameters["shape"], scale=distribution_parameters["scale"],
+                                   size=n_samples)
+        elif distribution_name == "geometric":
+            # p: float (probability)
+            return np.random.geometric(p=distribution_parameters["p"], size=n_samples)
+        elif distribution_name == "gumbel":
+            # loc: float, default=0; scale: float, default=1
+            return np.random.gumbel(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
+                                    size=n_samples)
+        elif distribution_name == "hypergeometric":
+            # ngood: int, >=0; nbad: int, >=0; nsample: int, >=1, <= ngood+nbad
+            return np.random.hypergeometric(ngood=distribution_parameters["ngood"],
+                                            nbad=distribution_parameters["nbad"],
+                                            nsample=distribution_parameters["nsample"], size=n_samples)
+        elif distribution_name == "laplace":
+            # loc: float, default=0; scale: float, default=1
+            return np.random.laplace(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
+                                     size=n_samples)
+        elif distribution_name == "logistic":
+            # loc: float, default=0; scale: float, default=1
+            return np.random.logistic(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
+                                      size=n_samples)
+        elif distribution_name == "lognormal":
+            # mean: float, default=0; sigma: >0, default=1
+            return np.random.lognormal(mean=distribution_parameters["mean"],
+                                       sigma=distribution_parameters["sigma"], size=n_samples)
+        elif distribution_name == "logseries":
+            # p: float, 0<p<1
+            return np.random.logseries(p=distribution_parameters["p"], size=n_samples)
+        elif distribution_name == "multinomial":
+            # n: int; pvals: array of floats, sum(pvals)=1
+            return np.random.multinomial(n=distribution_parameters["n"], pvals=distribution_parameters["pvals"],
+                                         size=n_samples)
+        elif distribution_name == "multivariate_normal":
+            # mean: 1D array with length N; cov: 2D array of shape (N,N); tol: float
+            return np.random.multivariate_normal(mean=distribution_parameters["mean"],
+                                                 cov=distribution_parameters["cov"],
+                                                 tol=distribution_parameters["tol"], size=n_samples)
+        elif distribution_name == "negative_binomial":
+            # n: int, >0; p: float, 0<=p<=1;
+            return np.random.negative_binomial(n=distribution_parameters["n"],
+                                               p=distribution_parameters["p"], size=n_samples)
+        elif distribution_name == "noncentral_chisquare":
+            # df: int, >0; nonc: float, >0
+            return np.random.noncentral_chisquare(df=distribution_parameters["df"],
+                                                  nonc=distribution_parameters["nonc"],
+                                                  size=n_samples)
+        elif distribution_name == "noncentral_f":
+            # dfnum: int, >1; dfden: int, >1; nonc: float, >=0
+            return np.random.noncentral_f(dfnum=distribution_parameters["dfnum"],
+                                          dfden=distribution_parameters["dfden"],
+                                          nonc=distribution_parameters["nonc"], size=n_samples)
+        elif distribution_name == "normal":
+            # loc: float; scale: float
+            return np.random.normal(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
+                                    size=n_samples)
+        elif distribution_name == "pareto":
+            # a: float, >0
+            return np.random.pareto(a=distribution_parameters["a"], size=n_samples)
+        elif distribution_name == "poisson":
+            # lam: float, >=0
+            return np.random.poisson(lam=distribution_parameters["lam"], size=n_samples)
+        elif distribution_name == "power":
+            # a: float, >=0
+            return np.random.power(a=distribution_parameters["a"], size=n_samples)
+        elif distribution_name == "rayleigh":
+            # scale: float, >=0, default=1
+            return np.random.rayleigh(scale=distribution_parameters["scale"], size=n_samples)
+        elif distribution_name == "standard_cauchy":
+            return np.random.standard_cauchy(size=n_samples)
+        elif distribution_name == "standard_gamma":
+            # shape: float, >0
+            return np.random.standard_gamma(shape=distribution_parameters["shape"], size=n_samples)
+        elif distribution_name == "standard_normal":
+            return np.random.standard_normal(size=n_samples)
+        elif distribution_name == "standard_t":
+            # df: int, >0
+            return np.random.standard_t(df=distribution_parameters["df"], size=n_samples)
+        elif distribution_name == "triangular":
+            # left: float; mode: float, left <= mode <= right; right: float, >left
+            return np.random.triangular(left=distribution_parameters["left"],
+                                        mode=distribution_parameters["mode"],
+                                        right=distribution_parameters["right"], size=n_samples)
+        elif distribution_name == "uniform":
+            # low: float, default=0; high: float, default=1
+            return np.random.uniform(low=distribution_parameters["low"], high=distribution_parameters["high"],
+                                     size=n_samples)
+        elif distribution_name == "vonmises":
+            # mu: float; kappa: float, >=0
+            return np.random.vonmises(mu=distribution_parameters["mu"], kappa=distribution_parameters["kappa"],
+                                      size=n_samples)
+        elif distribution_name == "wald":
+            # mean: float, >0; scale: float, >=0
+            return np.random.wald(mean=distribution_parameters["mean"], scale=distribution_parameters["scale"],
+                                  size=n_samples)
+        elif distribution_name == "weibull":
+            # a: float, >0
+            return np.random.weibull(a=distribution_parameters["a"], size=n_samples)
+        elif distribution_name == "zipf":
+            # a: float, >1
+            return np.random.zipf(a=distribution_parameters["a"], size=n_samples)
 
     @staticmethod
     def get_default_parameters():
@@ -150,7 +285,7 @@ class AdversarialAutoencoderParameters:
         #   - learning rate
         #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
         #   default: 0.1
-        AdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
+        AdagradOptimizer_initial_accumulator_value_autoencoder = [0.1, 0.01, 0.001]
         AdagradOptimizer_initial_accumulator_value_discriminator = 0.1
         AdagradOptimizer_initial_accumulator_value_generator = 0.1
 
@@ -299,7 +434,8 @@ class AdversarialAutoencoderParameters:
                                     "bias_init_value_of_hidden_layer_x_autoencoder",
                                     "bias_init_value_of_hidden_layer_x_discriminator"]
             # check for hard coded grid search parameters (they are lists)
-            for var_name in list(locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
+            for var_name in list(
+                    locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
                 # ignore the variables which are always lists
                 if var_name not in local_vars_to_ignore:
                     if type(locals()[var_name]) == list:
@@ -338,8 +474,6 @@ class AdversarialAutoencoderParameters:
 
         # stores all the resulting parameter combinations
         all_final_parameter_combinations_list = []
-
-        print(param_values)
 
         # get all combinations
         parameter_value_combinations = list(itertools.product(*param_values))
@@ -447,8 +581,8 @@ class AdversarialAutoencoderParameters:
         #   - beta2: A float value or a constant float tensor. The exponential decay rate for the 2nd moment estimates.
         #   default: 0.999
         #   - epsilon: A small constant for numerical stability. default: 1e-08
-        AdamOptimizer_beta1_autoencoder =  random.uniform(0.8, 1.0)
-        AdamOptimizer_beta2_autoencoder =  random.uniform(0.99, 1.0)
+        AdamOptimizer_beta1_autoencoder = random.uniform(0.8, 1.0)
+        AdamOptimizer_beta2_autoencoder = random.uniform(0.99, 1.0)
         AdamOptimizer_epsilon_autoencoder = random.uniform(1e-07, 1e-09)
         AdamOptimizer_beta1_discriminator = random.uniform(0.8, 1.0)
         AdamOptimizer_beta2_discriminator = random.uniform(0.99, 1.0)
@@ -551,7 +685,8 @@ class AdversarialAutoencoderParameters:
         else:
             local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
                                     "local_vars_to_ignore", "args", "kwargs"]
-            for var_name in list(locals()): # convert to list to avoid RuntimeError: dictionary changed during iteration
+            for var_name in list(
+                    locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
                 if var_name not in local_vars_to_ignore:
                     param_dict[var_name] = locals()[var_name]
 

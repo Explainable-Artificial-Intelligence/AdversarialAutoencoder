@@ -1,6 +1,10 @@
+import ast
+import timeit
+
 import AdversarialAutoencoder
 import AdversarialAutoencoderParameters
 import random
+import numpy as np
 
 
 def do_gridsearch(*args, **kwargs):
@@ -140,7 +144,23 @@ def testing():
     """
     test random search
     """
-    do_randomsearch()
+    # do_randomsearch(1)
+
+    aae_parameter_class = AdversarialAutoencoderParameters.AdversarialAutoencoderParameters()
+
+    aae_parameter_class.draw_from_distribution("normal", loc=1.0, scale=2.0, n_samples=1)
+
+    print(aae_parameter_class.draw_from_distribution("normal", loc=1.0, scale=2.0, n_samples=1))
+    print(aae_parameter_class.draw_from_distribution("uniform", low=50, high=500))
+
+    print(np.random.normal(loc=1.0, scale=2.0))
+
+    print()
+
+
+    # do_randomsearch(2, "batch_size", learning_rate_autoencoder={"distribution_name": "normal", "loc": 1.0, "scale": 2.0})
+
+    return
 
     do_randomsearch(2, "batch_size", learning_rate_autoencoder=random.uniform(0.2, 0.001))
 
@@ -148,8 +168,15 @@ def testing():
 
     do_randomsearch(5, "batch_size", "learning_rate_autoencoder")
 
+    do_randomsearch(10, batch_size=random.uniform(0.2, 0.001))
+
     do_randomsearch(5, learning_rate_autoencoder=random.uniform(0.2, 0.001),
                     learning_rate_discriminator=random.uniform(0.2, 0.001))
+
+    print(eval("random.uniform(0.2, 0.001)"))
+    print(ast.literal_eval("random.uniform(0.2, 0.001)"))
+
+    return
 
     """
     test grid search
@@ -164,6 +191,9 @@ def testing():
     do_gridsearch()
 
     do_gridsearch("n_neurons_of_hidden_layer_x_autoencoder", learning_rate_autoencoder=[0.5],
+                  MomentumOptimizer_momentum_autoencoder=[1.0])
+
+    do_gridsearch("n_neurons_of_hidden_layer_x_autoencoder", learning_rate_autoencoder=[0.5, 0.1, 0.01, 0.001],
                   MomentumOptimizer_momentum_autoencoder=[1.0])
 
 
