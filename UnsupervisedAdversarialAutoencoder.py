@@ -3,126 +3,44 @@
     https://arxiv.org/abs/1511.05644 by Goodfellow et. al. and the implementation available on
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
+import json
 
 import tensorflow as tf
 import os
 import numpy as np
-from tensorflow.examples.tutorials.mnist import input_data
 import datetime
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
-import collections
 import DataLoading
 
 
-# def get_predictions(logits):
-#     condition = tf.less(logits, 0.0)
-#     return tf.where(condition, tf.zeros_like(logits), tf.ones_like(logits))
-
-
 class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
-
     def __init__(self, parameter_dictionary):
-        """
-        constructor
-        :param optimizer_autoencoder:
-        :param optimizer_discriminator:
-        :param optimizer_generator:
-        :param AdadeltaOptimizer_rho_autoencoder:
-        :param AdadeltaOptimizer_epsilon_autoencoder:
-        :param AdadeltaOptimizer_rho_discriminator:
-        :param AdadeltaOptimizer_epsilon_discriminator:
-        :param AdadeltaOptimizer_rho_generator:
-        :param AdadeltaOptimizer_epsilon_generator:
-        :param AdagradOptimizer_initial_accumulator_value_autoencoder:
-        :param AdagradOptimizer_initial_accumulator_value_discriminator:
-        :param AdagradOptimizer_initial_accumulator_value_generator:
-        :param MomentumOptimizer_momentum_autoencoder:
-        :param MomentumOptimizer_use_nesterov_autoencoder:
-        :param MomentumOptimizer_momentum_discriminator:
-        :param MomentumOptimizer_use_nesterov_discriminator:
-        :param MomentumOptimizer_momentum_generator:
-        :param MomentumOptimizer_use_nesterov_generator:
-        :param AdamOptimizer_epsilon_autoencoder:
-        :param AdamOptimizer_epsilon_discriminator:
-        :param AdamOptimizer_epsilon_generator:
-        :param FtrlOptimizer_learning_rate_power_autoencoder:
-        :param FtrlOptimizer_initial_accumulator_value_autoencoder:
-        :param FtrlOptimizer_l1_regularization_strength_autoencoder:
-        :param FtrlOptimizer_l2_regularization_strength_autoencoder:
-        :param FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder:
-        :param FtrlOptimizer_learning_rate_power_discriminator:
-        :param FtrlOptimizer_initial_accumulator_value_discriminator:
-        :param FtrlOptimizer_l1_regularization_strength_discriminator:
-        :param FtrlOptimizer_l2_regularization_strength_discriminator:
-        :param FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator:
-        :param FtrlOptimizer_learning_rate_power_generator:
-        :param FtrlOptimizer_initial_accumulator_value_generator:
-        :param FtrlOptimizer_l1_regularization_strength_generator:
-        :param FtrlOptimizer_l2_regularization_strength_generator:
-        :param FtrlOptimizer_l2_shrinkage_regularization_strength_generator:
-        :param ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder:
-        :param ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder:
-        :param ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator:
-        :param ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator:
-        :param ProximalGradientDescentOptimizer_l1_regularization_strength_generator:
-        :param ProximalGradientDescentOptimizer_l2_regularization_strength_generator:
-        :param ProximalAdagradOptimizer_initial_accumulator_value_autoencoder:
-        :param ProximalAdagradOptimizer_l1_regularization_strength_autoencoder:
-        :param ProximalAdagradOptimizer_l2_regularization_strength_autoencoder:
-        :param ProximalAdagradOptimizer_initial_accumulator_value_discriminator:
-        :param ProximalAdagradOptimizer_l1_regularization_strength_discriminator:
-        :param ProximalAdagradOptimizer_l2_regularization_strength_discriminator:
-        :param ProximalAdagradOptimizer_initial_accumulator_value_generator:
-        :param ProximalAdagradOptimizer_l1_regularization_strength_generator:
-        :param ProximalAdagradOptimizer_l2_regularization_strength_generator:
-        :param RMSPropOptimizer_decay_autoencoder:
-        :param RMSPropOptimizer_momentum_autoencoder:
-        :param RMSPropOptimizer_epsilon_autoencoder:
-        :param RMSPropOptimizer_centered_autoencoder:
-        :param RMSPropOptimizer_decay_discriminator:
-        :param RMSPropOptimizer_momentum_discriminator:
-        :param RMSPropOptimizer_epsilon_discriminator:
-        :param RMSPropOptimizer_centered_discriminator:
-        :param RMSPropOptimizer_decay_generator:
-        :param RMSPropOptimizer_momentum_generator:
-        :param RMSPropOptimizer_epsilon_generator:
-        :param RMSPropOptimizer_centered_generator:
-        :param input_dim: input dimension of the data
-        :param z_dim: dimension of the latent reprensentation
-        :param batch_size: number of training examples in one forward/backward pass
-        :param n_epochs: number of epochs for training
-        :param n_neurons_of_hidden_layer_x_autoencoder: array holding the number of neurons for the layers of the
-        autoencoder; position x in array corresponds to layer x+1
-        :param n_neurons_of_hidden_layer_x_discriminator: array holding the number of neurons for the layers of the
-        discriminator; position x in array corresponds to layer x+1
-        :param bias_init_value_of_hidden_layer_x_autoencoder: array holding the initial bias values for the layers of
-        the autoencoder; position x in array corresponds to layer x+1
-        :param bias_init_value_of_hidden_layer_x_discriminator: array holding the initial bias values for the layers of
-        the discriminator; position x in array corresponds to layer x+1
-        :param learning_rate_autoencoder: learning rate of the autoencoder optimizer
-        :param learning_rate_discriminator: learning rate of the discriminator optimizer
-        :param learning_rate_generator: learning rate of the generator optimizer
-        :param AdamOptimizer_beta1_autoencoder: exponential decay rate for the 1st moment estimates for the adam
-        optimizer for the autoencoder.
-        :param AdamOptimizer_beta1_discriminator: exponential decay rate for the 1st moment estimates for the adam
-        optimizer for the discriminator.
-        :param AdamOptimizer_beta1_generator: exponential decay rate for the 1st moment estimates for the adam
-        optimizer for the generator.
-        :param AdamOptimizer_beta2_autoencoder: exponential decay rate for the 2nd moment estimates for the adam
-        optimizer for the autoencoder.
-        :param AdamOptimizer_beta2_discriminator: exponential decay rate for the 2nd moment estimates for the adam
-        optimizer for the discriminator.
-        :param AdamOptimizer_beta2_generator: exponential decay rate for the 2nd moment estimates for the adam
-        optimizer for the generator.
-        :param results_path: path where to store the log, the saved models and the tensorboard event file
-        """
+
+        self.result_folder_name = None
+        self.parameter_dictionary = parameter_dictionary
+        self.verbose = parameter_dictionary["verbose"]
+
+        self.input_dim_x = parameter_dictionary["input_dim_x"]
+        self.input_dim_y = parameter_dictionary["input_dim_y"]
+
+        # input is RGB image
+        if parameter_dictionary["color_scale"] == "rgb_scale":
+            self.color_scale = "rgb_scale"
+            self.input_dim = parameter_dictionary["input_dim_x"] * parameter_dictionary["input_dim_y"] * 3
+        # input is gray scale image
+        else:
+            self.color_scale = "gray_scale"
+            self.input_dim = parameter_dictionary["input_dim_x"] * parameter_dictionary["input_dim_y"]
 
         self.performance = None
+        optimizer_autoencoder = parameter_dictionary["optimizer_autoencoder"]
+        optimizer_discriminator = parameter_dictionary["optimizer_discriminator"]
+        optimizer_generator = parameter_dictionary["optimizer_generator"]
 
-        self.input_dim = parameter_dictionary["input_dim"]
-        self.z_dim = parameter_dictionary["z_dim"]
+        # dataset selected by the user (MNIST, SVHN, cifar10, custom)
+        self.selected_dataset = parameter_dictionary["selected_dataset"]
 
         """
         params for network topology
@@ -130,11 +48,14 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # number of neurons of the hidden layers
         self.n_neurons_of_hidden_layer_x_autoencoder = parameter_dictionary["n_neurons_of_hidden_layer_x_autoencoder"]
-        self.n_neurons_of_hidden_layer_x_discriminator = parameter_dictionary["n_neurons_of_hidden_layer_x_discriminator"]
+        self.n_neurons_of_hidden_layer_x_discriminator = parameter_dictionary[
+            "n_neurons_of_hidden_layer_x_discriminator"]
 
         # initial bias values of the hidden layers
-        self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary["bias_init_value_of_hidden_layer_x_autoencoder"]
-        self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary["bias_init_value_of_hidden_layer_x_discriminator"]
+        self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
+            "bias_init_value_of_hidden_layer_x_autoencoder"]
+        self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
+            "bias_init_value_of_hidden_layer_x_discriminator"]
 
         """
         params for learning
@@ -145,6 +66,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # number of training examples in one forward/backward pass
         self.batch_size = parameter_dictionary["batch_size"]
+
+        # dimension of the latent representation
+        self.z_dim = parameter_dictionary["z_dim"]
 
         # learning rate for the different parts of the network
         self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
@@ -173,10 +97,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             parameter_dictionary["AdagradOptimizer_initial_accumulator_value_generator"]
 
         self.MomentumOptimizer_momentum_autoencoder = parameter_dictionary["MomentumOptimizer_momentum_autoencoder"]
-        self.MomentumOptimizer_use_nesterov_autoencoder = parameter_dictionary["MomentumOptimizer_use_nesterov_autoencoder"]
+        self.MomentumOptimizer_use_nesterov_autoencoder = parameter_dictionary[
+            "MomentumOptimizer_use_nesterov_autoencoder"]
 
         self.MomentumOptimizer_momentum_discriminator = parameter_dictionary["MomentumOptimizer_momentum_discriminator"]
-        self.MomentumOptimizer_use_nesterov_discriminator = parameter_dictionary["MomentumOptimizer_use_nesterov_discriminator"]
+        self.MomentumOptimizer_use_nesterov_discriminator = parameter_dictionary[
+            "MomentumOptimizer_use_nesterov_discriminator"]
 
         self.MomentumOptimizer_momentum_generator = parameter_dictionary["MomentumOptimizer_momentum_generator"]
         self.MomentumOptimizer_use_nesterov_generator = parameter_dictionary["MomentumOptimizer_use_nesterov_generator"]
@@ -298,21 +224,19 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # path for the results
         self.results_path = parameter_dictionary["results_path"]
 
-        batch_size = parameter_dictionary["batch_size"]
-        input_dim = parameter_dictionary["input_dim"]
-        z_dim = parameter_dictionary["z_dim"]
-        optimizer_autoencoder = parameter_dictionary["optimizer_autoencoder"]
-        optimizer_discriminator = parameter_dictionary["optimizer_discriminator"]
-        optimizer_generator = parameter_dictionary["optimizer_generator"]
+        """
+        placeholder variables 
+        """
 
         # holds the input data
-        self.X = tf.placeholder(dtype=tf.float32, shape=[batch_size, input_dim], name='Input')
+        self.X = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim], name='Input')
         # holds the desired output of the autoencoder
-        self.X_target = tf.placeholder(dtype=tf.float32, shape=[batch_size, input_dim], name='Target')
+        self.X_target = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim], name='Target')
         # holds the real distribution p(z) used as positive sample for the discriminator
-        self.real_distribution = tf.placeholder(dtype=tf.float32, shape=[batch_size, z_dim], name='Real_distribution')
+        self.real_distribution = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
+                                                name='Real_distribution')
         # holds the input samples for the decoder (only for generating the images; NOT used for training)
-        self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, z_dim], name='Decoder_input')
+        self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, self.z_dim], name='Decoder_input')
 
         """
         Init the network; generator doesn't need to be initiated, since the generator is the encoder of the autoencoder
@@ -336,10 +260,6 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             discriminator_neg_samples = \
                 self.discriminator(encoder_output, reuse=True,
                                    bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
-
-        # TODO: only for testing
-        self.discriminator_neg_samples_ = discriminator_neg_samples
-        self.discriminator_pos_samples_ = discriminator_pos_samples
 
         # output of the decoder
         with tf.variable_scope(tf.get_variable_scope()):
@@ -405,6 +325,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
     def get_performance(self):
         return self.performance
+
+    def get_result_folder_name(self):
+        return self.result_folder_name
 
     def get_optimizer_autoencoder(self, optimizer_name):
 
@@ -763,9 +686,41 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param real_distribution:
         :return:
         """
-        # Reshape immages to display them
-        input_images = tf.reshape(self.X, [-1, 28, 28, 1])
-        generated_images = tf.reshape(decoder_output, [-1, 28, 28, 1])
+
+        if self.color_scale == "rgb_scale":
+            # calculate the number of pixels we have per channel (red, green and blue)
+            n_colored_pixels_per_channel = self.input_dim_x * self.input_dim_y
+
+            # first input_dim_one_channel pixels: red
+            red_pixels_input_images = tf.reshape(self.X[:, :n_colored_pixels_per_channel],
+                                                 [-1, self.input_dim_x, self.input_dim_y, 1])
+            # next input_dim_one_channel pixels: green
+            green_pixels_input_images = tf.reshape(self.X[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2],
+                                                   [-1, self.input_dim_x, self.input_dim_y, 1])
+            # last input_dim_one_channel pixels: blue
+            blue_pixels_input_images = tf.reshape(self.X[:, n_colored_pixels_per_channel * 2:],
+                                                  [-1, self.input_dim_x, self.input_dim_y, 1])
+
+            # create the RBG image
+            input_images = tf.concat([red_pixels_input_images, green_pixels_input_images, blue_pixels_input_images], 3)
+
+            # first input_dim_one_channel pixels: red
+            red_pixels_generated_images = tf.reshape(decoder_output[:, :n_colored_pixels_per_channel],
+                                                     [-1, self.input_dim_x, self.input_dim_y, 1])
+            # next input_dim_one_channel pixels: green
+            green_pixels_generated_images = \
+                tf.reshape(decoder_output[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2],
+                           [-1, self.input_dim_x, self.input_dim_y, 1])
+            # last input_dim_one_channel pixels: blue
+            blue_pixels_generated_images = tf.reshape(decoder_output[:, n_colored_pixels_per_channel * 2:],
+                                                      [-1, self.input_dim_x, self.input_dim_y, 1])
+            # create the RBG image
+            generated_images = tf.concat([red_pixels_generated_images, green_pixels_generated_images,
+                                          blue_pixels_generated_images], 3)
+        else:
+            # Reshape immages to display them
+            input_images = tf.reshape(self.X, [-1, self.input_dim_x, self.input_dim_y, 1])
+            generated_images = tf.reshape(decoder_output, [-1, self.input_dim_x, self.input_dim_y, 1])
 
         # Tensorboard visualization
         tf.summary.scalar(name='Autoencoder Loss', tensor=autoencoder_loss)
@@ -773,8 +728,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         tf.summary.scalar(name='Generator Loss', tensor=generator_loss)
         tf.summary.histogram(name='Encoder Distribution', values=encoder_output)
         tf.summary.histogram(name='Real Distribution', values=real_distribution)
-        tf.summary.image(name='Input Images', tensor=input_images, max_outputs=10)
-        tf.summary.image(name='Generated Images', tensor=generated_images, max_outputs=10)
+        tf.summary.image(name='Input Images', tensor=input_images, max_outputs=50)
+        tf.summary.image(name='Generated Images', tensor=generated_images, max_outputs=50)
         summary_op = tf.summary.merge_all()
         return summary_op
 
@@ -786,11 +741,15 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"). \
             replace(" ", ":").replace(":", "_")
 
-        folder_name = "/{0}_Adversarial_Autoencoder". \
-            format(date)
+        folder_name = "/{0}_{1}". \
+            format(date, self.selected_dataset)
+        self.result_folder_name = folder_name
         tensorboard_path = self.results_path + folder_name + '/Tensorboard'
         saved_model_path = self.results_path + folder_name + '/Saved_models/'
         log_path = self.results_path + folder_name + '/log'
+
+        if not os.path.exists(self.results_path):
+            os.mkdir(self.results_path)
         if not os.path.exists(self.results_path + folder_name):
             os.mkdir(self.results_path + folder_name)
             os.mkdir(tensorboard_path)
@@ -811,6 +770,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         x_points = np.arange(-10, 10, 1.5).astype(np.float32)
         y_points = np.arange(-10, 10, 1.5).astype(np.float32)
 
+        # TODO: adjust function that it also works with RGB data
+
         nx, ny = len(x_points), len(y_points)
         plt.subplot()
         gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
@@ -823,12 +784,34 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # run the decoder
             x = sess.run(op, feed_dict={self.decoder_input: z})
             ax = plt.subplot(g)
-            img = np.array(x.tolist()).reshape(28, 28)
+            img = np.array(x.tolist()).reshape(self.input_dim_x, self.input_dim_y)
             ax.imshow(img, cmap='gray')
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_aspect('auto')
         plt.show()
+
+    @staticmethod
+    def get_input_data(selected_dataset):
+        """
+        returns the input data set based on self.selected_dataset
+        :return: object holding the train data, the test data and the validation data
+        """
+
+        # Modified National Institute of Standards and Technology
+        if selected_dataset == "MNIST":
+            return DataLoading.read_mnist_data_from_ubyte('./data', one_hot=True)
+        # Street View House Numbers
+        elif selected_dataset == "SVHN":
+            return DataLoading.read_svhn_from_mat('./data', one_hot=True)
+        elif selected_dataset == "cifar10":
+            # TODO:
+            print("not yet implemented")
+            return
+        elif selected_dataset == "custom":
+            # TODO:
+            print("not yet implemented")
+            return
 
     def train(self, is_train_mode_active=True):
         """
@@ -838,18 +821,10 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        # Get the MNIST data
-        # todo: no more hard coded input
-        mnist = input_data.read_data_sets('./data', one_hot=True)
+        log_path = None
 
-        # options = dict(dtype=dtype, reshape=reshape, seed=seed)
-        #
-        # train = DataSet(train_images, train_labels, **options)
-        # validation = DataSet(validation_images, validation_labels, **options)
-        # test = DataSet(test_images, test_labels, **options)
-        #
-        # dataSet = collections.namedtuple('Datasets', ['train', 'validation', 'test'])
-        # data = dataSet(train=train, validation=validation, test=test)
+        # Get the data
+        data = self.get_input_data(self.selected_dataset)
 
         # Saving the model
         saver = tf.train.Saver()
@@ -874,8 +849,10 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 for i in range(self.n_epochs):
 
                     # calculate the number of batches based on the batch_size and the size of the train set
-                    n_batches = int(mnist.train.num_examples / self.batch_size)
-                    print("------------------Epoch {}/{}------------------".format(i, self.n_epochs))
+                    n_batches = int(data.train.num_examples / self.batch_size)
+
+                    if self.verbose:
+                        print("------------------Epoch {}/{}------------------".format(i, self.n_epochs))
 
                     # iterate over the batches
                     for b in range(1, n_batches + 1):
@@ -887,7 +864,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         z_real_dist = np.random.randn(self.batch_size, self.z_dim) * 5.
 
                         # get the batch from the training data
-                        batch_x, batch_labels = mnist.train.next_batch(self.batch_size)
+                        batch_x, batch_labels = data.train.next_batch(self.batch_size)
                         # print(batch_x)
 
                         """
@@ -913,20 +890,19 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # every 50 steps: write a summary
                         if b % 50 == 0:
-                            a_loss, d_loss, g_loss, summary, discriminator_neg_samples_, discriminator_pos_samples_ = sess.run(
+                            a_loss, d_loss, g_loss, summary = sess.run(
                                 [self.autoencoder_loss, self.discriminator_loss, self.generator_loss,
-                                 self.tensorboard_summary, self.discriminator_neg_samples_,
-                                 self.discriminator_pos_samples_],
+                                 self.tensorboard_summary],
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
                                            self.real_distribution: z_real_dist})
                             writer.add_summary(summary, global_step=step)
-                            print("Epoch: {}, iteration: {}".format(i, b))
-                            print("summed losses:", a_loss + d_loss + g_loss)
-                            # print(discriminator_neg_samples_)
-                            # print(discriminator_pos_samples_)
-                            print("Autoencoder Loss: {}".format(a_loss))
-                            print("Discriminator Loss: {}".format(d_loss))
-                            print("Generator Loss: {}".format(g_loss))
+
+                            if self.verbose:
+                                print("Epoch: {}, iteration: {}".format(i, b))
+                                print("summed losses:", a_loss + d_loss + g_loss)
+                                print("Autoencoder Loss: {}".format(a_loss))
+                                print("Discriminator Loss: {}".format(d_loss))
+                                print("Generator Loss: {}".format(g_loss))
 
                             autoencoder_loss_final = a_loss
                             discriminator_loss_final = d_loss
@@ -939,22 +915,33 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 log.write("Generator Loss: {}\n".format(g_loss))
                         step += 1
 
-                        # saver.save(sess, save_path=saved_model_path, global_step=step)
+                # saver.save(sess, save_path=saved_model_path, global_step=step)
 
             # display the generated images of the latest trained autoencoder
             else:
                 # Get the latest results folder
                 all_results = os.listdir(self.results_path)
                 all_results.sort()
+
                 saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
                                                                          + '/Saved_models/'))
                 self.generate_image_grid(sess, op=self.decoder_output)
+
+        # write the parameter dictionary to some file
+        json_dictionary = json.dumps(self.parameter_dictionary)
+        with open(log_path + '/params.txt', 'a') as file:
+            file.write(json_dictionary)
+
+        if self.verbose:
+            print("Autoencoder Loss: {}".format(autoencoder_loss_final))
+            print("Discriminator Loss: {}".format(discriminator_loss_final))
+            print("Generator Loss: {}".format(generator_loss_final))
 
         # TODO: use weights for the losses (autoencoder loss more important than discrimininator..)
         self.performance = {"autoencoder_loss_final": autoencoder_loss_final,
                             "discriminator_loss_final": discriminator_loss_final,
                             "generator_loss_final": generator_loss_final,
-                            "summed_loss_final": autoencoder_loss_final+discriminator_loss_final+generator_loss_final}
+                            "summed_loss_final": autoencoder_loss_final + discriminator_loss_final + generator_loss_final}
 
         sess.close()
         tf.reset_default_graph()

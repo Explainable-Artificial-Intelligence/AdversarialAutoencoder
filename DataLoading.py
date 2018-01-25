@@ -9,6 +9,8 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.platform import gfile
 import glob
 import matplotlib.pyplot as plt
+import tensorflow as tf
+from scipy.io import loadmat
 
 import timeit
 
@@ -17,6 +19,195 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/py
 """
 
 DEFAULT_SOURCE_URL = 'https://storage.googleapis.com/cvdf-datasets/mnist/'
+
+"""
+Read tfrecords file
+"""
+# TODO: implement
+
+
+def read_and_decode(filename_queue, input_dim):
+    """
+    reads the filename queue and returns the images and labels
+    :param filename_queue: filename queue to read
+    :param input_dim: input dimension
+    :return: image and label
+    """
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(filename_queue)
+    features = tf.parse_single_example(
+        serialized_example,
+        # Defaults are not specified since both keys are required.
+        features={
+            # TODO:
+            # 'image_raw': tf.FixedLenFeature([], tf.string),
+            'image': tf.FixedLenFeature([], tf.string),
+            'label': tf.FixedLenFeature([], tf.int64),
+        })
+
+    # Convert from a scalar string tensor (whose single string has
+    # length mnist.IMAGE_PIXELS) to a uint8 tensor with shape
+    # [mnist.IMAGE_PIXELS].
+    # TODO:
+    # image = tf.decode_raw(features['image_raw'], tf.uint8)
+    image = tf.decode_raw(features['image'], tf.uint8)
+    # TODO:
+    # image.set_shape([mnist.IMAGE_PIXELS])
+    image.set_shape([input_dim])
+    # image.set_shape([IMAGE_SIZE*IMAGE_SIZE])
+
+    # OPTIONAL: Could reshape into a 28x28 image and apply distortions
+    # here.    Since we are not applying any distortions in this
+    # example, and the next step expects the image to be flattened
+    # into a vector, we don't bother.
+
+    # Convert from [0, 255] -> [-0.5, 0.5] floats.
+    # image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
+
+    # Convert from [0, 255] -> [0, 1.0] floats.
+    image = tf.cast(image, tf.float32) * (1. / 255)
+
+    # Convert label from a scalar uint8 tensor to an int32 scalar.
+    label = tf.cast(features['label'], tf.int32)
+
+    return image, label
+
+
+def inputs(filename, batch_size, input_dim):
+    """Reads input data.
+
+    Args:
+        filename: File name to read as input
+        batch_size: Number of examples per returned batch.
+        input_dim: input dimension of the data
+
+    Returns:
+        A tuple (images, labels), where:
+        * images is a float tensor with shape [batch_size, mnist.IMAGE_PIXELS]
+            in the range [0, 1.0].
+        * labels is an int32 tensor with shape [batch_size] with the true label,
+            a number in the range [0, mnist.NUM_CLASSES).
+    """
+    # filename = os.path.join(self.FLAGS.data_dir, self.TRAIN_FILE)
+
+    with tf.name_scope('input'):
+        filename_queue = tf.train.string_input_producer([filename])
+
+        # Even when reading in multiple threads, share the filename
+        # queue.
+        image, label = read_and_decode(filename_queue, input_dim)
+
+        # Shuffle the examples and collect them into batch_size batches.
+        # (Internally uses a RandomShuffleQueue.)
+        # We run this in two threads to avoid being a bottleneck.
+        images, sparse_labels = tf.train.shuffle_batch(
+            [image, label], batch_size=batch_size, num_threads=2,
+            capacity=1000 + 3 * batch_size,
+            # Ensures a minimum amount of shuffling of examples.
+            min_after_dequeue=1000)
+
+        return images, sparse_labels
+
+
+"""
+Read .mat file (svhn dataset) based on https://github.com/bdiesel/tensorflow-svhn/blob/master/svhn_data.py
+"""
+
+
+def convert_labels_to_one_hot(labels, num_classes):
+    labels = (np.arange(num_classes) == labels[:, None]).astype(np.float32)
+    return labels
+
+
+def convert_imgs_to_array(img_array, pixel_depth=255):
+    rows = img_array.shape[0]
+    cols = img_array.shape[1]
+    chans = img_array.shape[2]
+    num_imgs = img_array.shape[3]
+    scalar = 1 / pixel_depth
+    # Note: not the most efficent way but can monitor what is happening
+    # new_array = np.empty(shape=(num_imgs, rows, cols, chans), dtype=np.float32)
+    # for x in range(0, num_imgs):
+    #     new_array[x] = img_array[:, :, :, x]
+    # return new_array.reshape(num_imgs, 32*32*3)
+
+    new_array = np.empty(shape=(num_imgs, rows*cols*chans), dtype=np.float32)
+    for x in range(0, num_imgs):
+
+        red_pixels = img_array[:, :, 0, x].flatten()
+        green_pixels = img_array[:, :, 1, x].flatten()
+        blue_pixels = img_array[:, :, 2, x].flatten()
+
+
+        temp = np.append(red_pixels, green_pixels)
+        temp = np.append(temp, blue_pixels)
+
+
+        new_array[x] = temp
+
+
+        # print(img_array[:, :, :, x].shape)
+        # print(img_array[:, :, :, x])
+        # tf.concat([red_pixels_input_images, green_pixels_input_images, blue_pixels_input_images], 3)
+        # np.stack(red_pixels, green_pixels, blue_pixels, axis=3)
+        # new_array[x] = np.concatenate(red_pixels, green_pixels, blue_pixels, axis=3)
+
+        # TODO: works
+        # new_array[x] = img_array[:, :, :, x].flatten()
+
+        # new_array[x] = img_array[:, :, :, x]
+    return new_array
+
+
+def process_svhn_file(file, one_hot=False, num_classes=10):
+    data = loadmat(file)
+    imgs = data['X']
+    labels = data['y'].flatten()
+    labels[labels == 10] = 0  # Fix for weird labeling in dataset
+    if one_hot:
+        labels_one_hot = convert_labels_to_one_hot(labels, num_classes)
+    else:
+        labels_one_hot = labels
+    img_array = convert_imgs_to_array(imgs)
+    return img_array, labels_one_hot
+
+
+def read_svhn_from_mat(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
+                       reshape=False, seed=None):
+
+    train_filename = data_dir + "/svhn_train_32x32.mat"
+    test_filename = data_dir + "/svhn_test_32x32.mat"
+
+    train_file = open(train_filename, 'rb')
+    train_images, train_labels = process_svhn_file(train_file, one_hot, num_classes)
+    train_file.close()
+
+    test_file = open(test_filename, 'rb')
+    test_images, test_labels = process_svhn_file(test_file, one_hot, num_classes)
+    test_file.close()
+
+
+
+    # TODO:
+
+    validation_images = train_images[:validation_size]
+    validation_labels = train_labels[:validation_size]
+    train_images = train_images[validation_size:]
+    train_labels = train_labels[validation_size:]
+
+    options = dict(dtype=dtype, reshape=reshape, seed=seed)
+
+    train = DataSet(train_images, train_labels, **options)
+    validation = DataSet(validation_images, validation_labels, **options)
+    test = DataSet(test_images, test_labels, **options)
+
+    return base.Datasets(train=train, validation=validation, test=test)
+
+
+
+"""
+Read other file formats
+"""
 
 
 def get_bytes_from_file(filename):
@@ -92,8 +283,8 @@ def extract_labels(f, one_hot=False, num_classes=10):
         return labels
 
 
-def read_data_sets(train_dir, fake_data=False, one_hot=False, dtype=dtypes.float32, reshape=True, validation_size=5000,
-                   seed=None, source_url=DEFAULT_SOURCE_URL):
+def read_mnist_data_from_ubyte(train_dir, fake_data=False, one_hot=False, dtype=dtypes.float32, reshape=True, validation_size=5000,
+                               seed=None, source_url=DEFAULT_SOURCE_URL):
     if fake_data:
         def fake():
             return DataSet([], [], fake_data=True, one_hot=one_hot, dtype=dtype, seed=seed)
@@ -242,13 +433,35 @@ def testing():
     """
 
     """
+    read .mat file
+    """
+
+    start = timeit.default_timer()
+    print("read .mat")
+
+    svhn = read_svhn_from_mat('./data')
+    first_img, _ = svhn.train.next_batch(1)
+
+    stop = timeit.default_timer()
+    print(stop - start)
+    # tf.transpose(input_images, [1, 2, 0])
+    print()
+
+    lala = first_img.reshape(32, 32, 3)
+
+    plt.imshow(np.transpose(lala, [1,2,0]))
+    plt.show()
+
+    return
+
+    """
     read ubyte file
     """
 
     start = timeit.default_timer()
     print("read ubyte")
 
-    mnist = read_data_sets('./data', one_hot=True)
+    mnist = read_mnist_data_from_ubyte('./data', one_hot=True)
     ubyte_first_img, _ = mnist.train.next_batch(1)
 
     stop = timeit.default_timer()
