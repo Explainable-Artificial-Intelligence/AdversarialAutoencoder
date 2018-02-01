@@ -761,7 +761,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             os.mkdir(log_path)
         return tensorboard_path, saved_model_path, log_path
 
-    def generate_image_grid(self, sess, op):
+    def generate_image_grid(self, sess, op, epoch):
         """
         Generates a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
@@ -786,7 +786,8 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 ax.set_xticks([])
                 ax.set_yticks([])
                 ax.set_aspect('auto')
-        plt.show()
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
+        # plt.show()
 
     @staticmethod
     def get_input_data(selected_dataset):
@@ -913,7 +914,9 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 log.write("Generator Loss: {}\n".format(g_loss))
                         step += 1
 
-                # saver.save(sess, save_path=saved_model_path, global_step=step)
+                    self.generate_image_grid(sess, op=self.decoder_output, epoch=i)
+
+                        # saver.save(sess, save_path=saved_model_path, global_step=step)
 
             # display the generated images of the latest trained autoencoder
             else:
@@ -922,7 +925,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 all_results.sort()
                 saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
                                                                          + '/Saved_models/'))
-                self.generate_image_grid(sess, op=self.decoder_output)
+                # self.generate_image_grid(sess, op=self.decoder_output)
 
         # write the parameter dictionary to some file
         json_dictionary = json.dumps(self.parameter_dictionary)

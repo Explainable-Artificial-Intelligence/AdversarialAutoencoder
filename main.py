@@ -124,8 +124,6 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
         elif selected_autoencoder == "Supervised":
             adv_autoencoder = SupervisedAdversarialAutoencoder(random_param_combination)
         elif selected_autoencoder == "SemiSupervised":
-            # TODO: check if zdim=10 is necessary for semi supervised
-            # random_param_combination["z_dim"] = 10
             adv_autoencoder = SemiSupervisedAdversarialAutoencoder(random_param_combination)
 
         adv_autoencoder.train(True)
@@ -169,8 +167,43 @@ def testing():
     selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
     selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
 
-    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=100, z_dim=15,
-                    verbose=True)
+    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=100, z_dim=2,
+                    verbose=True,
+                    learning_rate_autoencoder=0.0001,
+                    learning_rate_discriminator=0.0001,
+                    learning_rate_generator=0.0001,
+                    AdamOptimizer_beta1_autoencoder=0.5,
+                    AdamOptimizer_beta1_discriminator=0.5,
+                    AdamOptimizer_beta1_generator=0.5,
+                    n_neurons_of_hidden_layer_x_autoencoder=[3000, 2000, 1000, 500, 250, 125],
+                    n_neurons_of_hidden_layer_x_discriminator=[3000, 2000, 1000, 500, 250, 125],
+                    bias_init_value_of_hidden_layer_x_autoencoder=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    bias_init_value_of_hidden_layer_x_discriminator=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+    return
+
+    # do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=10, z_dim=2,
+    #                 verbose=True, learning_rate_autoencoder=0.01, learning_rate_discriminator=0.01,
+    #                 learning_rate_generator=0.01)
+    #
+    # do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=10, z_dim=15,
+    #                 verbose=True)
+
+    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=2000, z_dim=2,
+                    verbose=True, batch_size=100,
+                    learning_rate_autoencoder=0.0001,
+                    learning_rate_discriminator=0.0001,
+                    learning_rate_generator=0.0001,
+                    AdamOptimizer_beta1_autoencoder=0.5,
+                    AdamOptimizer_beta1_discriminator=0.5,
+                    AdamOptimizer_beta1_generator=0.5,
+                    n_neurons_of_hidden_layer_x_autoencoder=[1000, 1000],
+                    n_neurons_of_hidden_layer_x_discriminator=[1000, 1000],
+                    bias_init_value_of_hidden_layer_x_autoencoder=[0.0, 0.0, 0.0],
+                    bias_init_value_of_hidden_layer_x_discriminator=[0.0, 0.0, 0.0])
+
+    # do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=100, z_dim=15,
+    #                 verbose=True)
 
     # do_randomsearch(2, selected_autoencoder="SemiSupervised", selected_dataset="MNIST", n_epochs=100, z_dim=15,
     #                 verbose=True, n_neurons_of_hidden_layer_x_autoencoder=[1536, 768, 384],

@@ -18,6 +18,9 @@ import DataLoading
 class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
+        # TODO: remove this; only for testing
+        # parameter_dictionary["color_scale"] = "gray_scale"
+
         self.result_folder_name = None
         self.parameter_dictionary = parameter_dictionary
         self.verbose = parameter_dictionary["verbose"]
@@ -237,6 +240,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                 name='Real_distribution')
         # holds the input samples for the decoder (only for generating the images; NOT used for training)
         self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, self.z_dim], name='Decoder_input')
+        self.decoder_input_multiple = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
+                                                     name='Decoder_input_multiple')
 
         """
         Init the network; generator doesn't need to be initiated, since the generator is the encoder of the autoencoder
@@ -267,12 +272,17 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.decoder_output = self.decoder(self.decoder_input, reuse=True,
                                                bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
 
+            self.decoder_output_multiple = \
+                self.decoder(self.decoder_input_multiple, reuse=True,
+                             bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+
         """
         Init the loss functions
         """
 
         # Autoencoder loss
-        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - decoder_output))
+        # self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - decoder_output))
+        self.autoencoder_loss = tf.reduce_mean(tf.abs(self.X_target - decoder_output))
 
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(
@@ -316,7 +326,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                             autoencoder_loss=self.autoencoder_loss,
                                             discriminator_loss=self.discriminator_loss,
                                             generator_loss=self.generator_loss,
-                                            real_distribution=self.real_distribution)
+                                            real_distribution=self.real_distribution,
+                                            decoder_output_multiple=self.decoder_output_multiple)
 
         """
         Init all variables         
@@ -674,8 +685,27 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                bias_init_value=bias_init_values[-1])
                 return discriminator_output
 
+    @staticmethod
+    def reshape_to_rgb_image(image_array, input_dim_x, input_dim_y):
+        """
+        reshapes the given image array to an rgb image for the tensorboard visualization
+        :param image_array: array of images to be reshaped
+        :param input_dim_x: dim x of the images
+        :param input_dim_y: dim y of the images
+        :return:
+        """
+        n_colored_pixels_per_channel = input_dim_x * input_dim_y
+        red_pixels = tf.reshape(image_array[:, :n_colored_pixels_per_channel],
+                                [-1, input_dim_x, input_dim_y, 1])
+        green_pixels = tf.reshape(image_array[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2],
+                                  [-1, input_dim_x, input_dim_y, 1])
+        blue_pixels = tf.reshape(image_array[:, n_colored_pixels_per_channel * 2:],
+                                 [-1, input_dim_x, input_dim_y, 1])
+        rgb_image = tf.concat([red_pixels, green_pixels, blue_pixels], 3)
+        return rgb_image
+
     def create_tensorboard_summary(self, decoder_output, encoder_output, autoencoder_loss, discriminator_loss,
-                                   generator_loss, real_distribution):
+                                   generator_loss, real_distribution, decoder_output_multiple):
         """
         defines what should be shown in the tensorboard summary
         :param decoder_output:
@@ -687,40 +717,16 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
+        # Reshape images accordingly to the color scale to display them
         if self.color_scale == "rgb_scale":
-            # calculate the number of pixels we have per channel (red, green and blue)
-            n_colored_pixels_per_channel = self.input_dim_x * self.input_dim_y
-
-            # first input_dim_one_channel pixels: red
-            red_pixels_input_images = tf.reshape(self.X[:, :n_colored_pixels_per_channel],
-                                                 [-1, self.input_dim_x, self.input_dim_y, 1])
-            # next input_dim_one_channel pixels: green
-            green_pixels_input_images = tf.reshape(self.X[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2],
-                                                   [-1, self.input_dim_x, self.input_dim_y, 1])
-            # last input_dim_one_channel pixels: blue
-            blue_pixels_input_images = tf.reshape(self.X[:, n_colored_pixels_per_channel * 2:],
-                                                  [-1, self.input_dim_x, self.input_dim_y, 1])
-
-            # create the RBG image
-            input_images = tf.concat([red_pixels_input_images, green_pixels_input_images, blue_pixels_input_images], 3)
-
-            # first input_dim_one_channel pixels: red
-            red_pixels_generated_images = tf.reshape(decoder_output[:, :n_colored_pixels_per_channel],
-                                                     [-1, self.input_dim_x, self.input_dim_y, 1])
-            # next input_dim_one_channel pixels: green
-            green_pixels_generated_images = \
-                tf.reshape(decoder_output[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2],
-                           [-1, self.input_dim_x, self.input_dim_y, 1])
-            # last input_dim_one_channel pixels: blue
-            blue_pixels_generated_images = tf.reshape(decoder_output[:, n_colored_pixels_per_channel * 2:],
-                                                      [-1, self.input_dim_x, self.input_dim_y, 1])
-            # create the RBG image
-            generated_images = tf.concat([red_pixels_generated_images, green_pixels_generated_images,
-                                          blue_pixels_generated_images], 3)
+            input_images = self.reshape_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
+            generated_images = self.reshape_to_rgb_image(decoder_output, self.input_dim_x, self.input_dim_y)
+            generated_images_z_dist = self.reshape_to_rgb_image(decoder_output_multiple, self.input_dim_x,
+                                                                self.input_dim_y)
         else:
-            # Reshape immages to display them
             input_images = tf.reshape(self.X, [-1, self.input_dim_x, self.input_dim_y, 1])
             generated_images = tf.reshape(decoder_output, [-1, self.input_dim_x, self.input_dim_y, 1])
+            generated_images_z_dist = tf.reshape(decoder_output_multiple, [-1, self.input_dim_x, self.input_dim_y, 1])
 
         # Tensorboard visualization
         tf.summary.scalar(name='Autoencoder Loss', tensor=autoencoder_loss)
@@ -729,7 +735,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         tf.summary.histogram(name='Encoder Distribution', values=encoder_output)
         tf.summary.histogram(name='Real Distribution', values=real_distribution)
         tf.summary.image(name='Input Images', tensor=input_images, max_outputs=50)
-        tf.summary.image(name='Generated Images', tensor=generated_images, max_outputs=50)
+        tf.summary.image(name='Generated Images from Input Images', tensor=generated_images, max_outputs=50)
+        tf.summary.image(name='Generated Images z-dist', tensor=generated_images_z_dist, max_outputs=50)
         summary_op = tf.summary.merge_all()
         return summary_op
 
@@ -757,7 +764,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             os.mkdir(log_path)
         return tensorboard_path, saved_model_path, log_path
 
-    def generate_image_grid(self, sess, op):
+    def generate_image_grid(self, sess, op, epoch):
         """
         Generates a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
@@ -766,6 +773,67 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
 
         # TODO: draw with function, not hard coded
+        # creates evenly spaced values within [-10, 10] with a spacing of 1.5
+        x_points = np.arange(-10, 10, 1.5).astype(np.float32)
+        y_points = np.arange(-10, 10, 1.5).astype(np.float32)
+
+        print(self.color_scale)
+
+        # TODO: adjust function that it also works with RGB data
+
+        nx, ny = len(x_points), len(y_points)
+        plt.subplot()
+        gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
+
+        for i, g in enumerate(gs):
+            # create a data point from the x_points and y_points array as input for the decoder
+            z = np.concatenate(([x_points[int(i / ny)]], [y_points[int(i % nx)]]))
+            z = np.reshape(z, (1, 2))
+
+            # run the decoder
+            x = sess.run(op, feed_dict={self.decoder_input: z})
+            ax = plt.subplot(g)
+
+            if self.color_scale == "gray_scale":
+                img = np.array(x.tolist()).reshape(self.input_dim_x, self.input_dim_y)
+                ax.imshow(img, cmap='gray')
+            else:
+                image_array = np.array(x.tolist())
+                n_colored_pixels_per_channel = self.input_dim_x * self.input_dim_y
+
+                red_pixels = image_array[:, :n_colored_pixels_per_channel].reshape(32, 32, 1)
+                green_pixels = \
+                    image_array[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel*2].reshape(32, 32, 1)
+                blue_pixels = image_array[:, n_colored_pixels_per_channel*2:].reshape(32, 32, 1)
+                img = np.concatenate([red_pixels, green_pixels, blue_pixels], 2)
+                ax.imshow(img)
+
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_aspect('auto')
+
+            # label y
+            if ax.is_first_col():
+                ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
+
+            # label x
+            if ax.is_last_row():
+                ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
+
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
+        # plt.show()
+
+    def generate_image_grid_z_dim(self, sess, op, epoch):
+        """
+        Generates a grid of images by passing a set of numbers to the decoder and getting its output.
+        :param sess: Tensorflow Session required to get the decoder output
+        :param op: Operation that needs to be called inorder to get the decoder output
+        :return: None, displays a matplotlib window with all the merged images.
+        """
+
+        # TODO: draw with function, not hard coded
+        random_points = [np.arange(-10, 10, 1.5).astype(np.float32) for i in range(self.z_dim)]
+
         # creates evenly spaced values within [-10, 10] with a spacing of 1.5
         x_points = np.arange(-10, 10, 1.5).astype(np.float32)
         y_points = np.arange(-10, 10, 1.5).astype(np.float32)
@@ -789,7 +857,17 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_aspect('auto')
-        plt.show()
+
+            # label y
+            if ax.is_first_col():
+                ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
+
+            # label x
+            if ax.is_last_row():
+                ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
+
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '_.png')
+        # plt.show()
 
     @staticmethod
     def get_input_data(selected_dataset):
@@ -803,11 +881,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             return DataLoading.read_mnist_data_from_ubyte('./data', one_hot=True)
         # Street View House Numbers
         elif selected_dataset == "SVHN":
-            return DataLoading.read_svhn_from_mat('./data', one_hot=True)
+            return DataLoading.read_svhn_from_mat('./data', one_hot=True, one_channel=False)
+            # TODO: remove this; only for testing
+            # return DataLoading.read_svhn_from_mat('./data', one_hot=True, one_channel=True)
         elif selected_dataset == "cifar10":
-            # TODO:
-            print("not yet implemented")
-            return
+            return DataLoading.read_cifar10('./data', one_hot=True)
         elif selected_dataset == "custom":
             # TODO:
             print("not yet implemented")
@@ -890,11 +968,39 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # every 50 steps: write a summary
                         if b % 50 == 0:
-                            a_loss, d_loss, g_loss, summary = sess.run(
+
+                            # TODO: depending on batch_size
+
+                            # creates evenly spaced values within [-10, 10] with a spacing of 1.5
+                            x_points = np.arange(-9, 10, 2.0).astype(np.float32)
+                            y_points = np.arange(-9, 10, 2.0).astype(np.float32)
+                            nx, ny = len(x_points), len(y_points)
+                            points = []
+
+                            for j in range(nx):
+                                for k in range(ny):
+                                    # create a data point from the x_points and y_points array as input for the decoder
+                                    # z = np.concatenate(([x_points[j]], [y_points[k]]))
+                                    z = np.array([x_points[j], y_points[k]])
+                                    # z = np.reshape(z, (1, 2))
+                                    points.append(z)
+
+                                    # create a data point from the x_points and y_points array as input for the decoder
+                                    # z = np.concatenate(([x_points[int(i / ny)]], [y_points[int(i % nx)]]))
+                                    # z = np.reshape(z, (1, 2))
+
+                            points = np.array(points)
+
+                            # random_points = [np.arange(-9, 10, 2.0).astype(np.float32) for i in range(self.z_dim)]
+                            # TODO: shape: batch_size, z_dim
+
+                            # TODO: test if it still works when , test and self.decoder_output_multiple get removed
+                            a_loss, d_loss, g_loss, summary, test = sess.run(
                                 [self.autoencoder_loss, self.discriminator_loss, self.generator_loss,
-                                 self.tensorboard_summary],
+                                 self.tensorboard_summary, self.decoder_output_multiple],
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
-                                           self.real_distribution: z_real_dist})
+                                           self.real_distribution: z_real_dist,
+                                           self.decoder_input_multiple: points})
                             writer.add_summary(summary, global_step=step)
 
                             if self.verbose:
@@ -915,7 +1021,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 log.write("Generator Loss: {}\n".format(g_loss))
                         step += 1
 
-                # saver.save(sess, save_path=saved_model_path, global_step=step)
+                    if i % 5 == 0:
+                        self.generate_image_grid(sess, op=self.decoder_output, epoch=i)
+                    # self.generate_image_grid_z_dim(sess, op=self.decoder_output_multiple, epoch=i)
+
+                        # saver.save(sess, save_path=saved_model_path, global_step=step)
 
             # display the generated images of the latest trained autoencoder
             else:
@@ -925,7 +1035,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
                                                                          + '/Saved_models/'))
-                self.generate_image_grid(sess, op=self.decoder_output)
+                # self.generate_image_grid(sess, op=self.decoder_output)
 
         # write the parameter dictionary to some file
         json_dictionary = json.dumps(self.parameter_dictionary)

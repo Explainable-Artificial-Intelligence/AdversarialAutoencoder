@@ -199,11 +199,11 @@ class AdversarialAutoencoderParameters:
         """
         return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2,
                 'color_scale': "gray_scale", 'verbose': False,
-                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250],
-                'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],
-                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0],
+                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],    # 1000, 500, 250, 125
+                'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
+                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
-                'learning_rate_autoencoder': 0.001, 'learning_rate_discriminator': 0.01,
+                'learning_rate_autoencoder': 0.001, 'learning_rate_discriminator': 0.001,
                 'learning_rate_generator': 0.01, 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'RMSPropOptimizer', 'optimizer_generator': 'RMSPropOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
@@ -265,13 +265,13 @@ class AdversarialAutoencoderParameters:
         """
         return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
                 'color_scale': "rgb_scale", 'verbose': False,
-                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250],
-                'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],
-                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0],
-                'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
-                'learning_rate_autoencoder': 0.001, 'learning_rate_discriminator': 0.01,
-                'learning_rate_generator': 0.01, 'optimizer_autoencoder': 'AdamOptimizer',
-                'optimizer_discriminator': 'RMSPropOptimizer', 'optimizer_generator': 'RMSPropOptimizer',
+                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
+                'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
+                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'learning_rate_autoencoder': 0.0001, 'learning_rate_discriminator': 0.0001,
+                'learning_rate_generator': 0.0001, 'optimizer_autoencoder': 'AdamOptimizer',
+                'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
@@ -281,10 +281,76 @@ class AdversarialAutoencoderParameters:
                 'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
                 'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
                 'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
-                'AdamOptimizer_beta1_autoencoder': 0.9, 'AdamOptimizer_beta2_autoencoder': 0.999,
-                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.9,
+                'AdamOptimizer_beta1_autoencoder': 0.5, 'AdamOptimizer_beta2_autoencoder': 0.999,
+                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.5,
                 'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
-                'AdamOptimizer_beta1_generator': 0.9, 'AdamOptimizer_beta2_generator': 0.999,
+                'AdamOptimizer_beta1_generator': 0.5, 'AdamOptimizer_beta2_generator': 0.999,
+                'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_autoencoder': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_learning_rate_power_generator': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_generator': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_generator': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_generator': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_generator': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_generator': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_generator': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_generator': 0.0,
+                'RMSPropOptimizer_decay_autoencoder': 0.9, 'RMSPropOptimizer_momentum_autoencoder': 0.0,
+                'RMSPropOptimizer_epsilon_autoencoder': 1e-10, 'RMSPropOptimizer_centered_autoencoder': False,
+                'RMSPropOptimizer_decay_discriminator': 0.9, 'RMSPropOptimizer_momentum_discriminator': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator': 1e-10, 'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
+                'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
+                'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss'}
+
+    @staticmethod
+    def get_default_parameters_cifar10():
+        """
+        returns the default parameters for the MNIST dataset
+        :return: dictionary holding the parameters needed to create the Autoencoder
+        """
+        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
+                'color_scale': "rgb_scale", 'verbose': False,
+                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
+                'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
+                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'learning_rate_autoencoder': 0.0001, 'learning_rate_discriminator': 0.0001,
+                'learning_rate_generator': 0.0001, 'optimizer_autoencoder': 'AdamOptimizer',
+                'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
+                'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
+                'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
+                'AdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_generator': 0.1,
+                'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
+                'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
+                'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
+                'AdamOptimizer_beta1_autoencoder': 0.5, 'AdamOptimizer_beta2_autoencoder': 0.999,
+                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.5,
+                'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
+                'AdamOptimizer_beta1_generator': 0.5, 'AdamOptimizer_beta2_generator': 0.999,
                 'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_autoencoder': 0.0,
@@ -351,8 +417,7 @@ class AdversarialAutoencoderParameters:
         elif selected_dataset == "SVHN":
             param_dict = self.get_default_parameters_svhn()
         elif selected_dataset == "cifar10":
-            # TODO: implement
-            raise NotImplementedError
+            param_dict = self.get_default_parameters_cifar10()
         elif selected_dataset == "custom":
             # TODO: implement
             raise NotImplementedError
