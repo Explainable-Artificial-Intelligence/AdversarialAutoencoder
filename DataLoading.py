@@ -9,7 +9,6 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.platform import gfile
 import glob
 import matplotlib.pyplot as plt
-import tensorflow as tf
 from scipy.io import loadmat
 from six.moves import cPickle
 
@@ -19,150 +18,63 @@ import timeit
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/datasets/mnist.py
 """
 
-DEFAULT_SOURCE_URL = 'https://storage.googleapis.com/cvdf-datasets/mnist/'
-
 """
-Read tfrecords file
+Read pickle file
 """
-
-
-# TODO: implement
-
-
-def read_and_decode(filename_queue, input_dim):
-    """
-    reads the filename queue and returns the images and labels
-    :param filename_queue: filename queue to read
-    :param input_dim: input dimension
-    :return: image and label
-    """
-    reader = tf.TFRecordReader()
-    _, serialized_example = reader.read(filename_queue)
-    features = tf.parse_single_example(
-        serialized_example,
-        # Defaults are not specified since both keys are required.
-        features={
-            # TODO:
-            # 'image_raw': tf.FixedLenFeature([], tf.string),
-            'image': tf.FixedLenFeature([], tf.string),
-            'label': tf.FixedLenFeature([], tf.int64),
-        })
-
-    # Convert from a scalar string tensor (whose single string has
-    # length mnist.IMAGE_PIXELS) to a uint8 tensor with shape
-    # [mnist.IMAGE_PIXELS].
-    # TODO:
-    # image = tf.decode_raw(features['image_raw'], tf.uint8)
-    image = tf.decode_raw(features['image'], tf.uint8)
-    # TODO:
-    # image.set_shape([mnist.IMAGE_PIXELS])
-    image.set_shape([input_dim])
-    # image.set_shape([IMAGE_SIZE*IMAGE_SIZE])
-
-    # OPTIONAL: Could reshape into a 28x28 image and apply distortions
-    # here.    Since we are not applying any distortions in this
-    # example, and the next step expects the image to be flattened
-    # into a vector, we don't bother.
-
-    # Convert from [0, 255] -> [-0.5, 0.5] floats.
-    # image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
-
-    # Convert from [0, 255] -> [0, 1.0] floats.
-    image = tf.cast(image, tf.float32) * (1. / 255)
-
-    # Convert label from a scalar uint8 tensor to an int32 scalar.
-    label = tf.cast(features['label'], tf.int32)
-
-    return image, label
-
-
-def inputs(filename, batch_size, input_dim):
-    """Reads input data.
-
-    Args:
-        filename: File name to read as input
-        batch_size: Number of examples per returned batch.
-        input_dim: input dimension of the data
-
-    Returns:
-        A tuple (images, labels), where:
-        * images is a float tensor with shape [batch_size, mnist.IMAGE_PIXELS]
-            in the range [0, 1.0].
-        * labels is an int32 tensor with shape [batch_size] with the true label,
-            a number in the range [0, mnist.NUM_CLASSES).
-    """
-    # filename = os.path.join(self.FLAGS.data_dir, self.TRAIN_FILE)
-
-    with tf.name_scope('input'):
-        filename_queue = tf.train.string_input_producer([filename])
-
-        # Even when reading in multiple threads, share the filename
-        # queue.
-        image, label = read_and_decode(filename_queue, input_dim)
-
-        # Shuffle the examples and collect them into batch_size batches.
-        # (Internally uses a RandomShuffleQueue.)
-        # We run this in two threads to avoid being a bottleneck.
-        images, sparse_labels = tf.train.shuffle_batch(
-            [image, label], batch_size=batch_size, num_threads=2,
-            capacity=1000 + 3 * batch_size,
-            # Ensures a minimum amount of shuffling of examples.
-            min_after_dequeue=1000)
-
-        return images, sparse_labels
 
 
 def read_cifar10(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
-                 reshape=False, seed=None, one_channel=False):
+                 reshape=False, seed=None, grey_scale=False):
+    """
+    reads pickled cifar10 dataset
+    :param data_dir: directory where the files are stored
+    :param one_hot: whether labels should be stored as one hot vector
+    :param num_classes: number of classes
+    :param dtype:  dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param validation_size: size of the validation dataset
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :param grey_scale: load the images as gray scale
+    :return:
+    """
+    # TODO: implement grey scale
+
+    # names of the cifar10 dataset
     cifar10_train_file_names = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4"]
     cifar10_test_file_name = "data_batch_5"
 
+    # holds the train images and labels
     train_images = []
     train_labels = []
+
+    # iterate over the train filenames
     for filename in cifar10_train_file_names:
+        # load the pickled file into a dictionary
         f = open(data_dir + '/cifar-10-batches-py/' + filename, 'rb')
         datadict = cPickle.load(f, encoding='latin1')
         f.close()
-        X = datadict["data"]
-        Y = datadict['labels']
+        # add the train images and the labels to the lists
+        train_images.extend(datadict["data"])
+        train_labels.extend(datadict['labels'])
 
-        train_images.extend(X)
-        train_labels.extend(Y)
-
+    # load the test data file
     f = open(data_dir + '/cifar-10-batches-py/' + cifar10_test_file_name, 'rb')
     datadict = cPickle.load(f, encoding='latin1')
     f.close()
-
-    train_images = np.array(train_images)
-    train_labels = np.array(train_labels)
-
-    print(train_images.shape)
-
-    train_images = train_images[validation_size:]
-    train_labels = train_labels[validation_size:]
+    # store the test images and the labels in two numpy arrays
     test_images = np.array(datadict["data"])
     test_labels = np.array(datadict['labels'])
 
-    # TODO: check if reshape is needed
+    # convert the lists to numpy array
+    train_images = np.array(train_images)
+    train_labels = np.array(train_labels)
 
-    # X = X.reshape(10000, 3, 32, 32).transpose(0, 2, 3, 1).astype("uint8")
-    # Y = np.array(Y)
-    #
-    # # Visualizing CIFAR 10
-    # fig, axes1 = plt.subplots(5, 5, figsize=(3, 3))
-    # for j in range(5):
-    #     for k in range(5):
-    #         i = np.random.choice(range(len(X)))
-    #         axes1[j][k].set_axis_off()
-    #         axes1[j][k].imshow(X[i:i + 1][0])
-    #
-    # plt.show()
-
+    # create the dataset holding the test, train and validation data
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
     return base.Datasets(train=train, validation=validation, test=test)
-
 
 
 """
@@ -171,56 +83,60 @@ Read .mat file (svhn dataset) based on https://github.com/bdiesel/tensorflow-svh
 
 
 def convert_labels_to_one_hot(labels, num_classes):
+    """
+    converts the labels to one hot vectors
+    :param labels: labels to convert
+    :param num_classes: number of classes we have
+    :return:
+    """
     labels = (np.arange(num_classes) == labels[:, None]).astype(np.float32)
     return labels
 
 
-def convert_imgs_to_array(img_array, pixel_depth=255, one_channel=False):
+def reshape_image_array(img_array, grey_scale=False):
+    """
+    reshape the image array according to the color scale (rgb or grey scale)
+    :param img_array: array of shape [rows, cols, color channels, number of images]
+    :param grey_scale: whether we want to have grey scale images
+    :return: the reshaped image array with shape [num_of_images, rows * cols * channels]
+    """
     rows = img_array.shape[0]
     cols = img_array.shape[1]
-    chans = img_array.shape[2]
+    channels = img_array.shape[2]
     num_imgs = img_array.shape[3]
-    scalar = 1 / pixel_depth
-    # Note: not the most efficent way but can monitor what is happening
-    # new_array = np.empty(shape=(num_imgs, rows, cols, chans), dtype=np.float32)
-    # for x in range(0, num_imgs):
-    #     new_array[x] = img_array[:, :, :, x]
-    # return new_array.reshape(num_imgs, 32*32*3)
 
-    if one_channel:
-        chans = 1
+    if grey_scale:
+        channels = 1
 
-    new_array = np.empty(shape=(num_imgs, rows * cols * chans), dtype=np.float32)
+    reshaped_img_array = np.empty(shape=(num_imgs, rows * cols * channels), dtype=np.float32)
     for x in range(0, num_imgs):
 
-        if one_channel:
+        if grey_scale:
             red_pixels = img_array[:, :, 0, x].flatten()
-            new_array[x] = red_pixels
+            reshaped_img_array[x] = red_pixels
         else:
             red_pixels = img_array[:, :, 0, x].flatten()
             green_pixels = img_array[:, :, 1, x].flatten()
             blue_pixels = img_array[:, :, 2, x].flatten()
 
-            temp = np.append(red_pixels, green_pixels)
-            temp = np.append(temp, blue_pixels)
-            new_array[x] = temp
+            temp_rgb_array = np.append(red_pixels, green_pixels)
+            temp_rgb_array = np.append(temp_rgb_array, blue_pixels)
+            reshaped_img_array[x] = temp_rgb_array
+
+    return reshaped_img_array
 
 
-            # print(img_array[:, :, :, x].shape)
-            # print(img_array[:, :, :, x])
-            # tf.concat([red_pixels_input_images, green_pixels_input_images, blue_pixels_input_images], 3)
-            # np.stack(red_pixels, green_pixels, blue_pixels, axis=3)
-            # new_array[x] = np.concatenate(red_pixels, green_pixels, blue_pixels, axis=3)
-
-            # TODO: works
-            # new_array[x] = img_array[:, :, :, x].flatten()
-
-            # new_array[x] = img_array[:, :, :, x]
-    return new_array
-
-
-def process_svhn_file(file, one_hot=False, num_classes=10, one_channel=False):
-    data = loadmat(file)
+def read_mat_file(filename, one_hot=False, num_classes=10, grey_scale=False):
+    """
+    reads the mat file and returns the array holding the images
+    :param filename: filename to read
+    :param one_hot: whether labels should be returned as one hot vector
+    :param num_classes: number of classes we have
+    :param grey_scale: whether we want to have grey scale images
+    :return: array holding the image data with shape [num_of_images, rows * cols * channels], array holding the labels
+    with shape [num_of_images, num_classes] if one_hot is true and shape [num_of_images] otherwise
+    """
+    data = loadmat(filename)
     imgs = data['X']
     labels = data['y'].flatten()
     labels[labels == 10] = 0  # Fix for weird labeling in dataset
@@ -228,43 +144,51 @@ def process_svhn_file(file, one_hot=False, num_classes=10, one_channel=False):
         labels_one_hot = convert_labels_to_one_hot(labels, num_classes)
     else:
         labels_one_hot = labels
-    img_array = convert_imgs_to_array(img_array=imgs, one_channel=one_channel)
+    # labels_one_hot = labels
+    img_array = reshape_image_array(img_array=imgs, grey_scale=grey_scale)
     return img_array, labels_one_hot
 
 
 def read_svhn_from_mat(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
-                       reshape=False, seed=None, one_channel=False):
+                       reshape=False, seed=None, grey_scale=False):
+    """
+    reads data from a .mat file and returns a DataSet object holding the train, test and validation data and labels
+    :param data_dir: directory where the files are stored
+    :param one_hot: whether labels should be stored as one hot vector
+    :param num_classes: number of classes
+    :param dtype:  dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param validation_size: size of the validation dataset
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :param grey_scale: load the images as grey scale
+    :return:
+    """
+
     train_filename = data_dir + "/svhn_train_32x32.mat"
     test_filename = data_dir + "/svhn_test_32x32.mat"
 
+    # read the train file
     train_file = open(train_filename, 'rb')
-    train_images, train_labels = process_svhn_file(file=train_file, one_hot=one_hot, num_classes=num_classes,
-                                                   one_channel=one_channel)
+    train_images, train_labels = read_mat_file(filename=train_file, one_hot=one_hot, num_classes=num_classes,
+                                               grey_scale=grey_scale)
     train_file.close()
 
+    # read the test file
     test_file = open(test_filename, 'rb')
-    test_images, test_labels = process_svhn_file(file=test_file, one_hot=one_hot, num_classes=num_classes,
-                                                 one_channel=one_channel)
+    test_images, test_labels = read_mat_file(filename=test_file, one_hot=one_hot, num_classes=num_classes,
+                                             grey_scale=grey_scale)
     test_file.close()
 
-    # TODO:
-
-    validation_images = train_images[:validation_size]
-    validation_labels = train_labels[:validation_size]
-    train_images = train_images[validation_size:]
-    train_labels = train_labels[validation_size:]
-
-    options = dict(dtype=dtype, reshape=reshape, seed=seed)
-
-    train = DataSet(train_images, train_labels, **options)
-    validation = DataSet(validation_images, validation_labels, **options)
-    test = DataSet(test_images, test_labels, **options)
+    # create the dataset holding the test, train and validation data
+    test, train, validation = create_dataset(dtype, num_classes, False, reshape, seed, test_images, test_labels,
+                                             train_images, train_labels, validation_size)
 
     return base.Datasets(train=train, validation=validation, test=test)
 
 
 """
-Read other file formats
+Read ubyte files
 """
 
 
@@ -341,39 +265,41 @@ def extract_labels(f, one_hot=False, num_classes=10):
         return labels
 
 
-def read_mnist_data_from_ubyte(train_dir, fake_data=False, one_hot=False, dtype=dtypes.float32, reshape=True,
-                               validation_size=5000,
-                               seed=None, source_url=DEFAULT_SOURCE_URL):
-    if fake_data:
-        def fake():
-            return DataSet([], [], fake_data=True, one_hot=one_hot, dtype=dtype, seed=seed)
+def read_mnist_data_from_ubyte(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, reshape=True,
+                               validation_size=5000, seed=None):
+    """
+    reads mnist data from a ubyte file and returns a DataSet object holding the train, test and validation data and labels
+    :param data_dir: directory where the files are stored
+    :param one_hot: whether labels should be stored as one hot vector
+    :param num_classes: number of classes
+    :param dtype:  dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param validation_size: size of the validation dataset
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :return:
+    """
 
-        train = fake()
-        validation = fake()
-        test = fake()
-        return base.Datasets(train=train, validation=validation, test=test)
-
-    if not source_url:  # empty string check
-        source_url = DEFAULT_SOURCE_URL
+    source_url = 'https://storage.googleapis.com/cvdf-datasets/mnist/'
 
     TRAIN_IMAGES = 'train-images-idx3-ubyte.gz'
     TRAIN_LABELS = 'train-labels-idx1-ubyte.gz'
     TEST_IMAGES = 't10k-images-idx3-ubyte.gz'
     TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
 
-    local_file = base.maybe_download(TRAIN_IMAGES, train_dir, source_url + TRAIN_IMAGES)
+    local_file = base.maybe_download(TRAIN_IMAGES, data_dir, source_url + TRAIN_IMAGES)
     with gfile.Open(local_file, 'rb') as f:
         train_images = extract_images(f)
 
-    local_file = base.maybe_download(TRAIN_LABELS, train_dir, source_url + TRAIN_LABELS)
+    local_file = base.maybe_download(TRAIN_LABELS, data_dir, source_url + TRAIN_LABELS)
     with gfile.Open(local_file, 'rb') as f:
         train_labels = extract_labels(f, one_hot=one_hot)
 
-    local_file = base.maybe_download(TEST_IMAGES, train_dir, source_url + TEST_IMAGES)
+    local_file = base.maybe_download(TEST_IMAGES, data_dir, source_url + TEST_IMAGES)
     with gfile.Open(local_file, 'rb') as f:
         test_images = extract_images(f)
 
-    local_file = base.maybe_download(TEST_LABELS, train_dir, source_url + TEST_LABELS)
+    local_file = base.maybe_download(TEST_LABELS, data_dir, source_url + TEST_LABELS)
     with gfile.Open(local_file, 'rb') as f:
         test_labels = extract_labels(f, one_hot=one_hot)
 
@@ -381,41 +307,53 @@ def read_mnist_data_from_ubyte(train_dir, fake_data=False, one_hot=False, dtype=
         raise ValueError(
             'Validation size should be between 0 and {}. Received: {}.'.format(len(train_images), validation_size))
 
-    validation_images = train_images[:validation_size]
-    validation_labels = train_labels[:validation_size]
-    train_images = train_images[validation_size:]
-    train_labels = train_labels[validation_size:]
-
-    options = dict(dtype=dtype, reshape=reshape, seed=seed)
-
-    train = DataSet(train_images, train_labels, **options)
-    validation = DataSet(validation_images, validation_labels, **options)
-    test = DataSet(test_images, test_labels, **options)
+    test, train, validation = create_dataset(dtype, num_classes, False, reshape, seed, test_images, test_labels,
+                                             train_images, train_labels, validation_size)
 
     return base.Datasets(train=train, validation=validation, test=test)
 
 
-def read_image_and_labels(filename):
+"""
+read csv files
+"""
+
+
+def read_image_and_labels_from_csv(filename, dim_x=28, dim_y=28):
+    """
+    reads image data and labels from a csv file; assumes labels is stored in the first column
+    :param filename:
+    :return:
+    """
     data = pandas.read_csv(filename, sep=',', header=None)
     labels = data.ix[:, 0].values
-    data = data.drop(data.columns[0], axis=1)
+    data = data.drop(data.columns[0], axis=1)   # drop the labels
     images = data.values
 
     n_data_points = labels.size
-
-    # TODO: change from hard coded
-    images = images.reshape(n_data_points, 28, 28, 1)
+    images = images.reshape(n_data_points, dim_x, dim_y, 1)
 
     return images, labels
 
 
-def read_csv_data_set(train_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
+def read_csv_data_set(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
                       reshape=True, seed=None):
+    """
+    reads a csv data set and returns a DataSet object holding the train, test and validation data and labels
+    :param data_dir: directory where the files are stored
+    :param one_hot: whether labels should be stored as one hot vector
+    :param num_classes: number of classes
+    :param dtype:  dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param validation_size: size of the validation dataset
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :return:
+    """
     TRAIN_IMAGES = 'mnist_train.csv'
     TEST_IMAGES = 'mnist_test.csv'
 
-    train_images, train_labels = read_image_and_labels(train_dir + '/' + TRAIN_IMAGES)
-    test_images, test_labels = read_image_and_labels(train_dir + '/' + TEST_IMAGES)
+    train_images, train_labels = read_image_and_labels_from_csv(data_dir + '/' + TRAIN_IMAGES)
+    test_images, test_labels = read_image_and_labels_from_csv(data_dir + '/' + TEST_IMAGES)
 
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
@@ -423,12 +361,20 @@ def read_csv_data_set(train_dir, one_hot=False, num_classes=10, dtype=dtypes.flo
     return base.Datasets(train=train, validation=validation, test=test)
 
 
-def read_images_from_dir(image_dir, n_classes=10, image_fileformat='.png'):
-    """
+"""
+read image data (png)
+"""
 
-    :param image_dir: ./data/mnist_png/testing/
-    :param n_classes:
-    :param image_fileformat:
+
+def read_images_from_dir(data_dir, n_classes=10, image_fileformat='.png', dim_x=28, dim_y=28, color_channels=1):
+    """
+    reads the images from the data directory
+    :param data_dir: ./data/mnist_png/testing/
+    :param n_classes: number of classes we have
+    :param image_fileformat: fileformat of the image
+    :param dim_x: x resolution of the image
+    :param dim_y: y resolution of the image
+    :param color_channels: number of channels (1=gray scale, 3=rgb)
     :return:
     """
 
@@ -437,7 +383,7 @@ def read_images_from_dir(image_dir, n_classes=10, image_fileformat='.png'):
     n_data_points = 0
 
     for n in range(n_classes):
-        for image_path in glob.glob(image_dir + str(n) + "/*" + image_fileformat):
+        for image_path in glob.glob(data_dir + str(n) + "/*" + image_fileformat):
             image = imageio.imread(image_path)
             images.append(image)
             labels.append(n)
@@ -445,19 +391,31 @@ def read_images_from_dir(image_dir, n_classes=10, image_fileformat='.png'):
 
     images = np.array(images)
     labels = np.array(labels)
-    # TODO: change from hard coded
-    images = images.reshape(n_data_points, 28, 28, 1)
+    images = images.reshape(n_data_points, dim_x, dim_y, color_channels)
 
     return images, labels
 
 
-def read_data_in_images(train_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
+def read_mnist_from_png(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
                         reshape=True, seed=None):
+    """
+    reads the png images from the data directories and returns a DataSet object holding the train, test and validation
+    data and labels
+    :param data_dir: directory where the files are stored
+    :param one_hot: whether labels should be stored as one hot vector
+    :param num_classes: number of classes
+    :param dtype:  dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param validation_size: size of the validation dataset
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :return:
+    """
     print("reading test data")
-    test_images, test_labels = read_images_from_dir(train_dir + "/mnist_png/testing/", image_fileformat="png")
+    test_images, test_labels = read_images_from_dir(data_dir + "/mnist_png/testing/", image_fileformat="png")
 
     print("reading train data")
-    train_images, train_labels = read_images_from_dir(train_dir + "/mnist_png/training/", image_fileformat="png")
+    train_images, train_labels = read_images_from_dir(data_dir + "/mnist_png/training/", image_fileformat="png")
 
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
@@ -467,6 +425,21 @@ def read_data_in_images(train_dir, one_hot=False, num_classes=10, dtype=dtypes.f
 
 def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels, train_images, train_labels,
                    validation_size):
+    """
+    creates three datasets holding the test, train and the validation data and labels and returns them
+    :param dtype: dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
+    :param num_classes: number of classes we have
+    :param one_hot: whether labels should be stored as one hot vector
+    :param reshape: true: Convert shape from [num examples, rows, columns, depth] to [num examples, rows*columns]
+    (assuming depth == 1)
+    :param seed: for shuffling the data set
+    :param test_images: numpy array holding the test images
+    :param test_labels: numpy array holding the test labels
+    :param train_images: numpy array holding the train images
+    :param train_labels: numpy array holding the train labels
+    :param validation_size: int; the desired size of our validation dataset
+    :return: DataSet test, DataSet train, DataSet validation
+    """
     if one_hot:
         train_labels = dense_to_one_hot(train_labels, num_classes)
         test_labels = dense_to_one_hot(test_labels, num_classes)
@@ -493,97 +466,125 @@ def testing():
     read cifar10
     """
 
-    cifar10 = read_cifar10('./data', one_hot=True)
-    first_img, _ = cifar10.train.next_batch(1)
+    if False:
+        cifar10 = read_cifar10('./data', one_hot=True)
+        first_img, _ = cifar10.train.next_batch(1)
 
-    print(first_img.shape)
-    lala = first_img.reshape(3, 32, 32)
-    plt.imshow(np.transpose(lala, [1, 2, 0]))
-    plt.show()
+        print(_)
 
-    return
+        lala = first_img.reshape(3, 32, 32)
+        plt.imshow(np.transpose(lala, [1, 2, 0]))
+        plt.show()
 
     """
     read .mat file
     """
 
-    start = timeit.default_timer()
-    print("read .mat")
+    if True:
 
-    svhn = read_svhn_from_mat('./data', one_channel=True)
-    first_img, _ = svhn.train.next_batch(1)
+        grey_scale = False
 
-    stop = timeit.default_timer()
-    print(stop - start)
-    lala = first_img.reshape(32, 32)
+        if grey_scale:
+            start = timeit.default_timer()
+            print("read .mat")
 
-    # for 3 channels
-    # lala = first_img.reshape(32, 32, 3)
+            svhn = read_svhn_from_mat('./data', grey_scale=True, one_hot=True)
+            first_img, _ = svhn.train.next_batch(1)
 
-    # for one channel
-    plt.gray()
-    plt.imshow(lala)
+            print(_)
 
-    # for 3 channels:
-    # plt.imshow(np.transpose(lala, [1,2,0]))
-    plt.show()
+            stop = timeit.default_timer()
+            print(stop - start)
+            lala = first_img.reshape(32, 32)
 
-    return
+            plt.gray()
+            plt.imshow(lala)
+            plt.show()
+        else:
+            start = timeit.default_timer()
+            print("read .mat")
+
+            svhn = read_svhn_from_mat('./data', grey_scale=False, one_hot=True)
+            first_img, _ = svhn.train.next_batch(1)
+
+            print(_)
+
+            stop = timeit.default_timer()
+            print(stop - start)
+
+            # do some reshaping to display the images properly
+            red = first_img[:, :1024].reshape(32, 32, 1)
+            green = first_img[:, 1024:2048].reshape(32, 32, 1)
+            blue = first_img[:, 2048:].reshape(32, 32, 1)
+
+            plt.imshow(np.concatenate([red, green, blue], 2))
+            plt.show()
 
     """
     read ubyte file
     """
 
-    start = timeit.default_timer()
-    print("read ubyte")
+    if False:
+        start = timeit.default_timer()
+        print("read ubyte")
 
-    mnist = read_mnist_data_from_ubyte('./data', one_hot=True)
-    ubyte_first_img, _ = mnist.train.next_batch(1)
+        mnist = read_mnist_data_from_ubyte('./data', one_hot=True)
+        ubyte_first_img, _ = mnist.train.next_batch(1)
 
-    stop = timeit.default_timer()
-    print(stop - start)
+        print(_)
 
-    first_image = ubyte_first_img.reshape([28, 28])
-    plt.gray()
-    plt.imshow(first_image)
-    plt.show()
+        stop = timeit.default_timer()
+        print(stop - start)
+
+        first_image = ubyte_first_img.reshape([28, 28])
+        plt.gray()
+        plt.imshow(first_image)
+        plt.show()
 
     """
     read csv file: The format is: label, pix-11, pix-12, pix-13, ...
     """
 
-    start = timeit.default_timer()
-    print("read csv")
+    if False:
 
-    # test reading csv files
-    train_images = read_csv_data_set('./data', one_hot=True)
-    csv_first_img, _ = train_images.train.next_batch(1)
+        start = timeit.default_timer()
+        print("read csv")
 
-    stop = timeit.default_timer()
-    print(stop - start)
+        # test reading csv files
+        train_images = read_csv_data_set('./data', one_hot=True)
+        csv_first_img, _ = train_images.train.next_batch(1)
 
-    first_image = csv_first_img.reshape([28, 28])
-    plt.gray()
-    plt.imshow(first_image)
-    plt.show()
+        print(_)
+
+        stop = timeit.default_timer()
+        print(stop - start)
+
+        first_image = csv_first_img.reshape([28, 28])
+        plt.gray()
+        plt.imshow(first_image)
+        plt.show()
 
     """
     read png files:
     """
 
-    start = timeit.default_timer()
-    print("read png")
+    if False:
 
-    mnist = read_data_in_images('./data', one_hot=True)
-    png_first_img, _ = mnist.train.next_batch(1)
+        start = timeit.default_timer()
+        print("read png")
 
-    stop = timeit.default_timer()
-    print(stop - start)
+        mnist = read_mnist_from_png('./data', one_hot=True)
+        png_first_img, _ = mnist.train.next_batch(1)
 
-    first_image = ubyte_first_img.reshape([28, 28])
-    plt.gray()
-    plt.imshow(first_image)
-    plt.show()
+        print(_)
+
+        stop = timeit.default_timer()
+        print(stop - start)
+
+        first_image = png_first_img.reshape([28, 28])
+        plt.gray()
+        plt.imshow(first_image)
+        plt.show()
 
 
 if __name__ == '__main__':
