@@ -449,6 +449,12 @@ class AdversarialAutoencoderParameters:
         :return:
         """
 
+        # store verbose in a local variable, so the value error below doesn't get raised..
+        verbose = None
+        if kwargs["verbose"]:
+            verbose = kwargs["verbose"]
+            del kwargs["verbose"]
+
         # deal with illegal input
         if not all(isinstance(element, list) for element in kwargs.values()):
             raise ValueError("Key worded arguments must be provided as a list: "
@@ -460,8 +466,8 @@ class AdversarialAutoencoderParameters:
         n_epochs = 10
 
         # network topology
-        # n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
-        n_neurons_of_hidden_layer_x_autoencoder = [[500, 250, 125], [1000, 750, 25]]
+        n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
+        # n_neurons_of_hidden_layer_x_autoencoder = [[500, 250, 125], [1000, 750, 25]]
         n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]
 
         # initial bias values for the hidden layers
@@ -631,6 +637,10 @@ class AdversarialAutoencoderParameters:
 
         # get the default parameters
         param_dict = self.get_default_parameters(selected_autoencoder, selected_dataset)
+
+        # set the verbose parameter properly
+        if verbose:
+            param_dict["verbose"] = verbose
 
         # iterate over the variable names provided as parameters and set their value in the parameter dictionary as
         # defined above

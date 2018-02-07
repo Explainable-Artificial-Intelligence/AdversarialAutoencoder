@@ -1,15 +1,11 @@
 import AdversarialAutoencoderParameters
-import random
-import numpy as np
 
 from SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
 from UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
 
-# TODO: refactor gridsearch the same way as random search
 
-
-def do_gridsearch(*args, **kwargs):
+def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="MNIST", **kwargs):
     """
     Performs a grid search using all possible combinations of the parameters provided. In case there are no parameters
     provided it uses all the possible parameter combinations from the hard coded parameters.
@@ -25,6 +21,8 @@ def do_gridsearch(*args, **kwargs):
                         MomentumOptimizer_momentum_autoencoder=[1.0])
     :param args: strings of the variable defined in the Parameters class to do the grid search for. In this case
     it uses the possible parameter values in the Parameters class: "variable_name"
+    :param selected_dataset: ["MNIST", "SVHN", "cifar10", "custom"]
+    :param selected_autoencoder: ["Unsupervised", "Supervised", "SemiSupervised"]
     :param kwargs: arbitrary number of: variable_name=[variable_value1, variable_value2, variable_value3]
     :return: the best parameter combination as a dictionary
     """
@@ -36,7 +34,8 @@ def do_gridsearch(*args, **kwargs):
 
     # iterate over the parameter combinations
     gridsearch_parameter_combinations = \
-        aae_parameter_class.get_gridsearch_parameters(*args, **kwargs)
+        aae_parameter_class.get_gridsearch_parameters(*args, selected_autoencoder=selected_autoencoder,
+                                                      selected_dataset=selected_dataset, **kwargs)
 
     # stores the performance for the parameter combination
     performance_for_parameter_combination = []
@@ -45,29 +44,42 @@ def do_gridsearch(*args, **kwargs):
     for a in gridsearch_parameter_combinations:
         print(a)
     print()
-    return
 
     # iterate over each parameter combination
     for gridsearch_parameter_combination in gridsearch_parameter_combinations:
         print("Training .. ", gridsearch_parameter_combination)
 
         # create the AAE and train it with the current parameters
-        adv_autoencoder = AdversarialAutoencoder(gridsearch_parameter_combination)
+        if selected_autoencoder == "Unsupervised":
+            adv_autoencoder = AdversarialAutoencoder(gridsearch_parameter_combination)
+        elif selected_autoencoder == "Supervised":
+            adv_autoencoder = SupervisedAdversarialAutoencoder(gridsearch_parameter_combination)
+        elif selected_autoencoder == "SemiSupervised":
+            adv_autoencoder = SemiSupervisedAdversarialAutoencoder(gridsearch_parameter_combination)
         adv_autoencoder.train(True)
 
         # get the performance
         performance = adv_autoencoder.get_performance()
         print(performance)
+        folder_name = adv_autoencoder.get_result_folder_name()
 
         # store the param_comb and the performance in the list
-        performance_for_parameter_combination.append((gridsearch_parameter_combination, performance))
+        performance_for_parameter_combination.append((gridsearch_parameter_combination, performance, folder_name))
 
     # sort combinations by their performance
     sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x[1]["summed_loss_final"])
 
+    print("#" * 20)
+
+    for comb in sorted_list:
+        print("performance:", comb[1])
+        print("folder name:", comb[2])
+        print()
+
     print(sorted_list)
     print("best param combination:", sorted_list[0][0])
     print("best performance:", sorted_list[0][1])
+    print("folder name:", sorted_list[0][2])
 
     return sorted_list[0][0]
 
@@ -160,6 +172,8 @@ def testing():
     :return:
     """
 
+    # do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=[1, 2], verbose=True)
+
     """
     test random search
     """
@@ -167,7 +181,7 @@ def testing():
     selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
     selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
 
-    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=100, z_dim=2,
+    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=1, z_dim=10,
                     verbose=True,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,
