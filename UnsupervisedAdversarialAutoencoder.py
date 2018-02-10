@@ -53,12 +53,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # initial bias values of the hidden layers
         # TODO: remove this
         self.bias_init_value_of_hidden_layer_x_autoencoder \
-            = [0.0 * (len(self.n_neurons_of_hidden_layer_x_autoencoder)+1)]
+            = [0.0] * (len(self.n_neurons_of_hidden_layer_x_autoencoder)+1)
         self.bias_init_value_of_hidden_layer_x_discriminator \
-            = [0.0 * (len(self.n_neurons_of_hidden_layer_x_discriminator)+1)]
-
-        print(self.n_neurons_of_hidden_layer_x_autoencoder)
-        print(self.bias_init_value_of_hidden_layer_x_autoencoder)
+            = [0.0] * (len(self.n_neurons_of_hidden_layer_x_discriminator)+1)
 
         # self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
         #     "bias_init_value_of_hidden_layer_x_autoencoder"]
