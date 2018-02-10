@@ -504,7 +504,7 @@ def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test
     validation_labels = train_labels[:validation_size]
     train_images = train_images[validation_size:]
     train_labels = train_labels[validation_size:]
-    options = dict(dtype=dtype, reshape=reshape, seed=seed)
+    options = dict(dtype=dtype, reshape=reshape)
     train = DataSet(train_images, train_labels, **options)
     validation = DataSet(validation_images, validation_labels, **options)
     test = DataSet(test_images, test_labels, **options)
