@@ -57,6 +57,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.bias_init_value_of_hidden_layer_x_discriminator \
             = [0.0 * (len(self.n_neurons_of_hidden_layer_x_discriminator)+1)]
 
+        print(self.n_neurons_of_hidden_layer_x_autoencoder)
+        print(self.bias_init_value_of_hidden_layer_x_autoencoder)
+
         # self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
         #     "bias_init_value_of_hidden_layer_x_autoencoder"]
         # self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
