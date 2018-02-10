@@ -41,9 +41,10 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
     performance_for_parameter_combination = []
 
     print("There are", len(gridsearch_parameter_combinations), "combinations:")
-    for a in gridsearch_parameter_combinations:
-        print(a)
-    print()
+
+    # for a in gridsearch_parameter_combinations:
+    #     print(a)
+    # print()
 
     # iterate over each parameter combination
     for gridsearch_parameter_combination in gridsearch_parameter_combinations:
@@ -75,11 +76,19 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
         print("performance:", comb[1])
         print("folder name:", comb[2])
         print()
+        with open('gridsearch_log.txt', 'a') as log:
+            log.write("performance: {}\n".format(comb[1]))
+            log.write("folder name: {}\n".format(comb[2]))
 
     print(sorted_list)
     print("best param combination:", sorted_list[0][0])
     print("best performance:", sorted_list[0][1])
     print("folder name:", sorted_list[0][2])
+
+    with open('gridsearch_log.txt', 'a') as log:
+        log.write("best param combination: {}\n".format(sorted_list[0][0]))
+        log.write("best performance: {}\n".format(sorted_list[0][1]))
+        log.write("folder name: {}\n".format(sorted_list[0][2]))
 
     return sorted_list[0][0]
 
@@ -167,21 +176,109 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
     return sorted_list[0][0]
 
 
+def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):
+    """
+    creates a network topology based on the provided parameters
+    :param n_layers: number of layers the network should have
+    :param init_n_neurons: number of neurons the first layer should have
+    :param n_neurons_decay_factor: by what factor the number of neurons in the suceeding layers should be reduced
+    e.g. with a factor of 2: [3000, 3000, 3000] -> [3000, 1500, 750]
+    :param n_decaying_layers: number of layers where the number of neurons should be reduced by the
+    n_neurons_decay_factor
+    :return:
+    """
+
+    random_network_topology = [init_n_neurons]*n_layers
+    for decaying_layer in range(n_decaying_layers, 0, -1):
+        random_network_topology[n_layers-decaying_layer] = \
+             int(random_network_topology[n_layers-decaying_layer-1] / n_neurons_decay_factor)
+
+    return random_network_topology
+
+
+def create_random_network_topologies(max_layers, init_n_neurons, n_neurons_decay_factors):
+
+    random_network_topologies = []
+
+    for n_layers in range(1, max_layers+1):
+        # maximum number of layers with a reduced number of nerons compared to the preceding layers
+        for n_decaying_layers in range(n_layers):
+
+            # we only have to iterate over the n_neurons_decay_factors if we have at least one decaying layer
+            if n_decaying_layers > 0:
+                for n_neurons_decay_factor in n_neurons_decay_factors:
+                    random_network_topologies.append(
+                            create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers))
+            # otherwise we can pick an arbitrary value for the
+            else:
+                random_network_topologies.append(
+                    create_network_topology(n_layers, init_n_neurons, 1, n_decaying_layers))
+
+    return random_network_topologies
+
+
 def testing():
     """
     :return:
     """
 
-    # do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=[1, 2], verbose=True)
+    selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
+    selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
+
+
+    n_neurons_of_hidden_layer_x_autoencoder = \
+        create_random_network_topologies(max_layers=3, init_n_neurons=3000,
+                                         n_neurons_decay_factors=[1, 1.5, 2, 3])
+
+    n_neurons_of_hidden_layer_x_discriminator = \
+        create_random_network_topologies(max_layers=3, init_n_neurons=3000,
+                                         n_neurons_decay_factors=[1, 1.5, 2, 3])
+
+    bias_init_value_of_hidden_layer_x_autoencoder = [[0.0]*(len(i)+1) for i in n_neurons_of_hidden_layer_x_autoencoder]
+    bias_init_value_of_hidden_layer_x_discriminator = [[0.0]*(len(i)+1) for i in n_neurons_of_hidden_layer_x_discriminator]
+
+    do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=[100], verbose=False,
+                  z_dim=[2],
+                  learning_rate_autoencoder=[0.001],
+                  learning_rate_discriminator=[0.01],
+                  learning_rate_generator=[0.01],
+                  AdamOptimizer_beta1_autoencoder=[0.5],
+                  AdamOptimizer_beta1_discriminator=[0.5],
+                  AdamOptimizer_beta1_generator=[0.5],
+                  n_neurons_of_hidden_layer_x_autoencoder=n_neurons_of_hidden_layer_x_autoencoder,
+                  n_neurons_of_hidden_layer_x_discriminator=n_neurons_of_hidden_layer_x_discriminator,
+                  bias_init_value_of_hidden_layer_x_autoencoder=[0.0],
+                  bias_init_value_of_hidden_layer_x_discriminator=[0.0])
+
+
+    return
+
+    n_neurons_of_hidden_layer_x_autoencoder = [[3000, 2000, 1000, 500, 250, 125], [3000, 3000]]
+    n_neurons_of_hidden_layer_x_discriminator = [[3000, 2000, 1000, 500, 250, 125], [3000, 3000]]
+    bias_init_value_of_hidden_layer_x_autoencoder = [[0.0]*(len(i)+1) for i in n_neurons_of_hidden_layer_x_autoencoder]
+    bias_init_value_of_hidden_layer_x_discriminator = [[0.0]*(len(i)+1) for i in
+                                                       n_neurons_of_hidden_layer_x_discriminator]
+
+    print(n_neurons_of_hidden_layer_x_autoencoder)
+    print(n_neurons_of_hidden_layer_x_discriminator)
+    print(bias_init_value_of_hidden_layer_x_autoencoder)
+    print(bias_init_value_of_hidden_layer_x_discriminator)
+
+    return
+
+    do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=[1,2], verbose=True,
+                  n_neurons_of_hidden_layer_x_autoencoder=[[3000, 2000, 1000, 500, 250, 125]],
+                  n_neurons_of_hidden_layer_x_discriminator=[[3000, 2000, 1000, 500, 250, 125]],
+                  bias_init_value_of_hidden_layer_x_autoencoder=[[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+                  bias_init_value_of_hidden_layer_x_discriminator=[[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])
+
+    return
 
     """
     test random search
     """
 
-    selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
-    selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
-
-    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=1, z_dim=10,
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=100, z_dim=10,
                     verbose=True,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,

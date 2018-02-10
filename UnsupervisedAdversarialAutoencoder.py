@@ -1,5 +1,5 @@
 """
-    Implementation of an Adversarial Autoencoder based on the Paper Adversarial Autoencoders
+    Implementation of a unsupervised Adversarial Autoencoder based on the Paper Adversarial Autoencoders
     https://arxiv.org/abs/1511.05644 by Goodfellow et. al. and the implementation available on
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
@@ -51,10 +51,16 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             "n_neurons_of_hidden_layer_x_discriminator"]
 
         # initial bias values of the hidden layers
-        self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
-            "bias_init_value_of_hidden_layer_x_autoencoder"]
-        self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
-            "bias_init_value_of_hidden_layer_x_discriminator"]
+        # TODO: remove this
+        self.bias_init_value_of_hidden_layer_x_autoencoder = [[0.0] * (len(i) + 1) for i in
+                                                              self.n_neurons_of_hidden_layer_x_autoencoder]
+        self.bias_init_value_of_hidden_layer_x_discriminator = [[0.0] * (len(i) + 1) for i in
+                                                                self.n_neurons_of_hidden_layer_x_discriminator]
+
+        # self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
+        #     "bias_init_value_of_hidden_layer_x_autoencoder"]
+        # self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
+        #     "bias_init_value_of_hidden_layer_x_discriminator"]
 
         """
         params for learning
@@ -500,6 +506,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                self.n_neurons_of_hidden_layer_x_discriminator[i],
                                                'discriminator_dense_layer_' + str(i + 1),
                                                bias_init_value=bias_init_values[i]))
+
                 discriminator_output = AdversarialAutoencoderHelperFunctions.\
                     create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
                                        'discriminator_output',  bias_init_value=bias_init_values[-1])
@@ -635,7 +642,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # this is working (in train function) as input
         # random_points = np.random.uniform(-10, 10, [self.batch_size, self.z_dim])
 
-        print(random_points)
+        # print(random_points)
 
         plt.subplot()
         gs = gridspec.GridSpec(image_grid_x_length, image_grid_y_length, hspace=0.05, wspace=0.05)
@@ -677,7 +684,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             ax.set_yticks([])
             ax.set_aspect('auto')
 
-        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '_.png')
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
     def train(self, is_train_mode_active=True):
         """
@@ -728,6 +735,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         #   - inherit for flower (paper p. 6)
                         #   - inherit for swiss roll  (paper p. 6)
                         z_real_dist = np.random.randn(self.batch_size, self.z_dim) * 5.
+                        # z_real_dist = np.random.normal(scale=5., size=[self.batch_size, self.z_dim])
 
                         # get the batch from the training data
                         batch_x, batch_labels = data.train.next_batch(self.batch_size)
@@ -754,8 +762,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         # train the generator to fool the discriminator with its generated samples.
                         sess.run(self.generator_optimizer, feed_dict={self.X: batch_x, self.X_target: batch_x})
 
-                        # every 50 steps: write a summary
-                        if b % 50 == 0:
+                        # every 5 epochs: write a summary
+                        if i % 5 == 0:
 
                             # TODO: draw from function not hard coded
                             # draw some random points as input for the decoder
@@ -787,7 +795,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 log.write("Generator Loss: {}\n".format(g_loss))
                         step += 1
 
-                    if i % 5 == 0:
+                    if i % 25 == 0:
+                        # TODO: maybe two separate functions are not needed..
                         if self.z_dim > 2:
                             self.generate_image_grid_z_dim(sess, op=self.decoder_output, epoch=i)
                         else:

@@ -451,7 +451,7 @@ class AdversarialAutoencoderParameters:
 
         # store verbose in a local variable, so the value error below doesn't get raised..
         verbose = None
-        if kwargs["verbose"]:
+        if "verbose" in kwargs:
             verbose = kwargs["verbose"]
             del kwargs["verbose"]
 

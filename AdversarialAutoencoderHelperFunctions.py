@@ -1,3 +1,7 @@
+"""
+    Holds the functions shared by all three Autoencoders (Unsupervised, Supervised and SemiSupervised).
+"""
+
 import tensorflow as tf
 import datetime
 import os

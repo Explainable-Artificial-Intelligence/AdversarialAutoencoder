@@ -7,6 +7,7 @@ from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.contrib.learn.python.learn.datasets.mnist import DataSet
 from tensorflow.python.framework import dtypes
 from tensorflow.python.platform import gfile
+import tensorflow as tf
 import glob
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
@@ -17,6 +18,59 @@ import timeit
 """
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/datasets/mnist.py
 """
+
+
+"""
+Read .tfrecords
+"""
+
+
+def read_and_decode(filename_queue):
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(filename_queue)
+    features = tf.parse_single_example(
+    serialized_example,
+    features={
+        'image_raw': tf.FixedLenFeature([], tf.string)
+    })
+    image = tf.decode_raw(features['image_raw'], tf.uint8)
+    return image
+
+
+def get_all_records(FILE):
+    with tf.Session() as sess:
+        filename_queue = tf.train.string_input_producer([FILE], num_epochs=1)
+        image = read_and_decode(filename_queue)
+        init_op = tf.initialize_all_variables()
+        sess.run(init_op)
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+        try:
+            while True:
+                example = sess.run([image])
+        except tf.errors.OutOfRangeError as e:
+            coord.request_stop(e)
+        finally:
+            coord.request_stop()
+            coord.join(threads)
+
+
+def read_tfrecords(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, validation_size=5000,
+                   reshape=False, seed=None, grey_scale=False):
+
+    # instantiate a new protocol buffer, and fill in some of its fields.
+    example = tf.train.Example()
+    # TODO: remove hard coded filename
+    for record in tf.python_io.tf_record_iterator("data/ship_train.tfrecords"):
+        example.ParseFromString(record)
+        f = example.features.feature
+        v1 = f['int64 feature'].int64_list.value[0]
+        v2 = f['float feature'].float_list.value[0]
+        v3 = f['bytes feature'].bytes_list.value[0]
+        # for bytes you might want to represent them in a different way (based on what they were before saving)
+        # something like `np.fromstring(f['img'].bytes_list.value[0], dtype=np.uint8
+        # Now do something with your v1/v2/v3
+
 
 """
 Read pickle file
