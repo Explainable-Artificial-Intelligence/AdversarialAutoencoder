@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import collections
+import math
+from sklearn.decomposition import PCA
 
 
 def rotate_2D_array_by_angle(x_, y_, angle):
@@ -117,6 +119,7 @@ class FlowerDistribution(Distribution):
 
     def create_class_specific_samples(self, class_i, n_samples_per_class=1000):
         rotation_angle = 360 / self.n_classes * class_i
+
         x, y = np.random.multivariate_normal(self.mean, self.cov, n_samples_per_class).T
         x_rot, y_rot = rotate_2D_array_by_angle(x_=x, y_=y, angle=rotation_angle)
         return x_rot, y_rot
@@ -161,18 +164,86 @@ class SwissRollDistribution(Distribution):
 
         return x, y
 
+# TODO: old working version
+# class GaussianDistribution(Distribution):
+#     def __init__(self, n_classes=10, mean_x=0.0, mean_y=5.0, var_x=0.5, var_y=10):
+#         super().__init__(n_classes)
+#
+#         # see https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.random.multivariate_normal.html
+#         self.mean = [mean_x, mean_y]
+#         self.cov = [[var_x, 0], [0, var_y]]
+#
+#     def create_class_specific_samples(self, class_i, n_samples_per_class=1000):
+#         x, y = np.random.multivariate_normal(self.mean, self.cov, n_samples_per_class).T
+#         return x, y
+
+
+def points_on_circumference(center=(0, 0), r=50, n=100):
+    return [
+        (
+            center[0] + (math.cos(2 * math.pi / n * x) * r),  # x
+            center[1] + (math.sin(2 * math.pi / n * x) * r)  # y
+) for x in range(0, n + 1)]
+
 
 class GaussianDistribution(Distribution):
-    def __init__(self, n_classes=10, mean_x=0.0, mean_y=5.0, var_x=0.5, var_y=10):
+    def __init__(self, n_classes=10, mean_x=0.0, mean_y=5.0, var_x=0.5, var_y=10, mu=0, sigma=1, shape=(100, 2)):
         super().__init__(n_classes)
 
         # see https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.random.multivariate_normal.html
         self.mean = [mean_x, mean_y]
         self.cov = [[var_x, 0], [0, var_y]]
 
+
+        self.n_classes = n_classes
+        self.mu = mu
+        self.sigma = sigma
+        self.shape = shape
+
     def create_class_specific_samples(self, class_i, n_samples_per_class=1000):
+
+        # TOOD: n=n
+        mu_for_different_gaussians = points_on_circumference(center=(0, 0), r=10, n=self.n_classes)
+
+        generated_points = []
+
+        # plot the different classes on the latent space
+        for class_label, mu in zip(range(self.n_classes), mu_for_different_gaussians):
+
+            # TODO: make it work for z_dim
+            if self.shape[1] > 2:
+                mu = mu + (self.shape[1]-2)*(0,)
+                # mu = mu + mu
+
+            # get the points corresponding to the same classes
+            points_for_current_class_label = np.random.normal(mu, self.sigma, self.shape)
+            generated_points.extend(points_for_current_class_label)
+
+            # perform PCA if the dimension of the latent space is higher than 2
+            if self.shape[1] > 2:
+                pca = PCA(n_components=2)
+                pca.fit(points_for_current_class_label)
+                points_for_current_class_label = pca.transform(points_for_current_class_label)
+
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label))
+
+        plt.legend()
+        plt.show()
+
+        print(generated_points)
+        return np.array(generated_points[:, 0]), np.array(generated_points[:, 1])
+
+        return
+        [np.random.normal(self.mu, self.sigma, self.shape)]
+
+        print(np.random.normal(self.mu, self.sigma, self.shape))
+
         x, y = np.random.multivariate_normal(self.mean, self.cov, n_samples_per_class).T
         return x, y
+
+
 
 
 def testing():
@@ -182,30 +253,37 @@ def testing():
     """
     Test flower distribution
     """
-    var_y = 10
-    mean_y = var_y / 2 + 10
-    flowers = FlowerDistribution(n_classes=10, mean_x=0, mean_y=mean_y, var_x=0.1, var_y=var_y)
-    flowers.plot_samples()
-    print(flowers.get_samples_for_class_i(class_i=2, n_samples=5))
-    print(flowers.get_samples_for_class_i(class_i=2, n_samples=5))
-    print(flowers.get_samples(5947))
+    if False:
+        var_y = 10
+        mean_y = var_y / 2 + 10
+        flowers = FlowerDistribution(n_classes=10, mean_x=0, mean_y=mean_y, var_x=0.1, var_y=var_y)
+        # flowers = FlowerDistribution(n_classes=10, mu=0, sigma=1.0)
+        flowers.plot_samples()
+        print(flowers.get_samples_for_class_i(class_i=2, n_samples=5))
+        print(flowers.get_samples_for_class_i(class_i=2, n_samples=5))
+        print(flowers.get_samples(5947))
+        print(flowers.get_samples(5947)[0].shape)
 
     """
     Test swiss roll distribution
     """
-    swiss_roll = SwissRollDistribution(n_classes=10, spread=1.5, noise=0.3)
-    swiss_roll.plot_samples()
-    print(swiss_roll.get_samples_for_class_i(class_i=1, n_samples=10))
+    if False:
+        swiss_roll = SwissRollDistribution(n_classes=10, spread=1.5, noise=0.3)
+        swiss_roll.plot_samples()
+        print(swiss_roll.get_samples_for_class_i(class_i=1, n_samples=10))
 
     """
     Test gaussian distribution
     """
-    gaussian = GaussianDistribution(n_classes=10, mean_x=0, mean_y=0, var_x=10, var_y=10)
-    gaussian.create_class_samples(100)
-    gaussian.plot_samples()
-    gaussian.create_class_samples(10000)
-    gaussian.plot_samples()
-    print(gaussian.get_samples(50))
+    if True:
+        gaussian = GaussianDistribution(n_classes=10, mean_x=0, mean_y=0, var_x=10, var_y=10, shape=(100, 2))
+        print(gaussian.get_samples(53))
+        return
+        gaussian.create_class_samples(100)
+        gaussian.plot_samples()
+        gaussian.create_class_samples(10000)
+        gaussian.plot_samples()
+        print(gaussian.get_samples(50))
 
 
 if __name__ == '__main__':

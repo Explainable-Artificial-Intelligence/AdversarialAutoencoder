@@ -1,195 +1,11 @@
 import copy
 import random
 import itertools
-import numpy as np
-
+from src.util.Distributions import draw_from_np_distribution
 
 class AdversarialAutoencoderParameters:
     def __init__(self, **kwargs):
         self.parameters = kwargs
-
-    # TODO: move this to some helper class (distributions would be probably best)
-
-    @staticmethod
-    def draw_from_distribution(n_samples=1, **distribution_parameters):
-        """
-        wrapper function to draw from the distributions implemented in numpy.random.
-        :param n_samples: number of samples to return
-        :param distribution_parameters: dictionary holding
-            required:
-                - distribution_name: the distribution to draw from
-                - return_type: ['float', 'int']: type of the value this function should return
-            optionally:
-                - distribution specific parameters: e.g. the lower and upper boundary for the uniform distribution.
-                Note: necessary if it's required to draw from the distribution!
-                - is_positive: returned value should be >= 0
-                - is_greater_than_zero: returned value should be > 0
-                - is_negative: returned value should be <= 0
-                - is_smaller_than_zero: returned value should be < 0
-        :return:
-        """
-
-        # set n_samples to None, so the np.random functions return a single value
-        if n_samples == 1:
-            n_samples = None
-
-        return_value = None
-
-        if distribution_parameters["distribution_name"] == "beta":
-            # a: alpha, float, non-negative; b: beta, float, non-negative
-            return_value = np.random.beta(a=distribution_parameters["a"], b=distribution_parameters["b"],
-                                          size=n_samples)
-        elif distribution_parameters["distribution_name"] == "binomial":
-            # n: int, >= 0; p: float, 0<=p<=1
-            return_value = np.random.binomial(n=distribution_parameters["n"], p=distribution_parameters["p"],
-                                              size=n_samples)
-        elif distribution_parameters["distribution_name"] == "chisquare":
-            # df: degrees of freedom, int
-            return_value = np.random.chisquare(df=distribution_parameters["df"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "dirichlet":
-            # alpha: array, e.g. (10, 5, 3)
-            return_value = np.random.dirichlet(alpha=distribution_parameters["alpha"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "exponential":
-            # scale: float
-            return_value = np.random.exponential(scale=distribution_parameters["scale"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "f":
-            # dfnum: int, >0; dfden, int, >0
-            return_value = np.random.f(dfnum=distribution_parameters["dfnum"], dfden=distribution_parameters["dfden"],
-                                       size=n_samples)
-        elif distribution_parameters["distribution_name"] == "gamma":
-            # shape: float, >0; scale: float, >0, default=1
-            return_value = np.random.gamma(shape=distribution_parameters["shape"],
-                                           scale=distribution_parameters["scale"],
-                                           size=n_samples)
-        elif distribution_parameters["distribution_name"] == "geometric":
-            # p: float (probability)
-            return_value = np.random.geometric(p=distribution_parameters["p"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "gumbel":
-            # loc: float, default=0; scale: float, default=1
-            return_value = np.random.gumbel(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
-                                            size=n_samples)
-        elif distribution_parameters["distribution_name"] == "hypergeometric":
-            # ngood: int, >=0; nbad: int, >=0; nsample: int, >=1, <= ngood+nbad
-            return_value = np.random.hypergeometric(ngood=distribution_parameters["ngood"],
-                                                    nbad=distribution_parameters["nbad"],
-                                                    nsample=distribution_parameters["nsample"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "laplace":
-            # loc: float, default=0; scale: float, default=1
-            return_value = np.random.laplace(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
-                                             size=n_samples)
-        elif distribution_parameters["distribution_name"] == "logistic":
-            # loc: float, default=0; scale: float, default=1
-            return_value = np.random.logistic(loc=distribution_parameters["loc"],
-                                              scale=distribution_parameters["scale"],
-                                              size=n_samples)
-        elif distribution_parameters["distribution_name"] == "lognormal":
-            # mean: float, default=0; sigma: >0, default=1
-            return_value = np.random.lognormal(mean=distribution_parameters["mean"],
-                                               sigma=distribution_parameters["sigma"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "logseries":
-            # p: float, 0<p<1
-            return_value = np.random.logseries(p=distribution_parameters["p"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "multinomial":
-            # n: int; pvals: array of floats, sum(pvals)=1
-            return_value = np.random.multinomial(n=distribution_parameters["n"], pvals=distribution_parameters["pvals"],
-                                                 size=n_samples)
-        elif distribution_parameters["distribution_name"] == "multivariate_normal":
-            # mean: 1D array with length N; cov: 2D array of shape (N,N); tol: float
-            return_value = np.random.multivariate_normal(mean=distribution_parameters["mean"],
-                                                         cov=distribution_parameters["cov"],
-                                                         tol=distribution_parameters["tol"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "negative_binomial":
-            # n: int, >0; p: float, 0<=p<=1;
-            return_value = np.random.negative_binomial(n=distribution_parameters["n"],
-                                                       p=distribution_parameters["p"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "noncentral_chisquare":
-            # df: int, >0; nonc: float, >0
-            return_value = np.random.noncentral_chisquare(df=distribution_parameters["df"],
-                                                          nonc=distribution_parameters["nonc"],
-                                                          size=n_samples)
-        elif distribution_parameters["distribution_name"] == "noncentral_f":
-            # dfnum: int, >1; dfden: int, >1; nonc: float, >=0
-            return_value = np.random.noncentral_f(dfnum=distribution_parameters["dfnum"],
-                                                  dfden=distribution_parameters["dfden"],
-                                                  nonc=distribution_parameters["nonc"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "normal":
-            # loc: float; scale: float
-            return_value = np.random.normal(loc=distribution_parameters["loc"], scale=distribution_parameters["scale"],
-                                            size=n_samples)
-        elif distribution_parameters["distribution_name"] == "pareto":
-            # a: float, >0
-            return_value = np.random.pareto(a=distribution_parameters["a"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "poisson":
-            # lam: float, >=0
-            return_value = np.random.poisson(lam=distribution_parameters["lam"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "power":
-            # a: float, >=0
-            return_value = np.random.power(a=distribution_parameters["a"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "rayleigh":
-            # scale: float, >=0, default=1
-            return_value = np.random.rayleigh(scale=distribution_parameters["scale"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "standard_cauchy":
-            return_value = np.random.standard_cauchy(size=n_samples)
-        elif distribution_parameters["distribution_name"] == "standard_gamma":
-            # shape: float, >0
-            return_value = np.random.standard_gamma(shape=distribution_parameters["shape"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "standard_normal":
-            return_value = np.random.standard_normal(size=n_samples)
-        elif distribution_parameters["distribution_name"] == "standard_t":
-            # df: int, >0
-            return_value = np.random.standard_t(df=distribution_parameters["df"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "triangular":
-            # left: float; mode: float, left <= mode <= right; right: float, >left
-            return_value = np.random.triangular(left=distribution_parameters["left"],
-                                                mode=distribution_parameters["mode"],
-                                                right=distribution_parameters["right"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "uniform":
-            # low: float, default=0; high: float, default=1
-            return_value = np.random.uniform(low=distribution_parameters["low"], high=distribution_parameters["high"],
-                                             size=n_samples)
-        elif distribution_parameters["distribution_name"] == "vonmises":
-            # mu: float; kappa: float, >=0
-            return_value = np.random.vonmises(mu=distribution_parameters["mu"], kappa=distribution_parameters["kappa"],
-                                              size=n_samples)
-        elif distribution_parameters["distribution_name"] == "wald":
-            # mean: float, >0; scale: float, >=0
-            return_value = np.random.wald(mean=distribution_parameters["mean"], scale=distribution_parameters["scale"],
-                                          size=n_samples)
-        elif distribution_parameters["distribution_name"] == "weibull":
-            # a: float, >0
-            return_value = np.random.weibull(a=distribution_parameters["a"], size=n_samples)
-        elif distribution_parameters["distribution_name"] == "zipf":
-            # a: float, >1
-            return_value = np.random.zipf(a=distribution_parameters["a"], size=n_samples)
-
-        # TODO: works only for n_samples=1 -> make it work on higher values as well
-
-        # output should be >= 0
-        if distribution_parameters.get("is_positive"):
-            return_value = abs(return_value)
-        # output should be > 0
-        if distribution_parameters.get("is_greater_than_zero"):
-            if distribution_parameters["return_type"] == "int":
-                return_value = abs(return_value) + 1
-            else:
-                return_value = abs(return_value) + 1e-12
-        # output should be <= 0
-        if distribution_parameters.get("is_negative"):
-            return_value = abs(return_value)*-1
-        # output should be < 0
-        if distribution_parameters.get("is_smaller_than_zero"):
-            if distribution_parameters["return_type"] == "int":
-                return_value = abs(return_value)*-1 - 1
-            else:
-                return_value = abs(return_value)*-1 - 1e-12
-
-        # change type of the return value
-        if distribution_parameters["return_type"] == "int":
-            return_value = int(return_value)
-        elif distribution_parameters["return_type"] == "float":
-            return_value = float(return_value)
-
-        return return_value
 
     @staticmethod
     def get_default_parameters_mnist():
@@ -203,9 +19,15 @@ class AdversarialAutoencoderParameters:
                 'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
-                'learning_rate_autoencoder': 0.001, 'learning_rate_discriminator': 0.001,
-                'learning_rate_generator': 0.01, 'optimizer_autoencoder': 'AdamOptimizer',
-                'optimizer_discriminator': 'RMSPropOptimizer', 'optimizer_generator': 'RMSPropOptimizer',
+                'learning_rate_autoencoder': 0.0001,
+                'learning_rate_discriminator': 0.0001,
+                'learning_rate_generator': 0.0001,
+                'decaying_learning_rate_name_autoencoder': None,
+                'decaying_learning_rate_name_discriminator': None,
+                'decaying_learning_rate_name_generator': None,
+                'optimizer_autoencoder': 'AdamOptimizer',
+                'optimizer_discriminator': 'AdamOptimizer',
+                'optimizer_generator': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
@@ -269,8 +91,13 @@ class AdversarialAutoencoderParameters:
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
-                'learning_rate_autoencoder': 0.0001, 'learning_rate_discriminator': 0.0001,
-                'learning_rate_generator': 0.0001, 'optimizer_autoencoder': 'AdamOptimizer',
+                'learning_rate_autoencoder': 0.0001,
+                'learning_rate_discriminator': 0.0001,
+                'learning_rate_generator': 0.0001,
+                'decaying_learning_rate_name_autoencoder': None,
+                'decaying_learning_rate_name_discriminator': None,
+                'decaying_learning_rate_name_generator': None,
+                'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
@@ -335,9 +162,15 @@ class AdversarialAutoencoderParameters:
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
-                'learning_rate_autoencoder': 0.0001, 'learning_rate_discriminator': 0.0001,
-                'learning_rate_generator': 0.0001, 'optimizer_autoencoder': 'AdamOptimizer',
-                'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
+                'learning_rate_autoencoder': 0.0001,
+                'learning_rate_discriminator': 0.0001,
+                'learning_rate_generator': 0.0001,
+                'decaying_learning_rate_name_autoencoder': None,
+                'decaying_learning_rate_name_discriminator': None,
+                'decaying_learning_rate_name_generator': None,
+                'optimizer_autoencoder': 'AdamOptimizer',
+                'optimizer_discriminator': 'AdamOptimizer',
+                'optimizer_generator': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
@@ -434,7 +267,7 @@ class AdversarialAutoencoderParameters:
         :return:
         """
 
-        n_layers = self.draw_from_distribution(distribution_name="uniform", low=1, high=10, return_type="int")
+        n_layers = draw_from_np_distribution(distribution_name="uniform", low=1, high=10, return_type="int")
 
         # TODO: work in progress
 
@@ -735,9 +568,9 @@ class AdversarialAutoencoderParameters:
         # the network structure, etc.
 
         # train duration
-        batch_size = self.draw_from_distribution(distribution_name="uniform", low=50, high=500, return_type="int")
+        batch_size = draw_from_np_distribution(distribution_name="uniform", low=50, high=500, return_type="int")
         n_epochs = 10  # TODO: probably doesn't make really sense ..
-        z_dim = self.draw_from_distribution(distribution_name="uniform", low=2, high=100, return_type="int")
+        z_dim = draw_from_np_distribution(distribution_name="uniform", low=2, high=100, return_type="int")
 
         # network topology
         n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]  # TODO: function to create a random number of layers
@@ -751,11 +584,11 @@ class AdversarialAutoencoderParameters:
 
         # individual learning rates
         learning_rate_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
         learning_rate_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
         learning_rate_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
 
         # available optimizers:
         autoencoder_optimizers = ["AdamOptimizer",
@@ -788,41 +621,41 @@ class AdversarialAutoencoderParameters:
         #   - rho: decay rate; default: 0.95
         #   - epsilon: A constant epsilon used to better conditioning the grad update; default: 1e-08
         AdadeltaOptimizer_rho_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
         AdadeltaOptimizer_epsilon_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
         AdadeltaOptimizer_rho_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
         AdadeltaOptimizer_epsilon_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
         AdadeltaOptimizer_rho_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
         AdadeltaOptimizer_epsilon_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
 
         # AdagradOptimizer
         #   - learning rate
         #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
         #   default: 0.1
         AdagradOptimizer_initial_accumulator_value_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
         AdagradOptimizer_initial_accumulator_value_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
         AdagradOptimizer_initial_accumulator_value_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
 
         # MomentumOptimizer
         #   - learning rate
         #   - momentum: A Tensor or a floating point value. The momentum.
         #   - use_nesterov: If True use Nesterov Momentum; default: False http://proceedings.mlr.press/v28/sutskever13.pdf
         MomentumOptimizer_momentum_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         MomentumOptimizer_use_nesterov_autoencoder = random.choice([True, False])
         MomentumOptimizer_momentum_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         MomentumOptimizer_use_nesterov_discriminator = random.choice([True, False])
         MomentumOptimizer_momentum_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         MomentumOptimizer_use_nesterov_generator = random.choice([True, False])
 
         # AdamOptimizer
@@ -833,23 +666,23 @@ class AdversarialAutoencoderParameters:
         #   default: 0.999
         #   - epsilon: A small constant for numerical stability. default: 1e-08
         AdamOptimizer_beta1_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         AdamOptimizer_beta2_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
         AdamOptimizer_epsilon_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
         AdamOptimizer_beta1_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         AdamOptimizer_beta2_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
         AdamOptimizer_epsilon_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
         AdamOptimizer_beta1_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         AdamOptimizer_beta2_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
         AdamOptimizer_epsilon_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
 
         # FtrlOptimizer
         #   - learning rate
@@ -861,52 +694,52 @@ class AdversarialAutoencoderParameters:
         #   L2 above in that the L2 above is a stabilization penalty, whereas this L2 shrinkage is a magnitude penalty.
         #   default: 0.0
         FtrlOptimizer_learning_rate_power_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
         FtrlOptimizer_initial_accumulator_value_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         FtrlOptimizer_l1_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_learning_rate_power_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
         FtrlOptimizer_initial_accumulator_value_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         FtrlOptimizer_l1_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_learning_rate_power_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
         FtrlOptimizer_initial_accumulator_value_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         FtrlOptimizer_l1_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         FtrlOptimizer_l2_shrinkage_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
 
         # ProximalGradientDescentOptimizer
         #   - learning rate
         #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
         #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
         ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalGradientDescentOptimizer_l1_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalGradientDescentOptimizer_l2_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
 
         # ProximalAdagradOptimizer
         #   - learning rate
@@ -915,23 +748,23 @@ class AdversarialAutoencoderParameters:
         #   - l1_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
         #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
         ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
         ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalAdagradOptimizer_initial_accumulator_value_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
         ProximalAdagradOptimizer_l1_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalAdagradOptimizer_l2_regularization_strength_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalAdagradOptimizer_initial_accumulator_value_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
         ProximalAdagradOptimizer_l1_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
         ProximalAdagradOptimizer_l2_regularization_strength_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
 
         # RMSPropOptimizer
         #   - learning rate
@@ -942,25 +775,25 @@ class AdversarialAutoencoderParameters:
         #   uncentered second moment. Setting this to True may help with training, but is slightly more expensive in terms
         #   of computation and memory. Defaults to False.
         RMSPropOptimizer_decay_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         RMSPropOptimizer_momentum_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         RMSPropOptimizer_epsilon_autoencoder = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
         RMSPropOptimizer_centered_autoencoder = random.choice([True, False])
         RMSPropOptimizer_decay_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         RMSPropOptimizer_momentum_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         RMSPropOptimizer_epsilon_discriminator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
         RMSPropOptimizer_centered_discriminator = random.choice([True, False])
         RMSPropOptimizer_decay_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
         RMSPropOptimizer_momentum_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
         RMSPropOptimizer_epsilon_generator = \
-            self.draw_from_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+            draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
         RMSPropOptimizer_centered_generator = random.choice([True, False])
 
         # available loss functions
@@ -987,7 +820,7 @@ class AdversarialAutoencoderParameters:
             for var_name in kwargs:
                 # we have a dictionary, so we want to draw from the respective distribution
                 if isinstance(kwargs[var_name], dict):
-                    param_dict[var_name] = self.draw_from_distribution(**kwargs[var_name])
+                    param_dict[var_name] = draw_from_np_distribution(**kwargs[var_name])
                 else:
                     param_dict[var_name] = kwargs[var_name]
 

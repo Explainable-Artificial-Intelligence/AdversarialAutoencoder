@@ -15,21 +15,21 @@ User Interface will have those "steps":
 ## UI sketches: 
 
 ### Load images
-![Alt text](Docs/1_load_images.png "Load images")
+![Alt text](doc/1_load_images.png "Load images")
 
 ### Load tabular data
-![Alt text](Docs/1_load_tabular.png "Load tabular data")
+![Alt text](doc/1_load_tabular.png "Load tabular data")
 
 ### Build network
-![Alt text](Docs/2_build.png "Build network")
+![Alt text](doc/2_build.png "Build network")
 
 ### Train network
-![Alt text](Docs/3_train.png "Train network")
+![Alt text](doc/3_train.png "Train network")
 
 ### Visualize results
-![Alt text](Docs/4_visualize.png "Visualize results")
+![Alt text](doc/4_visualize.png "Visualize results")
 
 ### Tune parameters
-![Alt text](Docs/5_tune.png "Tune parameters")
+![Alt text](doc/5_tune.png "Tune parameters")
 
 

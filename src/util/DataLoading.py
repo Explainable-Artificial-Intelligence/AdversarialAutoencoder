@@ -24,6 +24,7 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/py
 Read .tfrecords
 """
 
+# TODO:
 
 def read_and_decode(filename_queue):
     reader = tf.TFRecordReader()
@@ -92,7 +93,7 @@ def read_cifar10(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, 
     :param grey_scale: load the images as gray scale
     :return:
     """
-    # TODO: implement grey scale
+    # TODO: implement gray scale
 
     # names of the cifar10 dataset
     cifar10_train_file_names = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4"]
@@ -562,6 +563,8 @@ def testing():
             first_img, _ = svhn.train.next_batch(1)
 
             print(_)
+
+            print(first_img.shape)
 
             stop = timeit.default_timer()
             print(stop - start)

@@ -1,5 +1,5 @@
 """
-    Implementation of an Adversarial Autoencoder based on the Paper Adversarial Autoencoders
+    Implementation of a SemiSupervised Adversarial Autoencoder based on the Paper Adversarial Autoencoders
     https://arxiv.org/abs/1511.05644 by Goodfellow et. al. and the implementation available on
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
@@ -12,15 +12,21 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
-import AdversarialAutoencoderHelperFunctions
+import src.util.AdversarialAutoencoderHelperFunctions as aae_helper
+from src.util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
 
 
 class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
+        self.train_status = "start"
         self.result_folder_name = None
         self.parameter_dictionary = parameter_dictionary
         self.verbose = parameter_dictionary["verbose"]
+
+        """
+        params for the data 
+        """
 
         # TODO: include in parameter dictionary
         self.n_classes = 10
@@ -37,11 +43,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         else:
             self.color_scale = "gray_scale"
             self.input_dim = parameter_dictionary["input_dim_x"] * parameter_dictionary["input_dim_y"]
-
-        self.performance = None
-        optimizer_autoencoder = parameter_dictionary["optimizer_autoencoder"]
-        optimizer_discriminator = parameter_dictionary["optimizer_discriminator"]
-        optimizer_generator = parameter_dictionary["optimizer_generator"]
 
         # dataset selected by the user (MNIST, SVHN, cifar10, custom)
         self.selected_dataset = parameter_dictionary["selected_dataset"]
@@ -74,148 +75,158 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # dimension of the latent representation
         self.z_dim = parameter_dictionary["z_dim"]
 
+        # Create a variable to track the global step.
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
+
         # learning rate for the different parts of the network
         self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
         self.learning_rate_discriminator = parameter_dictionary["learning_rate_discriminator"]
         self.learning_rate_generator = parameter_dictionary["learning_rate_generator"]
 
+        self.decaying_learning_rate_name_autoencoder = parameter_dictionary["decaying_learning_rate_name_autoencoder"]
+        self.decaying_learning_rate_name_discriminator = \
+            parameter_dictionary["decaying_learning_rate_name_discriminator"]
+        self.decaying_learning_rate_name_generator = parameter_dictionary["decaying_learning_rate_name_generator"]
+
         """
         params for optimizers
         """
-        self.AdadeltaOptimizer_rho_autoencoder = parameter_dictionary["AdadeltaOptimizer_rho_autoencoder"]
-        self.AdadeltaOptimizer_epsilon_autoencoder = parameter_dictionary["AdadeltaOptimizer_epsilon_autoencoder"]
+        if True:
 
-        self.AdadeltaOptimizer_rho_discriminator = parameter_dictionary["AdadeltaOptimizer_rho_discriminator"]
-        self.AdadeltaOptimizer_epsilon_discriminator = parameter_dictionary["AdadeltaOptimizer_epsilon_discriminator"]
+            self.AdadeltaOptimizer_rho_autoencoder = parameter_dictionary["AdadeltaOptimizer_rho_autoencoder"]
+            self.AdadeltaOptimizer_epsilon_autoencoder = parameter_dictionary["AdadeltaOptimizer_epsilon_autoencoder"]
 
-        self.AdadeltaOptimizer_rho_generator = parameter_dictionary["AdadeltaOptimizer_rho_generator"]
-        self.AdadeltaOptimizer_epsilon_generator = parameter_dictionary["AdadeltaOptimizer_epsilon_generator"]
+            self.AdadeltaOptimizer_rho_discriminator = parameter_dictionary["AdadeltaOptimizer_rho_discriminator"]
+            self.AdadeltaOptimizer_epsilon_discriminator = parameter_dictionary["AdadeltaOptimizer_epsilon_discriminator"]
 
-        self.AdagradOptimizer_initial_accumulator_value_autoencoder = \
-            parameter_dictionary["AdagradOptimizer_initial_accumulator_value_autoencoder"]
+            self.AdadeltaOptimizer_rho_generator = parameter_dictionary["AdadeltaOptimizer_rho_generator"]
+            self.AdadeltaOptimizer_epsilon_generator = parameter_dictionary["AdadeltaOptimizer_epsilon_generator"]
 
-        self.AdagradOptimizer_initial_accumulator_value_discriminator = \
-            parameter_dictionary["AdagradOptimizer_initial_accumulator_value_discriminator"]
+            self.AdagradOptimizer_initial_accumulator_value_autoencoder = \
+                parameter_dictionary["AdagradOptimizer_initial_accumulator_value_autoencoder"]
 
-        self.AdagradOptimizer_initial_accumulator_value_generator = \
-            parameter_dictionary["AdagradOptimizer_initial_accumulator_value_generator"]
+            self.AdagradOptimizer_initial_accumulator_value_discriminator = \
+                parameter_dictionary["AdagradOptimizer_initial_accumulator_value_discriminator"]
 
-        self.MomentumOptimizer_momentum_autoencoder = parameter_dictionary["MomentumOptimizer_momentum_autoencoder"]
-        self.MomentumOptimizer_use_nesterov_autoencoder = parameter_dictionary[
-            "MomentumOptimizer_use_nesterov_autoencoder"]
+            self.AdagradOptimizer_initial_accumulator_value_generator = \
+                parameter_dictionary["AdagradOptimizer_initial_accumulator_value_generator"]
 
-        self.MomentumOptimizer_momentum_discriminator = parameter_dictionary["MomentumOptimizer_momentum_discriminator"]
-        self.MomentumOptimizer_use_nesterov_discriminator = parameter_dictionary[
-            "MomentumOptimizer_use_nesterov_discriminator"]
+            self.MomentumOptimizer_momentum_autoencoder = parameter_dictionary["MomentumOptimizer_momentum_autoencoder"]
+            self.MomentumOptimizer_use_nesterov_autoencoder = parameter_dictionary[
+                "MomentumOptimizer_use_nesterov_autoencoder"]
 
-        self.MomentumOptimizer_momentum_generator = parameter_dictionary["MomentumOptimizer_momentum_generator"]
-        self.MomentumOptimizer_use_nesterov_generator = parameter_dictionary["MomentumOptimizer_use_nesterov_generator"]
+            self.MomentumOptimizer_momentum_discriminator = parameter_dictionary["MomentumOptimizer_momentum_discriminator"]
+            self.MomentumOptimizer_use_nesterov_discriminator = parameter_dictionary[
+                "MomentumOptimizer_use_nesterov_discriminator"]
 
-        self.AdamOptimizer_beta1_autoencoder = parameter_dictionary["AdamOptimizer_beta1_autoencoder"]
-        self.AdamOptimizer_beta2_autoencoder = parameter_dictionary["AdamOptimizer_beta2_autoencoder"]
-        self.AdamOptimizer_epsilon_autoencoder = parameter_dictionary["AdamOptimizer_epsilon_autoencoder"]
+            self.MomentumOptimizer_momentum_generator = parameter_dictionary["MomentumOptimizer_momentum_generator"]
+            self.MomentumOptimizer_use_nesterov_generator = parameter_dictionary["MomentumOptimizer_use_nesterov_generator"]
 
-        self.AdamOptimizer_beta1_discriminator = parameter_dictionary["AdamOptimizer_beta1_discriminator"]
-        self.AdamOptimizer_beta2_discriminator = parameter_dictionary["AdamOptimizer_beta2_discriminator"]
-        self.AdamOptimizer_epsilon_discriminator = parameter_dictionary["AdamOptimizer_epsilon_discriminator"]
+            self.AdamOptimizer_beta1_autoencoder = parameter_dictionary["AdamOptimizer_beta1_autoencoder"]
+            self.AdamOptimizer_beta2_autoencoder = parameter_dictionary["AdamOptimizer_beta2_autoencoder"]
+            self.AdamOptimizer_epsilon_autoencoder = parameter_dictionary["AdamOptimizer_epsilon_autoencoder"]
 
-        self.AdamOptimizer_beta1_generator = parameter_dictionary["AdamOptimizer_beta1_generator"]
-        self.AdamOptimizer_beta2_generator = parameter_dictionary["AdamOptimizer_beta2_generator"]
-        self.AdamOptimizer_epsilon_generator = parameter_dictionary["AdamOptimizer_epsilon_generator"]
+            self.AdamOptimizer_beta1_discriminator = parameter_dictionary["AdamOptimizer_beta1_discriminator"]
+            self.AdamOptimizer_beta2_discriminator = parameter_dictionary["AdamOptimizer_beta2_discriminator"]
+            self.AdamOptimizer_epsilon_discriminator = parameter_dictionary["AdamOptimizer_epsilon_discriminator"]
 
-        self.FtrlOptimizer_learning_rate_power_autoencoder = \
-            parameter_dictionary["FtrlOptimizer_learning_rate_power_autoencoder"]
-        self.FtrlOptimizer_initial_accumulator_value_autoencoder = \
-            parameter_dictionary["FtrlOptimizer_initial_accumulator_value_autoencoder"]
-        self.FtrlOptimizer_l1_regularization_strength_autoencoder = \
-            parameter_dictionary["FtrlOptimizer_l1_regularization_strength_autoencoder"]
-        self.FtrlOptimizer_l2_regularization_strength_autoencoder = \
-            parameter_dictionary["FtrlOptimizer_l2_regularization_strength_autoencoder"]
-        self.FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = \
-            parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder"]
+            self.AdamOptimizer_beta1_generator = parameter_dictionary["AdamOptimizer_beta1_generator"]
+            self.AdamOptimizer_beta2_generator = parameter_dictionary["AdamOptimizer_beta2_generator"]
+            self.AdamOptimizer_epsilon_generator = parameter_dictionary["AdamOptimizer_epsilon_generator"]
 
-        self.FtrlOptimizer_learning_rate_power_discriminator = \
-            parameter_dictionary["FtrlOptimizer_learning_rate_power_discriminator"]
-        self.FtrlOptimizer_initial_accumulator_value_discriminator = \
-            parameter_dictionary["FtrlOptimizer_initial_accumulator_value_discriminator"]
-        self.FtrlOptimizer_l1_regularization_strength_discriminator = \
-            parameter_dictionary["FtrlOptimizer_l1_regularization_strength_discriminator"]
-        self.FtrlOptimizer_l2_regularization_strength_discriminator = \
-            parameter_dictionary["FtrlOptimizer_l2_regularization_strength_discriminator"]
-        self.FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = \
-            parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator"]
+            self.FtrlOptimizer_learning_rate_power_autoencoder = \
+                parameter_dictionary["FtrlOptimizer_learning_rate_power_autoencoder"]
+            self.FtrlOptimizer_initial_accumulator_value_autoencoder = \
+                parameter_dictionary["FtrlOptimizer_initial_accumulator_value_autoencoder"]
+            self.FtrlOptimizer_l1_regularization_strength_autoencoder = \
+                parameter_dictionary["FtrlOptimizer_l1_regularization_strength_autoencoder"]
+            self.FtrlOptimizer_l2_regularization_strength_autoencoder = \
+                parameter_dictionary["FtrlOptimizer_l2_regularization_strength_autoencoder"]
+            self.FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = \
+                parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder"]
 
-        self.FtrlOptimizer_learning_rate_power_generator = \
-            parameter_dictionary["FtrlOptimizer_learning_rate_power_generator"]
-        self.FtrlOptimizer_initial_accumulator_value_generator = \
-            parameter_dictionary["FtrlOptimizer_initial_accumulator_value_generator"]
-        self.FtrlOptimizer_l1_regularization_strength_generator = \
-            parameter_dictionary["FtrlOptimizer_l1_regularization_strength_generator"]
-        self.FtrlOptimizer_l2_regularization_strength_generator = \
-            parameter_dictionary["FtrlOptimizer_l2_regularization_strength_generator"]
-        self.FtrlOptimizer_l2_shrinkage_regularization_strength_generator = \
-            parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_generator"]
+            self.FtrlOptimizer_learning_rate_power_discriminator = \
+                parameter_dictionary["FtrlOptimizer_learning_rate_power_discriminator"]
+            self.FtrlOptimizer_initial_accumulator_value_discriminator = \
+                parameter_dictionary["FtrlOptimizer_initial_accumulator_value_discriminator"]
+            self.FtrlOptimizer_l1_regularization_strength_discriminator = \
+                parameter_dictionary["FtrlOptimizer_l1_regularization_strength_discriminator"]
+            self.FtrlOptimizer_l2_regularization_strength_discriminator = \
+                parameter_dictionary["FtrlOptimizer_l2_regularization_strength_discriminator"]
+            self.FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = \
+                parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator"]
 
-        self.ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder"]
-        self.ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder"]
+            self.FtrlOptimizer_learning_rate_power_generator = \
+                parameter_dictionary["FtrlOptimizer_learning_rate_power_generator"]
+            self.FtrlOptimizer_initial_accumulator_value_generator = \
+                parameter_dictionary["FtrlOptimizer_initial_accumulator_value_generator"]
+            self.FtrlOptimizer_l1_regularization_strength_generator = \
+                parameter_dictionary["FtrlOptimizer_l1_regularization_strength_generator"]
+            self.FtrlOptimizer_l2_regularization_strength_generator = \
+                parameter_dictionary["FtrlOptimizer_l2_regularization_strength_generator"]
+            self.FtrlOptimizer_l2_shrinkage_regularization_strength_generator = \
+                parameter_dictionary["FtrlOptimizer_l2_shrinkage_regularization_strength_generator"]
 
-        self.ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator"]
-        self.ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator"]
+            self.ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder"]
+            self.ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder"]
 
-        self.ProximalGradientDescentOptimizer_l1_regularization_strength_generator = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_generator"]
-        self.ProximalGradientDescentOptimizer_l2_regularization_strength_generator = \
-            parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_generator"]
+            self.ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator"]
+            self.ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator"]
 
-        self.ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = \
-            parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_autoencoder"]
-        self.ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = \
-            parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_autoencoder"]
-        self.ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = \
-            parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_autoencoder"]
+            self.ProximalGradientDescentOptimizer_l1_regularization_strength_generator = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l1_regularization_strength_generator"]
+            self.ProximalGradientDescentOptimizer_l2_regularization_strength_generator = \
+                parameter_dictionary["ProximalGradientDescentOptimizer_l2_regularization_strength_generator"]
 
-        self.ProximalAdagradOptimizer_initial_accumulator_value_discriminator = \
-            parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_discriminator"]
-        self.ProximalAdagradOptimizer_l1_regularization_strength_discriminator = \
-            parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_discriminator"]
-        self.ProximalAdagradOptimizer_l2_regularization_strength_discriminator = \
-            parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_discriminator"]
+            self.ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = \
+                parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_autoencoder"]
+            self.ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = \
+                parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_autoencoder"]
+            self.ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = \
+                parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_autoencoder"]
 
-        self.ProximalAdagradOptimizer_initial_accumulator_value_generator = \
-            parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_generator"]
-        self.ProximalAdagradOptimizer_l1_regularization_strength_generator = \
-            parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_generator"]
-        self.ProximalAdagradOptimizer_l2_regularization_strength_generator = \
-            parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_generator"]
+            self.ProximalAdagradOptimizer_initial_accumulator_value_discriminator = \
+                parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_discriminator"]
+            self.ProximalAdagradOptimizer_l1_regularization_strength_discriminator = \
+                parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_discriminator"]
+            self.ProximalAdagradOptimizer_l2_regularization_strength_discriminator = \
+                parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_discriminator"]
 
-        self.RMSPropOptimizer_decay_autoencoder = parameter_dictionary["RMSPropOptimizer_decay_autoencoder"]
-        self.RMSPropOptimizer_momentum_autoencoder = parameter_dictionary["RMSPropOptimizer_momentum_autoencoder"]
-        self.RMSPropOptimizer_epsilon_autoencoder = parameter_dictionary["RMSPropOptimizer_epsilon_autoencoder"]
-        self.RMSPropOptimizer_centered_autoencoder = parameter_dictionary["RMSPropOptimizer_centered_autoencoder"]
+            self.ProximalAdagradOptimizer_initial_accumulator_value_generator = \
+                parameter_dictionary["ProximalAdagradOptimizer_initial_accumulator_value_generator"]
+            self.ProximalAdagradOptimizer_l1_regularization_strength_generator = \
+                parameter_dictionary["ProximalAdagradOptimizer_l1_regularization_strength_generator"]
+            self.ProximalAdagradOptimizer_l2_regularization_strength_generator = \
+                parameter_dictionary["ProximalAdagradOptimizer_l2_regularization_strength_generator"]
 
-        self.RMSPropOptimizer_decay_discriminator = parameter_dictionary["RMSPropOptimizer_decay_discriminator"]
-        self.RMSPropOptimizer_momentum_discriminator = parameter_dictionary["RMSPropOptimizer_momentum_discriminator"]
-        self.RMSPropOptimizer_epsilon_discriminator = parameter_dictionary["RMSPropOptimizer_epsilon_discriminator"]
-        self.RMSPropOptimizer_centered_discriminator = parameter_dictionary["RMSPropOptimizer_centered_discriminator"]
+            self.RMSPropOptimizer_decay_autoencoder = parameter_dictionary["RMSPropOptimizer_decay_autoencoder"]
+            self.RMSPropOptimizer_momentum_autoencoder = parameter_dictionary["RMSPropOptimizer_momentum_autoencoder"]
+            self.RMSPropOptimizer_epsilon_autoencoder = parameter_dictionary["RMSPropOptimizer_epsilon_autoencoder"]
+            self.RMSPropOptimizer_centered_autoencoder = parameter_dictionary["RMSPropOptimizer_centered_autoencoder"]
 
-        self.RMSPropOptimizer_decay_generator = parameter_dictionary["RMSPropOptimizer_decay_generator"]
-        self.RMSPropOptimizer_momentum_generator = parameter_dictionary["RMSPropOptimizer_momentum_generator"]
-        self.RMSPropOptimizer_epsilon_generator = parameter_dictionary["RMSPropOptimizer_epsilon_generator"]
-        self.RMSPropOptimizer_centered_generator = parameter_dictionary["RMSPropOptimizer_centered_generator"]
+            self.RMSPropOptimizer_decay_discriminator = parameter_dictionary["RMSPropOptimizer_decay_discriminator"]
+            self.RMSPropOptimizer_momentum_discriminator = parameter_dictionary["RMSPropOptimizer_momentum_discriminator"]
+            self.RMSPropOptimizer_epsilon_discriminator = parameter_dictionary["RMSPropOptimizer_epsilon_discriminator"]
+            self.RMSPropOptimizer_centered_discriminator = parameter_dictionary["RMSPropOptimizer_centered_discriminator"]
 
-        # exponential decay rate for the 1st moment estimates for the adam optimizer.
-        self.AdamOptimizer_beta1_autoencoder = parameter_dictionary["AdamOptimizer_beta1_autoencoder"]
-        self.AdamOptimizer_beta1_discriminator = parameter_dictionary["AdamOptimizer_beta1_discriminator"]
-        self.AdamOptimizer_beta1_generator = parameter_dictionary["AdamOptimizer_beta1_generator"]
+            self.RMSPropOptimizer_decay_generator = parameter_dictionary["RMSPropOptimizer_decay_generator"]
+            self.RMSPropOptimizer_momentum_generator = parameter_dictionary["RMSPropOptimizer_momentum_generator"]
+            self.RMSPropOptimizer_epsilon_generator = parameter_dictionary["RMSPropOptimizer_epsilon_generator"]
+            self.RMSPropOptimizer_centered_generator = parameter_dictionary["RMSPropOptimizer_centered_generator"]
 
-        # exponential decay rate for the 2nd moment estimates for the adam optimizer.
-        self.AdamOptimizer_beta2_autoencoder = parameter_dictionary["AdamOptimizer_beta2_autoencoder"]
-        self.AdamOptimizer_beta2_discriminator = parameter_dictionary["AdamOptimizer_beta2_discriminator"]
-        self.AdamOptimizer_beta2_generator = parameter_dictionary["AdamOptimizer_beta2_generator"]
+            # exponential decay rate for the 1st moment estimates for the adam optimizer.
+            self.AdamOptimizer_beta1_autoencoder = parameter_dictionary["AdamOptimizer_beta1_autoencoder"]
+            self.AdamOptimizer_beta1_discriminator = parameter_dictionary["AdamOptimizer_beta1_discriminator"]
+            self.AdamOptimizer_beta1_generator = parameter_dictionary["AdamOptimizer_beta1_generator"]
+
+            # exponential decay rate for the 2nd moment estimates for the adam optimizer.
+            self.AdamOptimizer_beta2_autoencoder = parameter_dictionary["AdamOptimizer_beta2_autoencoder"]
+            self.AdamOptimizer_beta2_discriminator = parameter_dictionary["AdamOptimizer_beta2_discriminator"]
+            self.AdamOptimizer_beta2_generator = parameter_dictionary["AdamOptimizer_beta2_generator"]
 
         """
         loss functions
@@ -260,10 +271,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # init autoencoder
         with tf.variable_scope(tf.get_variable_scope()):
             # encoder part of the autoencoder and also the generator
-            latent_variable_z, class_label_y = \
+            self.latent_variable_z, self.class_label_y = \
                 self.encoder(self.X, bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
             # Concat class label and the encoder output
-            decoder_input = tf.concat([class_label_y, latent_variable_z], 1)
+            decoder_input = tf.concat([self.class_label_y, self.latent_variable_z], 1)
             # decoder part of the autoencoder; takes z and y as input
             decoder_output = self.decoder(decoder_input,
                                           bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
@@ -271,12 +282,12 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # init discriminator for the samples drawn from some gaussian distribution (holds style information)
         with tf.variable_scope(tf.get_variable_scope()):
             # discriminator for the positive gaussian samples drawn from N(z|0,I)
-            discriminator_gaussian_pos_samples = \
+            self.discriminator_gaussian_pos_samples = \
                 self.discriminator_gaussian(self.real_distribution,
                                             bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
             # discriminator for the negative gaussian samples q(z) (generated by the generator)
-            discriminator_gaussian_neg_samples = \
-                self.discriminator_gaussian(latent_variable_z, reuse=True,
+            self.discriminator_gaussian_neg_samples = \
+                self.discriminator_gaussian(self.latent_variable_z, reuse=True,
                                             bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
 
         # init discriminator for the samples drawn from the categorical distribution (holds class label information)
@@ -288,7 +299,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # discriminator for the negative categorical samples (= predicted labels y) (generated by the
             # generator)
             discriminator_categorical_neg_samples = \
-                self.discriminator_categorical(class_label_y, reuse=True,
+                self.discriminator_categorical(self.class_label_y, reuse=True,
                                                bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
 
         # variable for predicting the class labels from the labeled data (for performance evaluation)
@@ -301,8 +312,8 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # variable for "manually" passing values through the decoder (currently not in use -> later when clicking on
         # distribution -> show respective image)
         with tf.variable_scope(tf.get_variable_scope()):
-            self.decoder_output = self.decoder(self.decoder_input, reuse=True,
-                                               bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+            self.decoder_output_real_dist = self.decoder(self.decoder_input, reuse=True,
+                                                         bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
 
             self.decoder_output_multiple = \
                 self.decoder(self.decoder_input_multiple, reuse=True,
@@ -323,37 +334,37 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Gaussian Discriminator Loss
         discriminator_gaussian_loss_pos_samples = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_discriminator,
-                                   labels=tf.ones_like(discriminator_gaussian_pos_samples),
-                                   logits=discriminator_gaussian_pos_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
+                                         labels=tf.ones_like(self.discriminator_gaussian_pos_samples),
+                                         logits=self.discriminator_gaussian_pos_samples))
         discriminator_gaussian_loss_neg_samples = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_discriminator,
-                                   labels=tf.zeros_like(discriminator_gaussian_neg_samples),
-                                   logits=discriminator_gaussian_neg_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
+                                         labels=tf.zeros_like(self.discriminator_gaussian_neg_samples),
+                                         logits=self.discriminator_gaussian_neg_samples))
         self.discriminator_gaussian_loss = discriminator_gaussian_loss_neg_samples + \
                                            discriminator_gaussian_loss_pos_samples
 
         # Categorical Discrimminator Loss
         discriminator_categorical_loss_pos_samples = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_discriminator,
-                                   labels=tf.ones_like(discriminator_categorical_pos_samples),
-                                   logits=discriminator_categorical_pos_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
+                                         labels=tf.ones_like(discriminator_categorical_pos_samples),
+                                         logits=discriminator_categorical_pos_samples))
         discriminator_categorical_loss_neg_samples = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_discriminator,
-                                   labels=tf.zeros_like(discriminator_categorical_neg_samples),
-                                   logits=discriminator_categorical_neg_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
+                                         labels=tf.zeros_like(discriminator_categorical_neg_samples),
+                                         logits=discriminator_categorical_neg_samples))
         self.discriminator_categorical_loss = discriminator_categorical_loss_pos_samples + \
                                               discriminator_categorical_loss_neg_samples
 
         # Generator loss
         generator_gaussian_loss = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_generator,
-                                   labels=tf.ones_like(discriminator_gaussian_neg_samples),
-                                   logits=discriminator_gaussian_neg_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_generator,
+                                         labels=tf.ones_like(self.discriminator_gaussian_neg_samples),
+                                         logits=self.discriminator_gaussian_neg_samples))
         generator_categorical_loss = tf.reduce_mean(
-            AdversarialAutoencoderHelperFunctions.get_loss_function(loss_function=self.loss_function_generator,
-                                   labels=tf.ones_like(discriminator_categorical_neg_samples),
-                                   logits=discriminator_categorical_neg_samples))
+            aae_helper.get_loss_function(loss_function=self.loss_function_generator,
+                                         labels=tf.ones_like(discriminator_categorical_neg_samples),
+                                         logits=discriminator_categorical_neg_samples))
         self.generator_loss = generator_gaussian_loss + generator_categorical_loss
 
         # Supervised Encoder Loss
@@ -364,6 +375,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         Init the optimizers
         """
 
+        optimizer_autoencoder = parameter_dictionary["optimizer_autoencoder"]
+        optimizer_discriminator = parameter_dictionary["optimizer_discriminator"]
+        optimizer_generator = parameter_dictionary["optimizer_generator"]
+
+        # get the discriminator and encoder variables
         all_variables = tf.trainable_variables()
         discriminator_gaussian_vars = [var for var in all_variables if 'discriminator_gaussian' in var.name]
         discriminator_categorical_vars = [var for var in all_variables if 'discriminator_categorical' in var.name]
@@ -372,44 +388,77 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # Optimizers
         # TODO: include optimizer in param dict (add discriminator_gaussian, discriminator_categorical,
         # supervised_encoder_optimizer, remove discriminator)
-        self.autoencoder_optimizer = \
-            AdversarialAutoencoderHelperFunctions.get_optimizer_autoencoder(self, optimizer_autoencoder).minimize(self.autoencoder_loss)
-        self.discriminator_gaussian_optimizer = \
-            AdversarialAutoencoderHelperFunctions.get_optimizer_discriminator(self, optimizer_discriminator).minimize(self.discriminator_gaussian_loss,
-                                                                               var_list=discriminator_gaussian_vars)
-        self.discriminator_categorical_optimizer = \
-            AdversarialAutoencoderHelperFunctions.get_optimizer_discriminator(self, optimizer_discriminator).minimize(self.discriminator_categorical_loss,
-                                                                               var_list=discriminator_categorical_vars)
-        self.generator_optimizer = \
-            AdversarialAutoencoderHelperFunctions.get_optimizer_generator(self, optimizer_generator).minimize(self.generator_loss,
-                                                                       var_list=encoder_vars)
+        self.autoencoder_optimizer = aae_helper.\
+            get_optimizer(self, optimizer_autoencoder, "autoencoder", global_step=self.global_step,
+                          decaying_learning_rate_name=self.decaying_learning_rate_name_autoencoder)
+        self.autoencoder_trainer = self.autoencoder_optimizer.minimize(self.autoencoder_loss)
+
+        self.discriminator_gaussian_optimizer = aae_helper.\
+            get_optimizer(self, optimizer_discriminator, "discriminator", global_step=self.global_step,
+                          decaying_learning_rate_name=self.decaying_learning_rate_name_discriminator)
+        self.discriminator_gaussian_trainer = \
+            self.discriminator_gaussian_optimizer.minimize(self.discriminator_gaussian_loss,
+                                                           var_list=discriminator_gaussian_vars)
+
+        self.discriminator_categorical_optimizer = aae_helper.\
+            get_optimizer(self, optimizer_discriminator, "discriminator", global_step=self.global_step,
+                          decaying_learning_rate_name=self.decaying_learning_rate_name_discriminator)
+        self.discriminator_categorical_trainer = \
+            self.discriminator_categorical_optimizer.minimize(self.discriminator_categorical_loss,
+                                                              var_list=discriminator_categorical_vars)
+
+        self.generator_optimizer = aae_helper.\
+            get_optimizer(self, optimizer_generator, "generator", global_step=self.global_step,
+                          decaying_learning_rate_name=self.decaying_learning_rate_name_generator)
+        self.generator_trainer = \
+            self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars, global_step=self.global_step)
+
         # TODO: include in param dictionary
-        self.supervised_encoder_optimizer = tf.train.AdamOptimizer(learning_rate=0.01,
-                                                                   beta1=0.9).minimize(self.supervised_encoder_loss,
-                                                                                       var_list=encoder_vars)
+        # self.supervised_encoder_optimizer = tf.train.AdamOptimizer(learning_rate=0.01,
+        #                                                            beta1=0.9)
+        self.supervised_encoder_optimizer = aae_helper.\
+            get_optimizer(self, optimizer_autoencoder, "autoencoder", global_step=self.global_step,
+                          decaying_learning_rate_name=self.decaying_learning_rate_name_autoencoder)
+        self.supervised_encoder_trainer = self.supervised_encoder_optimizer.minimize(self.supervised_encoder_loss,
+                                                                                     var_list=encoder_vars)
 
         """
         Create the tensorboard summary
         """
         self.tensorboard_summary = \
-            self.create_tensorboard_summary(decoder_output=decoder_output, encoder_output=latent_variable_z,
+            self.create_tensorboard_summary(decoder_output=decoder_output, encoder_output=self.latent_variable_z,
                                             autoencoder_loss=self.autoencoder_loss,
                                             discriminator_gaussian_loss=self.discriminator_gaussian_loss,
                                             discriminator_categorical_loss=self.discriminator_categorical_loss,
                                             generator_loss=self.generator_loss,
                                             supervised_encoder_loss=self.supervised_encoder_loss,
                                             real_distribution=self.real_distribution,
-                                            encoder_output_label=class_label_y,
+                                            encoder_output_label=self.class_label_y,
                                             categorical_distribution=self.categorial_distribution,
                                             decoder_output_multiple=self.decoder_output_multiple)
+
+        """
+        Variable for the "manual" summary
+        """
+
+        self.final_performance = None
+        self.performance_over_time = {"autoencoder_losses": [], "discriminator_gaussian_losses": [],
+                                      "discriminator_categorical_losses": [], "generator_losses": [],
+                                      "supervised_encoder_loss": [], "accuracy": [], "accuracy_epochs": [],
+                                      "list_of_epochs": []}
+        self.learning_rates = {"autoencoder_lr": [], "discriminator_g_lr": [], "discriminator_c_lr": [],
+                               "generator_lr": [], "supervised_encoder_lr": [], "list_of_epochs": []}
 
         """
         Init all variables         
         """
         self.init = tf.global_variables_initializer()
 
+    def get_final_performance(self):
+        return self.final_performance
+
     def get_performance(self):
-        return self.performance
+        return self.final_performance
 
     def get_result_folder_name(self):
         return self.result_folder_name
@@ -438,10 +487,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Encoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                latent_variable_z = AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
+                latent_variable_z = aae_helper.create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
                                                             bias_init_value=bias_init_values[0])
 
-                categorical_encoder_label = AdversarialAutoencoderHelperFunctions.create_dense_layer(latent_variable_z,
+                categorical_encoder_label = aae_helper.create_dense_layer(latent_variable_z,
                                                                     self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                                     self.n_classes, 'encoder_label')
 
@@ -455,14 +504,14 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                             'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
-                latent_variable_z = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_1,
+                latent_variable_z = aae_helper.create_dense_layer(dense_layer_1,
                                                             self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                             self.z_dim, 'encoder_output',
                                                             bias_init_value=bias_init_values[1])
 
-                categorical_encoder_label = AdversarialAutoencoderHelperFunctions.create_dense_layer(latent_variable_z,
+                categorical_encoder_label = aae_helper.create_dense_layer(latent_variable_z,
                                                                     self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                                     self.n_classes, 'encoder_label')
                 if not is_supervised:
@@ -475,21 +524,21 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                             'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n_hidden_layers):
                     dense_layer_i = tf.nn.relu(
-                        AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
+                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                 self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                 'encoder_dense_layer_' + str(i + 1),
                                                 bias_init_value=bias_init_values[i]))
-                latent_variable_z = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i,
+                latent_variable_z = aae_helper.create_dense_layer(dense_layer_i,
                                                             self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                             self.z_dim, 'encoder_output',
                                                             bias_init_value=bias_init_values[-1])
 
                 # label prediction of the encoder
-                categorical_encoder_label = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i,
+                categorical_encoder_label = aae_helper.create_dense_layer(dense_layer_i,
                                                                     self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                                     self.n_classes, 'encoder_label')
                 if not is_supervised:
@@ -522,35 +571,35 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is no hidden layer
             if n_hidden_layers == 0:
                 decoder_output = tf.nn.sigmoid(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.z_dim + self.n_classes, self.input_dim, 'decoder_output',
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes, self.input_dim, 'decoder_output',
                                             bias_init_value=bias_init_values[0]))
                 return decoder_output
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.z_dim + self.n_classes,
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes,
                                             self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                             'decoder_dense_layer_1',
                                             bias_init_value=bias_init_values[0]))
                 decoder_output = tf.nn.sigmoid(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                             self.input_dim,
                                             'decoder_output', bias_init_value=bias_init_values[1]))
                 return decoder_output
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.z_dim + self.n_classes,
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes,
                                             self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                             'decoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(n_hidden_layers - 1, 0, -1):
                     dense_layer_i = tf.nn.relu(
-                        AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
+                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                 self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                 'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
                                                 bias_init_value=bias_init_values[i]))
                 decoder_output = tf.nn.sigmoid(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                             self.input_dim,
                                             'decoder_output', bias_init_value=bias_init_values[-1]))
                 return decoder_output
@@ -578,16 +627,16 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Discriminator_Gaussian'):
             # there is no hidden layer
             if n__hidden_layers == 0:
-                discriminator_output = self.create_dense_layer(X, self.z_dim, 1, 'discriminator_gaussian_output',
+                discriminator_output = aae_helper.create_dense_layer(X, self.z_dim, 1, 'discriminator_gaussian_output',
                                                                bias_init_value=bias_init_values[0])
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                             'discriminator_gaussian_dense_layer_1',
                                             bias_init_value=bias_init_values[0]))
-                discriminator_output = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_1,
+                discriminator_output = aae_helper.create_dense_layer(dense_layer_1,
                                                                self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
                                                                'discriminator_gaussian_output',
                                                                bias_init_value=bias_init_values[1])
@@ -595,17 +644,17 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                             'discriminator_gaussian_dense_layer_1',
                                             bias_init_value=bias_init_values[0]))
                 for i in range(1, n__hidden_layers):
                     dense_layer_i = tf.nn.relu(
-                        AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
+                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
                                                 self.n_neurons_of_hidden_layer_x_discriminator[i],
                                                 'discriminator_gaussian_dense_layer_' +
                                                 str(i + 1),
                                                 bias_init_value=bias_init_values[i]))
-                discriminator_output = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i,
+                discriminator_output = aae_helper.create_dense_layer(dense_layer_i,
                                                                self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
                                                                'discriminator_gaussian_output',
                                                                bias_init_value=bias_init_values[-1])
@@ -634,16 +683,16 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Discriminator_Categorical'):
             # there is no hidden layer
             if n__hidden_layers == 0:
-                discriminator_output = AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.n_classes, 1, 'discriminator_categorical_output',
+                discriminator_output = aae_helper.create_dense_layer(X, self.n_classes, 1, 'discriminator_categorical_output',
                                                                bias_init_value=bias_init_values[0])
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    aae_helper.create_dense_layer(X, self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                             'discriminator_categorical_dense_layer_1',
                                             bias_init_value=bias_init_values[0]))
-                discriminator_output = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_1,
+                discriminator_output = aae_helper.create_dense_layer(dense_layer_1,
                                                                self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
                                                                'discriminator_categorical_output',
                                                                bias_init_value=bias_init_values[1])
@@ -651,17 +700,17 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = tf.nn.relu(
-                    AdversarialAutoencoderHelperFunctions.create_dense_layer(X, self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    aae_helper.create_dense_layer(X, self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                             'discriminator_categorical_dense_layer_1',
                                             bias_init_value=bias_init_values[0]))
                 for i in range(1, n__hidden_layers):
                     dense_layer_i = tf.nn.relu(
-                        AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
+                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
                                                 self.n_neurons_of_hidden_layer_x_discriminator[i],
                                                 'discriminator_categorical_dense_layer_' +
                                                 str(i + 1),
                                                 bias_init_value=bias_init_values[i]))
-                discriminator_output = AdversarialAutoencoderHelperFunctions.create_dense_layer(dense_layer_i,
+                discriminator_output = aae_helper.create_dense_layer(dense_layer_i,
                                                                self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
                                                                'discriminator_categorical_output',
                                                                bias_init_value=bias_init_values[-1])
@@ -698,10 +747,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Reshape images accordingly to the color scale to display them
         if self.color_scale == "rgb_scale":
-            input_images = AdversarialAutoencoderHelperFunctions.reshape_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
-            generated_images = AdversarialAutoencoderHelperFunctions.reshape_to_rgb_image(decoder_output, self.input_dim_x, self.input_dim_y)
-            generated_images_z_dist = AdversarialAutoencoderHelperFunctions.reshape_to_rgb_image(decoder_output_multiple, self.input_dim_x,
-                                                                self.input_dim_y)
+            input_images = aae_helper.reshape_tensor_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
+            generated_images = aae_helper.reshape_tensor_to_rgb_image(decoder_output, self.input_dim_x, self.input_dim_y)
+            generated_images_z_dist = aae_helper.reshape_tensor_to_rgb_image(decoder_output_multiple, self.input_dim_x,
+                                                                                                        self.input_dim_y)
         else:
             input_images = tf.reshape(self.X, [-1, self.input_dim_x, self.input_dim_y, 1])
             generated_images = tf.reshape(decoder_output, [-1, self.input_dim_x, self.input_dim_y, 1])
@@ -746,28 +795,12 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 ax = plt.subplot(gs[i])
                 i += 1
 
-                # reshape the images according to the color scale
+                # reshape the image array and display it
+                img = aae_helper.reshape_image_array(self, x)
                 if self.color_scale == "gray_scale":
-                    # matplotlib wants a 2D array
-                    img = np.array(x.tolist()).reshape(self.input_dim_x, self.input_dim_y)
-                    # show the image
-                    ax.imshow(img, cmap='gray')
+                    plt.imshow(img, cmap="gray")
                 else:
-                    image_array = np.array(x.tolist())
-                    n_colored_pixels_per_channel = self.input_dim_x * self.input_dim_y
-                    # first n_colored_pixels_per_channel encode red
-                    red_pixels = image_array[:, :n_colored_pixels_per_channel].reshape(self.input_dim_x,
-                                                                                       self.input_dim_y, 1)
-                    # next n_colored_pixels_per_channel encode green
-                    green_pixels = image_array[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2] \
-                        .reshape(self.input_dim_x, self.input_dim_y, 1)
-                    # last n_colored_pixels_per_channel encode blue
-                    blue_pixels = image_array[:, n_colored_pixels_per_channel * 2:].reshape(self.input_dim_x,
-                                                                                            self.input_dim_y, 1)
-                    # concatenate the color arrays into one array
-                    img = np.concatenate([red_pixels, green_pixels, blue_pixels], 2)
-                    # show the image
-                    ax.imshow(img)
+                    plt.imshow(img)
 
                 ax.set_xticks([])
                 ax.set_yticks([])
@@ -775,7 +808,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 # create the label for the y axis
                 if ax.is_first_col():
-                    class_label = int(i / self.n_classes) + 1
+                    class_label = int(i / self.n_classes)
                     ax.set_ylabel(class_label, fontsize=9)
 
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
@@ -789,10 +822,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        log_path = None
+        latent_representations_current_epoch = []
+        labels_current_epoch = []
 
         # Get the data
-        data = AdversarialAutoencoderHelperFunctions.get_input_data(self.selected_dataset)
+        data = aae_helper.get_input_data(self.selected_dataset)
 
         # Saving the model
         saver = tf.train.Saver()
@@ -810,33 +844,37 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # train the autoencoder
             if is_train_mode_active:
                 # creates folders for each run to store the tensorboard files, saved models and the log files.
-                tensorboard_path, saved_model_path, log_path = AdversarialAutoencoderHelperFunctions.form_results(self)
+                tensorboard_path, saved_model_path, log_path = aae_helper.form_results(self)
                 writer = tf.summary.FileWriter(logdir=tensorboard_path, graph=sess.graph)
+
+                # write the parameter dictionary to some file
+                json_dictionary = json.dumps(self.parameter_dictionary)
+                with open(log_path + '/params.txt', 'a') as file:
+                    file.write(json_dictionary)
 
                 batch_x_labeled, batch_labels_labeled = data.train.next_batch(self.n_labeled)
 
                 # we want n_epochs iterations
-                for i in range(self.n_epochs):
+                for epoch in range(self.n_epochs):
+
+
 
                     # calculate the number of batches based on the batch_size and the size of the train set
                     n_batches = int(self.n_labeled / self.batch_size)
 
                     if self.verbose:
-                        print("------------------Epoch {}/{}------------------".format(i, self.n_epochs))
+                        print("------------------Epoch {}/{}------------------".format(epoch, self.n_epochs))
 
                     # iterate over the batches
                     for b in range(1, n_batches + 1):
 
                         # draw a sample from p(z) and use it as real distribution for the discriminator
-                        # todo: general class for real distributions:
-                        #   - inherit for flower (paper p. 6)
-                        #   - inherit for swiss roll  (paper p. 6)
-                        z_real_dist = np.random.randn(self.batch_size, self.z_dim) * 5.
+                        z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
                         real_cat_dist = np.random.randint(low=0, high=10, size=self.batch_size)
                         real_cat_dist = np.eye(self.n_classes)[real_cat_dist]
 
                         # get the unlabeled batch from the training data
-                        batch_X_unlabeled, _ = data.train.next_batch(self.batch_size)
+                        batch_X_unlabeled, batch_X_unlabeled_labels = data.train.next_batch(self.batch_size)
 
                         # get the labeled minibatch
                         mini_batch_X_labeled, mini_batch_labels = self.get_mini_batch(batch_x_labeled,
@@ -848,7 +886,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         minimize the reconstruction error of the inputs on an unlabeled mini-batch
                         """
                         # train the autoencoder by minimizing the reconstruction error between X and X_target
-                        sess.run(self.autoencoder_optimizer, feed_dict={self.X: batch_X_unlabeled,
+                        sess.run(self.autoencoder_trainer, feed_dict={self.X: batch_X_unlabeled,
                                                                         self.X_target: batch_X_unlabeled})
 
                         """
@@ -859,14 +897,14 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         """
                         # train the discriminator to distinguish the true samples from the fake samples generated by the
                         # generator
-                        sess.run(self.discriminator_gaussian_optimizer,
+                        sess.run(self.discriminator_gaussian_trainer,
                                  feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                             self.real_distribution: z_real_dist})
-                        sess.run(self.discriminator_categorical_optimizer,
+                        sess.run(self.discriminator_categorical_trainer,
                                  feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                             self.categorial_distribution: real_cat_dist})
                         # train the generator to fool the discriminator with its generated samples.
-                        sess.run(self.generator_optimizer, feed_dict={self.X: batch_X_unlabeled,
+                        sess.run(self.generator_trainer, feed_dict={self.X: batch_X_unlabeled,
                                                                       self.X_target: batch_X_unlabeled})
 
                         """
@@ -874,11 +912,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         cost on a labeled mini-batch.
                         """
                         # update encoder
-                        sess.run(self.supervised_encoder_optimizer,
+                        sess.run(self.supervised_encoder_trainer,
                                  feed_dict={self.X_labeled: mini_batch_X_labeled, self.y: mini_batch_labels})
 
-                        # every 10 steps: write a summary
-                        if b % 10 == 0:
+                        # every 5 epochs: write a summary for every 10th minibatch
+                        if epoch % 5 == 0 and b % 10 == 0:
 
                             n_images_per_class = int(self.batch_size / self.n_classes)
                             class_labels_one_hot = np.identity(self.n_classes)
@@ -891,10 +929,13 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                     dec_inputs.append(np.concatenate((random_inputs, class_label), 1))
                             dec_inputs = np.array(dec_inputs).reshape(self.batch_size, self.z_dim + self.n_classes)
 
-                            a_loss, d_g_loss, d_c_loss, g_loss, s_loss, summary = sess.run(
+                            autoencoder_loss, discriminator_gaussian_loss, discriminator_categorical_loss, \
+                            generator_loss, supervised_encoder_loss, summary, real_dist, \
+                            latent_representation, encoder_cat_dist = sess.run(
                                 [self.autoencoder_loss, self.discriminator_gaussian_loss,
                                  self.discriminator_categorical_loss, self.generator_loss, self.supervised_encoder_loss,
-                                 self.tensorboard_summary],
+                                 self.tensorboard_summary, self.real_distribution, self.latent_variable_z,
+                                 self.class_label_y],
                                 feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                            self.real_distribution: z_real_dist, self.y: mini_batch_labels,
                                            self.X_labeled: mini_batch_X_labeled,
@@ -902,17 +943,57 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                            self.decoder_input_multiple: dec_inputs})
                             writer.add_summary(summary, global_step=step)
 
-                            autoencoder_loss_final = a_loss
-                            discriminator_loss_final = d_g_loss + d_c_loss
-                            generator_loss_final = g_loss
+                            latent_representations_current_epoch.extend(latent_representation)
+                            labels_current_epoch.extend(batch_X_unlabeled_labels)
+
+
+                            r = np.reshape(latent_representation[0, :], (1, self.z_dim))
+                            class_label_one_hot = np.reshape(batch_X_unlabeled_labels[0, :], (1, self.n_classes))
+                            dec_input = np.concatenate((class_label_one_hot, r), 1)
+
+                            # dec_input = np.concatenate((batch_labels[0, :], latent_representation[0, :]), 1)
+                            x = sess.run(self.decoder_output_real_dist, feed_dict={self.decoder_input: dec_input})
+
+                            # 5 losses
+                            # 5 learning rates
+                            # real dist, encoder dist, input image, output image, accuracy
+                            # encoder categorical, encoder gaussian, real categorical, real_gaussian
+
+                            self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
+                            self.performance_over_time["discriminator_gaussian_losses"].append(discriminator_gaussian_loss)
+                            self.performance_over_time["discriminator_categorical_losses"].append(discriminator_categorical_loss)
+                            self.performance_over_time["generator_losses"].append(generator_loss)
+                            self.performance_over_time["supervised_encoder_loss"].append(supervised_encoder_loss)
+                            self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
+
+                            # update the dictionary holding the learning rates
+                            self.learning_rates["autoencoder_lr"].append(
+                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer)))
+                            self.learning_rates["discriminator_g_lr"].append(
+                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.discriminator_gaussian_optimizer)))
+                            self.learning_rates["discriminator_c_lr"].append(
+                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer)))
+                            self.learning_rates["generator_lr"].append(
+                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer)))
+                            self.learning_rates["supervised_encoder_lr"].append(
+                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.supervised_encoder_optimizer)))
+                            self.learning_rates["list_of_epochs"].append(epoch + (b / n_batches))
+
+                            aae_helper.create_minibatch_summary_image_semi_supervised(self, real_dist, latent_representation, batch_X_unlabeled,
+                                                            x, epoch, b, real_cat_dist, encoder_cat_dist)
+
+                            # TODO: final loss for disc_gaussian and disc_categ and supervised_encoder_loss
+                            autoencoder_loss_final = autoencoder_loss
+                            discriminator_loss_final = discriminator_gaussian_loss + discriminator_categorical_loss
+                            generator_loss_final = generator_loss
 
                             if self.verbose:
-                                print("Epoch: {}, iteration: {}".format(i, b))
-                                print("Autoencoder Loss: {}".format(a_loss))
-                                print("Discriminator Gauss Loss: {}".format(d_g_loss))
-                                print("Discriminator Categorical Loss: {}".format(d_c_loss))
-                                print("Generator Loss: {}".format(g_loss))
-                                print("Supervised Loss: {}\n".format(s_loss))
+                                print("Epoch: {}, iteration: {}".format(epoch, b))
+                                print("Autoencoder Loss: {}".format(autoencoder_loss))
+                                print("Discriminator Gauss Loss: {}".format(discriminator_gaussian_loss))
+                                print("Discriminator Categorical Loss: {}".format(discriminator_categorical_loss))
+                                print("Generator Loss: {}".format(generator_loss))
+                                print("Supervised Loss: {}\n".format(supervised_encoder_loss))
 
                         step += 1
 
@@ -926,15 +1007,26 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                          self.y: mini_batch_labels})
                         accuracy += encoder_acc
                     accuracy /= num_batches
+                    self.performance_over_time["accuracy"].append(accuracy)
+                    self.performance_over_time["accuracy_epochs"].append(epoch)
 
                     if self.verbose:
                         print("Encoder Classification Accuracy: {}".format(accuracy))
                     with open(log_path + '/log.txt', 'a') as log:
                         log.write("Encoder Classification Accuracy: {}\n".format(accuracy))
 
-                    if i % 5 == 0:
-                        self.generate_image_grid(sess, op=self.decoder_output, epoch=i)
-                        # saver.save(sess, save_path=saved_model_path, global_step=step)
+                    if epoch % 5 == 0:
+                        self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch)
+                        plt.close('all')
+
+                        if len(labels_current_epoch) > 0:
+                            result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
+                            aae_helper.draw_class_distribution_on_latent_space(latent_representations_current_epoch,
+                                                                               labels_current_epoch, result_path, epoch)
+
+                    # reset the list holding the latent representations for the current epoch
+                    latent_representations_current_epoch = []
+                    labels_current_epoch = []
 
             # display the generated images of the latest trained autoencoder
             else:
@@ -943,28 +1035,44 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 all_results.sort()
                 saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
                                                                          + '/Saved_models/'))
-                # self.generate_image_grid(sess, op=self.decoder_output)
+                self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
 
-        # write the parameter dictionary to some file
-        json_dictionary = json.dumps(self.parameter_dictionary)
-        with open(log_path + '/params.txt', 'a') as file:
-            file.write(json_dictionary)
+            # TODO: param whether model should be saved (?)
+            self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final, accuracy,
+                              None, saver, sess, step)
 
+    def end_training(self, autoencoder_loss_final, discriminator_loss_final, generator_loss_final, accuracy,
+                     saved_model_path, saver, sess, step):
+        """
+        ends the training by saving the model if a model path is provided, saving the final losses and closing the
+        tf session
+        :param autoencoder_loss_final: final loss of the autoencoder
+        :param discriminator_loss_final: final loss of the discriminator
+        :param generator_loss_final: final loss of the generator
+        :param saved_model_path: path where the saved model should be stored
+        :param saver: tf.train.Saver() to save the model
+        :param sess: session to save and to close
+        :param step: global step
+        :return:
+        """
+        # save the session if a path for the saved model is provided
+        if saved_model_path:
+            saver.save(sess, save_path=saved_model_path, global_step=step)
+
+        # print the final losses
         if self.verbose:
-            print()
-            print('#' * 10)
             print("Autoencoder Loss: {}".format(autoencoder_loss_final))
             print("Discriminator Loss: {}".format(discriminator_loss_final))
             print("Generator Loss: {}".format(generator_loss_final))
             print("Encoder Classification Accuracy: {}".format(accuracy))
 
-        # TODO: use weights for the losses (autoencoder loss more important than discrimininator..)
-        self.performance = {"autoencoder_loss_final": autoencoder_loss_final,
-                            "discriminator_loss_final": discriminator_loss_final,
-                            "generator_loss_final": generator_loss_final,
-                            "summed_loss_final": autoencoder_loss_final + discriminator_loss_final +
+        # set the final performance
+        self.final_performance = {"autoencoder_loss_final": autoencoder_loss_final,
+                                  "discriminator_loss_final": discriminator_loss_final,
+                                  "generator_loss_final": generator_loss_final,
+                                  "summed_loss_final": autoencoder_loss_final + discriminator_loss_final +
                                                  generator_loss_final,
-                            "accuracy": accuracy}
-
+                                  "accuracy": accuracy}
+        # close the tensorflow session
         sess.close()
-        tf.reset_default_graph()
+        # tf.reset_default_graph()

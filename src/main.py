@@ -1,8 +1,33 @@
-import AdversarialAutoencoderParameters
+import json
 
-from SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
-from SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
-from UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
+import src.util.AdversarialAutoencoderParameters as aae_params
+
+from src.autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
+from src.autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
+from src.autoencoders.UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
+
+
+def init_aae_with_params_file(params_filename, used_aae):
+    """
+    returns a adversarial autoencoder initiated with the provided parameter file
+    :param params_filename: path to the params.txt file
+    :param used_aae: ["Unsupervised", "Supervised", "SemiSupervised"]
+    :return:
+    """
+
+    # get the used parameters from the params.txt file
+    used_params = json.load(open(params_filename))
+
+    # create the AAE and train it with the used parameters
+    adv_autoencoder = None
+    if used_aae == "Unsupervised":
+        adv_autoencoder = AdversarialAutoencoder(used_params)
+    elif used_aae == "Supervised":
+        adv_autoencoder = SupervisedAdversarialAutoencoder(used_params)
+    elif used_aae == "SemiSupervised":
+        adv_autoencoder = SemiSupervisedAdversarialAutoencoder(used_params)
+
+    return adv_autoencoder
 
 
 def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="MNIST", **kwargs):
@@ -30,7 +55,7 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
     print("Doing grid search..")
 
     # get the parameter class for the AAE
-    aae_parameter_class = AdversarialAutoencoderParameters.AdversarialAutoencoderParameters()
+    aae_parameter_class = aae_params.AdversarialAutoencoderParameters()
 
     # iterate over the parameter combinations
     gridsearch_parameter_combinations = \
@@ -60,7 +85,7 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
         adv_autoencoder.train(True)
 
         # get the performance
-        performance = adv_autoencoder.get_performance()
+        performance = adv_autoencoder.get_final_performance()
         print(performance)
         folder_name = adv_autoencoder.get_result_folder_name()
 
@@ -116,7 +141,7 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
     print("Doing random search..")
 
     # get the parameter class for the AAE
-    aae_parameter_class = AdversarialAutoencoderParameters.AdversarialAutoencoderParameters()
+    aae_parameter_class = aae_params.AdversarialAutoencoderParameters()
 
     # get some random parameter combinations
     random_param_combinations = \
@@ -151,7 +176,7 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
         # adv_autoencoder.train(False)
 
         # get the performance
-        performance = adv_autoencoder.get_performance()
+        performance = adv_autoencoder.get_final_performance()
         print(performance)
         folder_name = adv_autoencoder.get_result_folder_name()
 
@@ -224,7 +249,66 @@ def testing():
 
     selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
     selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
+    decaying_learning_rate_names = ["exponential_decay", "inverse_time_decay", "natural_exp_decay",
+                                    "piecewise_constant", "polynomial_decay"]
 
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=2, verbose=True,
+                    z_dim=2, batch_size=59,
+                    learning_rate_autoencoder=0.0001,
+                    learning_rate_discriminator=0.0001,
+                    learning_rate_generator=0.0001,
+                    decaying_learning_rate_name_autoencoder="exponential_decay",
+                    decaying_learning_rate_name_discriminator="exponential_decay",
+                    decaying_learning_rate_name_generator="exponential_decay",
+                    AdamOptimizer_beta1_autoencoder=0.5,
+                    AdamOptimizer_beta1_discriminator=0.5,
+                    AdamOptimizer_beta1_generator=0.5,
+                    # n_neurons_of_hidden_layer_x_autoencoder=[1000, 1000],
+                    # n_neurons_of_hidden_layer_x_discriminator=[1000, 1000],
+                    # n_neurons_of_hidden_layer_x_autoencoder=[3000, 2000, 1000, 500, 250, 125],
+                    # n_neurons_of_hidden_layer_x_discriminator=[3000, 2000, 1000, 500, 250, 125],
+                    # bias_init_value_of_hidden_layer_x_autoencoder=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    # bias_init_value_of_hidden_layer_x_discriminator=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    )
+
+    return
+
+    # try overfitting
+
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="cifar10", n_epochs=10000, verbose=True,
+                    z_dim=32,
+                    learning_rate_autoencoder=0.0001,
+                    learning_rate_discriminator=0.0001,
+                    learning_rate_generator=0.0001,
+                    decaying_learning_rate_name_autoencoder=None,
+                    decaying_learning_rate_name_discriminator=None,
+                    decaying_learning_rate_name_generator=None,
+                    AdamOptimizer_beta1_autoencoder=0.5,
+                    AdamOptimizer_beta1_discriminator=0.5,
+                    AdamOptimizer_beta1_generator=0.5,
+                    n_neurons_of_hidden_layer_x_autoencoder=[3000, 3000, 3000],
+                    n_neurons_of_hidden_layer_x_discriminator=[3000, 3000, 3000],
+                    bias_init_value_of_hidden_layer_x_autoencoder=[0.0, 0.0, 0.0, 0.0],
+                    bias_init_value_of_hidden_layer_x_discriminator=[0.0, 0.0, 0.0, 0.0]
+                    )
+
+    return
+
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="SVHN", n_epochs=100, verbose=True,
+                    z_dim=2,
+                    learning_rate_autoencoder=0.01,
+                    learning_rate_discriminator=0.01,
+                    learning_rate_generator=0.01,
+                    AdamOptimizer_beta1_autoencoder=0.5,
+                    AdamOptimizer_beta1_discriminator=0.5,
+                    AdamOptimizer_beta1_generator=0.5,
+                    n_neurons_of_hidden_layer_x_autoencoder=[3000, 2000, 1000, 500, 250, 125],
+                    n_neurons_of_hidden_layer_x_discriminator=[3000, 2000, 1000, 500, 250, 125],
+                    bias_init_value_of_hidden_layer_x_autoencoder=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    bias_init_value_of_hidden_layer_x_discriminator=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    )
+
+    return
 
     n_neurons_of_hidden_layer_x_autoencoder = \
         create_random_network_topologies(max_layers=3, init_n_neurons=3000,

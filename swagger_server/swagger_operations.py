@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from DataLoader import read_data_sets
+from DataLoading import read_mnist_data_from_ubyte
 
 from connexion import NoContent
 
@@ -26,7 +26,7 @@ Load functions
 def load_data(path_to_data_dir):
     # TODO: other params
     global data
-    data = read_data_sets(path_to_data_dir)
+    data = read_mnist_data_from_ubyte(path_to_data_dir)
     return True
 
 
