@@ -3,6 +3,7 @@ import random
 import itertools
 from src.util.Distributions import draw_from_np_distribution
 
+
 class AdversarialAutoencoderParameters:
     def __init__(self, **kwargs):
         self.parameters = kwargs
@@ -14,11 +15,16 @@ class AdversarialAutoencoderParameters:
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
         return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2,
-                'color_scale': "gray_scale", 'verbose': False,
+                'color_scale': "gray_scale", 'verbose': False, 'save_final_model': False,
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],    # 1000, 500, 250, 125
                 'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
+                'activation_function_encoder': 'relu',
+                'activation_function_decoder': 'relu',
+                'activation_function_discriminator': 'relu',
+                'activation_function_discriminator_c': 'relu',  # for semi-supervised
+                'activation_function_discriminator_g': 'relu',  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
@@ -86,11 +92,16 @@ class AdversarialAutoencoderParameters:
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
         return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
-                'color_scale': "rgb_scale", 'verbose': False,
+                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False,
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'activation_function_encoder': 'relu',
+                'activation_function_decoder': 'relu',
+                'activation_function_discriminator': 'relu',
+                'activation_function_discriminator_c': 'relu',  # for semi-supervised
+                'activation_function_discriminator_g': 'relu',  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
@@ -157,11 +168,16 @@ class AdversarialAutoencoderParameters:
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
         return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
-                'color_scale': "rgb_scale", 'verbose': False,
+                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False,
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'activation_function_encoder': 'relu',
+                'activation_function_decoder': 'relu',
+                'activation_function_discriminator': 'relu',
+                'activation_function_discriminator_c': 'relu',  # for semi-supervised
+                'activation_function_discriminator_g': 'relu',  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
@@ -236,6 +252,47 @@ class AdversarialAutoencoderParameters:
         elif selected_autoencoder == "SemiSupervised":
             return './results/SemiSupervised'
 
+    @staticmethod
+    def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):
+        """
+        creates a network topology based on the provided parameters
+        :param n_layers: number of layers the network should have
+        :param init_n_neurons: number of neurons the first layer should have
+        :param n_neurons_decay_factor: by what factor the number of neurons in the suceeding layers should be reduced
+        e.g. with a factor of 2: [3000, 3000, 3000] -> [3000, 1500, 750]
+        :param n_decaying_layers: number of layers where the number of neurons should be reduced by the
+        n_neurons_decay_factor
+        :return:
+        """
+
+        random_network_topology = [init_n_neurons] * n_layers
+        for decaying_layer in range(n_decaying_layers, 0, -1):
+            random_network_topology[n_layers - decaying_layer] = \
+                int(random_network_topology[n_layers - decaying_layer - 1] / n_neurons_decay_factor)
+
+        return random_network_topology
+
+    def create_random_network_topologies(self, max_layers, init_n_neurons, n_neurons_decay_factors):
+
+        random_network_topologies = []
+
+        for n_layers in range(1, max_layers + 1):
+            # maximum number of layers with a reduced number of nerons compared to the preceding layers
+            for n_decaying_layers in range(n_layers):
+
+                # we only have to iterate over the n_neurons_decay_factors if we have at least one decaying layer
+                if n_decaying_layers > 0:
+                    for n_neurons_decay_factor in n_neurons_decay_factors:
+                        random_network_topologies.append(
+                            self.create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor,
+                                                    n_decaying_layers))
+                # otherwise we can pick an arbitrary value for the n_neurons_decay_factor
+                else:
+                    random_network_topologies.append(
+                        self.create_network_topology(n_layers, init_n_neurons, 1, n_decaying_layers))
+
+        return random_network_topologies
+
     def get_default_parameters(self, selected_autoencoder, selected_dataset):
         """
         returns the default parameters based on the selected autoencoder and selected dataset
@@ -258,18 +315,6 @@ class AdversarialAutoencoderParameters:
         param_dict["selected_dataset"] = selected_dataset
         param_dict["results_path"] = self.get_result_path_for_selected_autoencoder(selected_autoencoder)
         return param_dict
-
-    def get_randomized_network_topology(self, input_dim, z_dim):
-        """
-
-        :param input_dim:
-        :param z_dim:
-        :return:
-        """
-
-        n_layers = draw_from_np_distribution(distribution_name="uniform", low=1, high=10, return_type="int")
-
-        # TODO: work in progress
 
     def get_gridsearch_parameters(self, selected_autoencoder, selected_dataset, *args, **kwargs):
         """

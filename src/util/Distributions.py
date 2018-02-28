@@ -176,16 +176,19 @@ def draw_from_np_distribution(n_samples=1, **distribution_parameters):
             return_value = abs(return_value) * -1 - 1e-12
 
     # change type of the return value
-    if distribution_parameters["return_type"] == "int":
-        return_value = int(return_value)
-    elif distribution_parameters["return_type"] == "float":
-        return_value = float(return_value)
+    if distribution_parameters.get("return_type"):
+        if distribution_parameters["return_type"] == "float":
+            return_value = float(return_value)
+        elif distribution_parameters["return_type"] == "int":
+            return_value = int(return_value)
+    else:
+        pass
 
     return return_value
 
 
 def create_class_specific_samples_swiss_roll(class_i: int, n_classes: int, spread: float, noise: float,
-                                             n_samples_per_class: int = 1000) -> np.array:
+                                             n_samples_per_class: int = 1000, no_noise: bool = False) -> np.array:
     """
     :param class_i: class to createt the samples for
     :param n_samples_per_class: number of samples to create
@@ -203,8 +206,21 @@ def create_class_specific_samples_swiss_roll(class_i: int, n_classes: int, sprea
     generator = np.random.RandomState()
 
     temp = np.arange(0, 2, 1 / n_classes)
-    t = 3 * spread * np.pi * (temp[class_i] + 0.1 * generator.rand(1, n_samples_per_class))
-    # t = self.spread * np.pi * (1 + 2 * generator.rand(1, self.n_samples))
+
+    if no_noise:
+        t = [3 * spread * np.pi * (temp[class_i] + 0.1 * np.array([0.5]*n_samples_per_class))]
+        # t = self.spread * np.pi * (1 + 2 * generator.rand(1, self.n_samples))
+    else:
+        t = 3 * spread * np.pi * (temp[class_i] + 0.1 * generator.rand(1, n_samples_per_class))
+        # t = self.spread * np.pi * (1 + 2 * generator.rand(1, self.n_samples))
+
+    # print(t)
+    # print(t.shape)
+    #
+    # t = 3 * spread * np.pi * (temp[class_i] + 0.1 * generator.rand(1, n_samples_per_class))
+    # print(t)
+    # print(t.shape)
+
 
     x = t * np.cos(t)
     y = t * np.sin(t)
@@ -219,7 +235,7 @@ def create_class_specific_samples_swiss_roll(class_i: int, n_classes: int, sprea
     return x, y
 
 
-def draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(100, 2)):
+def draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(100, 2), shuffle=True):
     """
     draws from a swiss roll distribution
     :param n_classes:
@@ -238,7 +254,7 @@ def draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(100, 2)):
 
     # number of points we want at max for each class
     n_samples = shape[0]
-    n_samples_per_class = math.ceil(n_samples / n_classes)
+    n_samples_per_class = int(math.ceil(n_samples / n_classes))
 
     # holds the generated x and y points
     generated_points_x = np.array([])
@@ -247,15 +263,16 @@ def draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(100, 2)):
     # generate the points and app them to the arrays
     for class_i in range(n_classes):
         x, y = create_class_specific_samples_swiss_roll(class_i=class_i, n_classes=n_classes, spread=spread, noise=noise,
-                                                        n_samples_per_class=n_samples_per_class)
+                                                        n_samples_per_class=n_samples_per_class, no_noise=False) # TODO: set no noise to False
         generated_points_x = np.append(generated_points_x, x)
         generated_points_y = np.append(generated_points_y, y)
 
     # shuffle the samples
-    perm0 = np.arange(n_samples)
-    np.random.shuffle(perm0)
-    generated_points_x = generated_points_x[perm0]
-    generated_points_y = generated_points_y[perm0]
+    if shuffle:
+        perm0 = np.arange(n_samples)
+        np.random.shuffle(perm0)
+        generated_points_x = generated_points_x[perm0]
+        generated_points_y = generated_points_y[perm0]
 
     # truncate the arrays
     generated_points_x = generated_points_x[:n_samples]
@@ -323,9 +340,10 @@ def draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(100, 2), shuffle=
     generated_samples = np.array(generated_samples)
 
     # shuffle the samples
-    perm0 = np.arange(shape[0])
-    np.random.shuffle(perm0)
-    generated_samples = generated_samples[perm0]
+    if shuffle:
+        perm0 = np.arange(shape[0])
+        np.random.shuffle(perm0)
+        generated_samples = generated_samples[perm0]
 
     # truncate the samples
     generated_samples = generated_samples[:shape[0]]
@@ -333,9 +351,88 @@ def draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(100, 2), shuffle=
     return np.array(generated_samples).reshape(shape)
 
 
+def walk_along_multiple_gaussians(center=(0, 0), radius=10, n_points_to_return=100):
+    """
+    function "walks" along the centers of multiple gaussians laying on the circumference of a circle and returns
+    the provided number of points as np.array
+    :param center: center of the circle
+    :param radius: radius of the circle
+    :param n_points_to_return: number of points to return
+    :return:
+    """
+    return np.array(points_on_circumference(center=center, radius=radius, n=n_points_to_return))
+
+
+def walk_along_swiss_roll():
+
+    # TODO: draw from swiss roll without random shuffling and get every nth item
+
+    n_classes = 10
+    shape = (1000, 2)
+    spread = 1.5
+    noise = 0.0
+
+    # number of points we want at max for each class
+    n_samples = shape[0]
+    n_samples_per_class = int(math.ceil(n_samples / n_classes))
+
+    # holds the generated x and y points
+    generated_points_x = np.array([])
+    generated_points_y = np.array([])
+
+    # generate the points and app them to the arrays
+    for class_i in range(n_classes):
+        x, y = create_class_specific_samples_swiss_roll(class_i=class_i, n_classes=n_classes, spread=spread, noise=noise,
+                                                        n_samples_per_class=n_samples_per_class, no_noise=True)
+        generated_points_x = np.append(generated_points_x, x)
+        generated_points_y = np.append(generated_points_y, y)
+
+
+def walk_along_single_gaussian(min_value=-10, max_value=10, n_points_to_return=(14, 14)):
+    """
+    walk along a single gaussian by laying a grid over it and sampling this grid evenly.
+    :param min_value:
+    :param max_value: max_value of the gaussian
+    :param n_points_to_return:
+    :return:
+    """
+
+    # TODO: parameter for z_dim; sample randomly instead of evenly
+
+    # number fo points
+    x_n = n_points_to_return[0]
+    y_n = n_points_to_return[1]
+
+    x_points_spacing = abs(max_value-min_value) / x_n
+    y_points_spacing = abs(max_value-min_value) / y_n
+
+    # creates evenly spaced values within [-10, 10] with a spacing of 1.5
+    x_points = np.arange(max_value, min_value, -x_points_spacing).astype(np.float32)
+    y_points = np.arange(min_value, max_value, y_points_spacing).astype(np.float32)
+
+    nx, ny = len(x_points), len(y_points)
+
+    lala = []
+
+    # iterate over the image grid
+    for i in range(nx*ny):
+        # create a data point from the x_points and y_points array as input for the decoder
+        z = np.concatenate(([y_points[int(i % nx)]], [x_points[int(i / ny)]]))
+        # z = np.reshape(z, (1, 2))
+
+        lala.append(z)
+
+    print(lala)
+    print(np.array(lala))
+    return lala
+
+
 def testing():
     """
     """
+
+    # walk_along_multiple_gaussians()
+    # walk_along_single_gaussian()
 
     # test multiple gaussians
     if False:
@@ -347,7 +444,7 @@ def testing():
 
     # test swiss roll
     if True:
-        generated_points = draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(1000, 2))
+        generated_points = draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(1000, 2), shuffle=True)
         print(generated_points)
         print(generated_points.shape)
         plt.scatter(generated_points[:, 0], generated_points[:, 1])

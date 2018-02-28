@@ -11,6 +11,33 @@ from sklearn.decomposition import PCA
 from src.util import DataLoading
 
 
+def use_activation_function_for_layer(activation_function, layer):
+    """
+    uses the provided activation function for the layer and returns the new tensor
+    :param activation_function: ["relu", "relu6", "crelu", "elu", "softplus", "softsign", "sigmoid", "tanh", "linear"]
+    :param layer: tensor of the layer of which the activation function should be applied to
+    :return: tf tensor
+    """
+    if activation_function == "relu":
+        return tf.nn.relu(layer)
+    elif activation_function == "relu6":
+        return tf.nn.relu6(layer)
+    elif activation_function == "crelu":
+        return tf.nn.crelu(layer)
+    elif activation_function == "elu":
+        return tf.nn.elu(layer)
+    elif activation_function == "softplus":
+        return tf.nn.softplus(layer)
+    elif activation_function == "softsign":
+        return tf.nn.softsign(layer)
+    elif activation_function == "sigmoid":
+        return tf.nn.sigmoid(layer)
+    elif activation_function == "tanh":
+        return tf.nn.tanh(layer)
+    elif activation_function == "linear":
+        return layer
+
+
 def get_decaying_learning_rate(decaying_learning_rate_name, global_step, initial_learning_rate=0.1):
     """
     wrapper function for the decayed learning rate functions as defined in
@@ -63,10 +90,13 @@ def get_decaying_learning_rate(decaying_learning_rate_name, global_step, initial
     elif decaying_learning_rate_name == "piecewise_constant":
         """
         Example: use a learning rate that's 1.0 for the first 100000 steps, 0.5 for steps 100001 to 110000, and 0.1 for
-        any additional steps.
+        any additional steps:
+            boundaries = [100000, 110000]
+            values = [1.0, 0.5, 0.1]
+            learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
         """
-        boundaries = [100000, 110000]
-        values = [1.0, 0.5, 0.1]
+        boundaries = [250]
+        values = [0.0001, 0.00001]
         learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
 
     elif decaying_learning_rate_name == "polynomial_decay":
@@ -88,6 +118,12 @@ def get_decaying_learning_rate(decaying_learning_rate_name, global_step, initial
         cycle = False
         learning_rate = tf.train.polynomial_decay(initial_learning_rate, global_step, decay_steps,
                                                   end_learning_rate, power, cycle)
+
+    elif decaying_learning_rate_name == "static":
+        """
+        Static learning rate.
+        """
+        learning_rate = initial_learning_rate
 
     else:
         raise ValueError(decaying_learning_rate_name, "is not a valid value for this variable.")
@@ -278,7 +314,8 @@ def get_input_data(selected_dataset):
         raise NotImplementedError
 
 
-def draw_class_distribution_on_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path, epoch):
+def draw_class_distribution_on_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path,
+                                            epoch, combined_plot=False):
     """
     draws the class distribution on the latent space.
     :param latent_representations_current_epoch: list of shape (n_batches*batch_size, z_dim) holding the encoder output,
@@ -286,9 +323,13 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
     :param labels_current_epoch: list of shape (n_batches*batch_size, n_classes), holds the labels of the inputs
     encoded as one-hot vectors
     :param result_path: path where to store the resulting image
-    :param: epoch: current epoch; for the file name of the resulting image
+    :param epoch: current epoch; for the file name of the resulting image
+    :param combined_plot: whether the plot should be combined with the image grid
     :return:
     """
+
+    if combined_plot:
+        plt.subplot(1, 2, 2)
 
     # convert lists to numpy array
     latent_representations_current_epoch = np.array(latent_representations_current_epoch)
@@ -314,9 +355,15 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
         # plot them
         plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label))
 
+    if combined_plot:
+        plt.title("Epoch: " + str(epoch))
+
     plt.legend()
     plt.savefig(result_path + str(epoch) + "_latent_space_class_distribution" + '.png')
     plt.close('all')
+
+    # change figsize back to default
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
 
 def reshape_image_array(aae_class, img_array):
@@ -354,7 +401,7 @@ def reshape_image_array(aae_class, img_array):
 
 
 def create_minibatch_summary_image(aae_class, real_dist, latent_representation, discriminator_neg, discriminator_pos,
-                                   batch_x, decoder_output, epoch, mini_batch_i):
+                                   batch_x, decoder_output, epoch, mini_batch_i, batch_labels):
     """
     creates a summary image displaying the losses and the learning rates over time, the real distribution and the latent
     representation, the discriminator outputs (pos and neg) and one input image and its reconstruction image
@@ -367,8 +414,20 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     :param decoder_output: output of the decoder for the current batch
     :param epoch: current epoch of the training (only used for the image filename)
     :param mini_batch_i: current iteration of the minibatch (only used for the image filename)
+    :param batch_labels: list of shape (n_batches*batch_size, n_classes), holds the labels of the inputs
+    encoded as one-hot vectors
     :return:
     """
+
+    # convert lists to numpy array
+    latent_representation = np.array(latent_representation)
+    batch_labels = np.array(batch_labels)
+
+    # convert one hot vectors to integer labels
+    int_labels = np.argmax(batch_labels, axis=1)
+
+    # get the number of classes
+    n_classes = batch_labels.shape[1]
 
     # increase figure size
     plt.rcParams["figure.figsize"] = (15, 20)
@@ -433,17 +492,21 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     if aae_class.z_dim > 2:
         plt.hist(latent_representation.flatten())
     else:
-        plt.scatter(latent_representation[:, 0], latent_representation[:, 1])
+        # plot the different classes on the latent space
+        for class_label in range(n_classes):
+            # get the points corresponding to the same classes
+            points_for_current_class_label = latent_representation[np.where(int_labels == class_label)]
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label))
+    plt.legend()
     plt.title("encoder dist")
 
     # plot the discriminator outputs
     plt.subplot(4, 3, 9)
-    plt.hist(discriminator_neg.flatten())
-    plt.title("discriminator_neg dist")
-
-    plt.subplot(4, 3, 10)
-    plt.hist(discriminator_pos.flatten())
-    plt.title("discriminator_pos dist")
+    plt.hist(discriminator_neg.flatten(), alpha=0.5, label="neg", color="#d95f02")
+    plt.hist(discriminator_pos.flatten(), alpha=0.5, label="pos", color="#1b9e77")
+    plt.title("discriminator distr.")
 
     """
     plot one input image and its reconstruction

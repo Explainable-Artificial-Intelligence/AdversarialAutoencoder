@@ -234,7 +234,7 @@ def create_random_network_topologies(max_layers, init_n_neurons, n_neurons_decay
                 for n_neurons_decay_factor in n_neurons_decay_factors:
                     random_network_topologies.append(
                             create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers))
-            # otherwise we can pick an arbitrary value for the
+            # otherwise we can pick an arbitrary value for the n_neurons_decay_factor
             else:
                 random_network_topologies.append(
                     create_network_topology(n_layers, init_n_neurons, 1, n_decaying_layers))
@@ -250,16 +250,24 @@ def testing():
     selected_datasets = ["MNIST", "SVHN", "cifar10", "custom"]
     selected_autoencoders = ["Unsupervised", "Supervised", "SemiSupervised"]
     decaying_learning_rate_names = ["exponential_decay", "inverse_time_decay", "natural_exp_decay",
-                                    "piecewise_constant", "polynomial_decay"]
+                                    "piecewise_constant", "polynomial_decay", "static"]
+    activation_functions = ["relu", "relu6", "crelu", "elu", "softplus", "softsign", "sigmoid", "tanh", "linear"]
 
-    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=2, verbose=True,
-                    z_dim=2, batch_size=59,
+
+    # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\Good_Results\\2018-02-13_10_48_53_SVHN\\log\\params.txt", "Supervised")
+    # aae.train(True)
+
+    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=21, verbose=True,
+                    z_dim=2,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,
                     learning_rate_generator=0.0001,
-                    decaying_learning_rate_name_autoencoder="exponential_decay",
-                    decaying_learning_rate_name_discriminator="exponential_decay",
-                    decaying_learning_rate_name_generator="exponential_decay",
+                    activation_function_encoder='relu',
+                    activation_function_decoder='relu',
+                    activation_function_discriminator='relu',
+                    decaying_learning_rate_name_autoencoder="piecewise_constant",
+                    decaying_learning_rate_name_discriminator="piecewise_constant",
+                    decaying_learning_rate_name_generator="piecewise_constant",
                     AdamOptimizer_beta1_autoencoder=0.5,
                     AdamOptimizer_beta1_discriminator=0.5,
                     AdamOptimizer_beta1_generator=0.5,

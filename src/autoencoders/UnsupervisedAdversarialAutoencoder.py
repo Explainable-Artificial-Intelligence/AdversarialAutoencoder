@@ -3,14 +3,17 @@
     https://arxiv.org/abs/1511.05644 by Goodfellow et. al. and the implementation available on
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
+import glob
 import json
 
+import imageio
 import tensorflow as tf
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
+import re
 
 import src.util.AdversarialAutoencoderHelperFunctions as aae_helper
 from src.util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
@@ -23,6 +26,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.result_folder_name = None
         self.parameter_dictionary = parameter_dictionary
         self.verbose = parameter_dictionary["verbose"]
+        self.save_final_model = parameter_dictionary["save_final_model"]    # whether to save the final model
 
         """
         params for the data 
@@ -57,6 +61,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             "bias_init_value_of_hidden_layer_x_autoencoder"]
         self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
             "bias_init_value_of_hidden_layer_x_discriminator"]
+
+        # activation functions for the different parts of the network
+        self.activation_function_encoder = parameter_dictionary["activation_function_encoder"]
+        self.activation_function_decoder = parameter_dictionary["activation_function_decoder"]
+        self.activation_function_discriminator = parameter_dictionary["activation_function_discriminator"]
 
         """
         params for learning
@@ -298,19 +307,19 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(
             aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
-                                                                    labels=tf.ones_like(self.discriminator_pos_samples),
-                                                                    logits=self.discriminator_pos_samples))
+                                         labels=tf.ones_like(self.discriminator_pos_samples),
+                                         logits=self.discriminator_pos_samples))
         discriminator_loss_neg_samples = tf.reduce_mean(
             aae_helper.get_loss_function(loss_function=self.loss_function_discriminator,
-                                                                    labels=tf.zeros_like(self.discriminator_neg_samples),
-                                                                    logits=self.discriminator_neg_samples))
+                                         labels=tf.zeros_like(self.discriminator_neg_samples),
+                                         logits=self.discriminator_neg_samples))
         self.discriminator_loss = discriminator_loss_neg_samples + discriminator_loss_pos_samples
 
         # Generator loss
         self.generator_loss = tf.reduce_mean(
             aae_helper.get_loss_function(loss_function=self.loss_function_generator,
-                                                                    labels=tf.ones_like(self.discriminator_neg_samples),
-                                                                    logits=self.discriminator_neg_samples))
+                                         labels=tf.ones_like(self.discriminator_neg_samples),
+                                         logits=self.discriminator_neg_samples))
 
         """
         Init the optimizers
@@ -405,7 +414,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 return latent_variable
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = tf.nn.relu(aae_helper.
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_encoder, aae_helper.
                                            create_dense_layer(X, self.input_dim,
                                                               self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                               'encoder_dense_layer_1',
@@ -416,14 +425,13 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 return latent_variable
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = tf.nn.relu(
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder,
                     aae_helper.
                         create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                            'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n_hidden_layers):
-                    dense_layer_i = \
-                        tf.nn.relu(aae_helper.
-                                   create_dense_layer(dense_layer_i,
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder, aae_helper.
+                                                                                 create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                       'encoder_dense_layer_' + str(i + 1),
@@ -455,14 +463,14 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Decoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                decoder_output = tf.nn.sigmoid(
+                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
                     aae_helper.create_dense_layer(X, self.z_dim, self.input_dim,
                                                                              'decoder_output',
                                                                              bias_init_value=bias_init_values[0]))
                 return decoder_output
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = tf.nn.relu(aae_helper.
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_decoder, aae_helper.
                                            create_dense_layer(X, self.z_dim,
                                                               self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                               'decoder_dense_layer_1',
@@ -474,12 +482,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 return decoder_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = tf.nn.relu(
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
                     aae_helper.
                         create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                            'decoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(n_hidden_layers - 1, 0, -1):
-                    dense_layer_i = tf.nn.relu(
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
                         aae_helper.
                             create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
@@ -519,9 +527,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
-                dense_layer_1 = tf.nn.relu(
-                    aae_helper
-                        .create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
+                                                                 aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
                 discriminator_output = aae_helper\
                     .create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
@@ -529,12 +536,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 return discriminator_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = tf.nn.relu(
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
                     aae_helper
                         .create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n__hidden_layers):
-                    dense_layer_i = tf.nn.relu(
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
                         aae_helper.
                             create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
                                                self.n_neurons_of_hidden_layer_x_discriminator[i],
@@ -585,12 +592,15 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         summary_op = tf.summary.merge_all()
         return summary_op
 
-    def generate_image_grid(self, sess, op, epoch):
+    def generate_image_grid(self, sess, op, epoch, left_cell=None):
         """
         Generates and saves a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
         :param op: Operation that needs to be called inorder to get the decoder output
         :param epoch: current epoch of the training; image grid is saved as <epoch>.png
+        :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
+        and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
+        to be plotted and not the "combinated" image (image grid + class distr. on latent space).
         :return:
         """
 
@@ -599,9 +609,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         y_points = np.arange(-10, 10, 1.5).astype(np.float32)
 
         nx, ny = len(x_points), len(y_points)
-        plt.subplot()
         # create the image grid
-        gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
+        if left_cell:
+            gs = gridspec.GridSpecFromSubplotSpec(nx, ny, left_cell)
+        else:
+            plt.subplot()
+            gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
 
         # iterate over the image grid
         for i, g in enumerate(gs):
@@ -634,16 +647,20 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             if ax.is_last_row():
                 ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
 
-        # save the created image grid
-        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
+        if not left_cell:
+            # save the created image grid
+            plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
-    def generate_image_grid_z_dim(self, sess, op, epoch, image_grid_shape=(10, 10)):
+    def generate_image_grid_z_dim(self, sess, op, epoch, image_grid_shape=(10, 10), left_cell=None):
         """
         Generates a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
         :param op: Operation that needs to be called inorder to get the decoder output
         :param epoch: current epoch of the training; image grid is saved as <epoch>.png
         :param image_grid_shape: shape of the resulting image grid
+        :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
+        and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
+        to be plotted and not the "combinated" image (image grid + class distr. on latent space).
         :return: None, displays a matplotlib window with all the merged images.
         """
 
@@ -654,8 +671,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # randomly sample some points from the z dim space
         random_points = np.random.uniform(-10, 10, [n_points_to_sample, self.z_dim])
 
-        plt.subplot()
-        gs = gridspec.GridSpec(image_grid_x_length, image_grid_y_length, hspace=0.05, wspace=0.05)
+        # create the image grid
+        if left_cell:
+            gs = gridspec.GridSpecFromSubplotSpec(image_grid_x_length, image_grid_y_length, left_cell)
+        else:
+            plt.subplot()
+            gs = gridspec.GridSpec(image_grid_x_length, image_grid_y_length, hspace=0.05, wspace=0.05)
 
         for i, g in enumerate(gs):
             # create a data point from the x_points and y_points array as input for the decoder
@@ -678,7 +699,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             ax.set_yticks([])
             ax.set_aspect('auto')
 
-        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
+        if not left_cell:
+            plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
     def train(self, is_train_mode_active=True):
         """
@@ -742,7 +764,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                     for b in range(1, n_batches + 1):
 
                         # draw a sample from p(z) and use it as real distribution for the discriminator
-                        z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
+                        # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
+                        z_real_dist = \
+                            draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
 
                         # get the batch from the training data
                         batch_x, batch_labels = data.train.next_batch(self.batch_size)
@@ -805,7 +829,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             # create the summary image for the current minibatch
                             aae_helper.create_minibatch_summary_image(self, real_dist, latent_representation,
                                                                       discriminator_neg, discriminator_pos, batch_x,
-                                                                      decoder_output, epoch, b)
+                                                                      decoder_output, epoch, b, batch_labels)
 
                             if self.verbose:
                                 print("Epoch: {}, iteration: {}".format(epoch, b))
@@ -834,17 +858,26 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # every 5 epochs ..
                     if epoch % 5 == 0:
+                        # increase figure size
+                        plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
+                        outer_grid = gridspec.GridSpec(1, 2)
+                        left_cell = outer_grid[0, 0]  # the left SubplotSpec within outer_grid
+
                         # generate the image grid for the latent space
                         # TODO: maybe two separate functions are not needed..
                         if self.z_dim > 2:
-                            self.generate_image_grid_z_dim(sess, op=self.decoder_output_real_dist, epoch=epoch)
+                            self.generate_image_grid_z_dim(sess, op=self.decoder_output_real_dist, epoch=epoch,
+                                                           left_cell=left_cell)
                         else:
-                            self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch)
-                        plt.close('all')
+                            self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
+                                                     left_cell=left_cell)
+                        # plt.close('all')
 
                         # draw the class distribution on the latent space
                         result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
-                        aae_helper.draw_class_distribution_on_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path, epoch)
+                        aae_helper.draw_class_distribution_on_latent_space(latent_representations_current_epoch,
+                                                                           labels_current_epoch, result_path, epoch,
+                                                                           combined_plot=True)
 
                     # reset the list holding the latent representations for the current epoch
                     latent_representations_current_epoch = []
@@ -880,7 +913,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
         # save the session if a path for the saved model is provided
-        if saved_model_path:
+        if saved_model_path and self.save_final_model:
             saver.save(sess, save_path=saved_model_path, global_step=step)
 
         # print the final losses
@@ -895,6 +928,26 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                   "generator_loss_final": generator_loss_final,
                                   "summed_loss_final": autoencoder_loss_final + discriminator_loss_final
                                                        + generator_loss_final}
+
+        def atoi(text):
+            return int(text) if text.isdigit() else text
+
+        def natural_keys(text):
+            '''
+            alist.sort(key=natural_keys) sorts in human order
+            http://nedbatchelder.com/blog/200712/human_sorting.html
+            (See Toothy's implementation in the comments)
+            '''
+            return [atoi(c) for c in re.split('(\d+)', text)]
+
+        result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
+        filenames = glob.glob(result_path + "*_latent_space_class_distribution.png")
+        filenames.sort(key=natural_keys)
+        images = []
+        for filename in filenames:
+            images.append(imageio.imread(filename))
+        imageio.mimwrite(result_path + 'latent_space_class_distribution.gif', images, duration=1.0)
+
         # close the tensorflow session
         sess.close()
         # tf.reset_default_graph()
