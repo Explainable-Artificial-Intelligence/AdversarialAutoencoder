@@ -1,7 +1,7 @@
 import copy
 import random
 import itertools
-from src.util.Distributions import draw_from_np_distribution
+from util.Distributions import draw_from_np_distribution
 
 
 class AdversarialAutoencoderParameters:
@@ -246,11 +246,11 @@ class AdversarialAutoencoderParameters:
         :return: string, where to save the result files for training the autoencoder
         """
         if selected_autoencoder == "Unsupervised":
-            return './results/Unsupervised'
+            return '../results/Unsupervised'
         elif selected_autoencoder == "Supervised":
-            return './results/Supervised'
+            return '../results/Supervised'
         elif selected_autoencoder == "SemiSupervised":
-            return './results/SemiSupervised'
+            return '../results/SemiSupervised'
 
     @staticmethod
     def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):

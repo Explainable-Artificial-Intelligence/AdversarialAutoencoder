@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
-import src.util.AdversarialAutoencoderHelperFunctions as aae_helper
-from src.util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
+import util.AdversarialAutoencoderHelperFunctions as aae_helper
+from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
 
 
 class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):

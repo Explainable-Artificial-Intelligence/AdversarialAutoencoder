@@ -8,7 +8,7 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
-from src.util import DataLoading
+from util import DataLoading
 
 
 def use_activation_function_for_layer(activation_function, layer):
@@ -299,19 +299,7 @@ def get_input_data(selected_dataset):
     returns the input data set based on self.selected_dataset
     :return: object holding the train data, the test data and the validation data
     """
-
-    # hand written digits
-    if selected_dataset == "MNIST":
-        return DataLoading.read_mnist_data_from_ubyte('./data', one_hot=True)
-    # Street View House Numbers
-    elif selected_dataset == "SVHN":
-        return DataLoading.read_svhn_from_mat('./data', one_hot=True, validation_size=5000)
-    elif selected_dataset == "cifar10":
-        return DataLoading.read_cifar10('./data', one_hot=True, validation_size=5000)
-    elif selected_dataset == "custom":
-        # TODO:
-        print("not yet implemented")
-        raise NotImplementedError
+    return DataLoading.get_input_data(selected_dataset)
 
 
 def draw_class_distribution_on_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path,

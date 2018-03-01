@@ -1,10 +1,10 @@
 import json
 
-import src.util.AdversarialAutoencoderParameters as aae_params
+import util.AdversarialAutoencoderParameters as aae_params
 
-from src.autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
-from src.autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
-from src.autoencoders.UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
+from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
+from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
+from autoencoders.UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
 
 
 def init_aae_with_params_file(params_filename, used_aae):

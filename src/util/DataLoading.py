@@ -20,12 +20,30 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/py
 """
 
 
+def get_input_data(selected_dataset, filepath="../data"):
+    """
+    returns the input data set based on self.selected_dataset
+    :return: object holding the train data, the test data and the validation data
+    """
+
+    # hand written digits
+    if selected_dataset == "MNIST":
+        return read_mnist_data_from_ubyte(filepath, one_hot=True)
+    # Street View House Numbers
+    elif selected_dataset == "SVHN":
+        return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000)
+    elif selected_dataset == "cifar10":
+        return read_cifar10(filepath, one_hot=True, validation_size=5000)
+    elif selected_dataset == "custom":
+        # TODO:
+        print("not yet implemented")
+        raise NotImplementedError
+
 """
 Read .tfrecords
 """
 
 # TODO:
-
 def read_and_decode(filename_queue):
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(filename_queue)
@@ -424,7 +442,7 @@ read image data (png)
 def read_images_from_dir(data_dir, n_classes=10, image_fileformat='.png', dim_x=28, dim_y=28, color_channels=1):
     """
     reads the images from the data directory
-    :param data_dir: ./data/mnist_png/testing/
+    :param data_dir: ../data/mnist_png/testing/
     :param n_classes: number of classes we have
     :param image_fileformat: fileformat of the image
     :param dim_x: x resolution of the image
@@ -522,7 +540,7 @@ def testing():
     """
 
     if False:
-        cifar10 = read_cifar10('./data', one_hot=True)
+        cifar10 = read_cifar10('../data', one_hot=True)
         first_img, _ = cifar10.train.next_batch(1)
 
         print(_)
@@ -543,7 +561,7 @@ def testing():
             start = timeit.default_timer()
             print("read .mat")
 
-            svhn = read_svhn_from_mat('./data', grey_scale=True, one_hot=True)
+            svhn = read_svhn_from_mat('../data', grey_scale=True, one_hot=True)
             first_img, _ = svhn.train.next_batch(1)
 
             print(_)
@@ -559,7 +577,7 @@ def testing():
             start = timeit.default_timer()
             print("read .mat")
 
-            svhn = read_svhn_from_mat('./data', grey_scale=False, one_hot=True)
+            svhn = read_svhn_from_mat('../data', grey_scale=False, one_hot=True)
             first_img, _ = svhn.train.next_batch(1)
 
             print(_)
@@ -585,7 +603,7 @@ def testing():
         start = timeit.default_timer()
         print("read ubyte")
 
-        mnist = read_mnist_data_from_ubyte('./data', one_hot=True)
+        mnist = read_mnist_data_from_ubyte('../data', one_hot=True)
         ubyte_first_img, _ = mnist.train.next_batch(1)
 
         print(_)
@@ -608,7 +626,7 @@ def testing():
         print("read csv")
 
         # test reading csv files
-        train_images = read_csv_data_set('./data', one_hot=True)
+        train_images = read_csv_data_set('../data', one_hot=True)
         csv_first_img, _ = train_images.train.next_batch(1)
 
         print(_)
@@ -630,7 +648,7 @@ def testing():
         start = timeit.default_timer()
         print("read png")
 
-        mnist = read_mnist_from_png('./data', one_hot=True)
+        mnist = read_mnist_from_png('../data', one_hot=True)
         png_first_img, _ = mnist.train.next_batch(1)
 
         print(_)
