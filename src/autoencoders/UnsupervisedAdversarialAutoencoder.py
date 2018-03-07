@@ -3,17 +3,14 @@
     https://arxiv.org/abs/1511.05644 by Goodfellow et. al. and the implementation available on
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
-import glob
 import json
 
-import imageio
 import tensorflow as tf
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
-import re
 
 import util.AdversarialAutoencoderHelperFunctions as aae_helper
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
@@ -22,11 +19,19 @@ from util.Distributions import draw_from_multiple_gaussians, draw_from_single_ga
 class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
+        # vars for the swagger server
+        self.requested_operations_by_swagger = []
+        self.requested_operations_by_swagger_results = None
+
+
         self.train_status = "start"
         self.result_folder_name = None
         self.parameter_dictionary = parameter_dictionary
         self.verbose = parameter_dictionary["verbose"]
-        self.save_final_model = parameter_dictionary["save_final_model"]    # whether to save the final model
+        self.save_final_model = parameter_dictionary["save_final_model"]        # whether to save the final model
+        self.write_tensorboard = parameter_dictionary["write_tensorboard"]      # whether to write the tensorboard file
+        # create a summary image of the learning process every n epochs
+        self.summary_image_frequency = parameter_dictionary["summary_image_frequency"]
 
         """
         params for the data 
@@ -63,9 +68,24 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             "bias_init_value_of_hidden_layer_x_discriminator"]
 
         # activation functions for the different parts of the network
-        self.activation_function_encoder = parameter_dictionary["activation_function_encoder"]
-        self.activation_function_decoder = parameter_dictionary["activation_function_decoder"]
-        self.activation_function_discriminator = parameter_dictionary["activation_function_discriminator"]
+        if type(parameter_dictionary["activation_function_encoder"]) is list:
+            self.activation_function_encoder = parameter_dictionary["activation_function_encoder"]
+        else:
+            self.activation_function_encoder = [parameter_dictionary["activation_function_encoder"]] * \
+                                               (len(self.n_neurons_of_hidden_layer_x_autoencoder)+1)
+
+        if type(parameter_dictionary["activation_function_decoder"]) is list:
+            self.activation_function_decoder = parameter_dictionary["activation_function_decoder"]
+        else:
+            self.activation_function_decoder = [parameter_dictionary["activation_function_decoder"]] * \
+                                               (len(self.n_neurons_of_hidden_layer_x_autoencoder)+1)
+
+        if type(parameter_dictionary["activation_function_discriminator"]) is list:
+            self.activation_function_discriminator = parameter_dictionary["activation_function_discriminator"]
+        else:
+            self.activation_function_discriminator \
+                = [parameter_dictionary["activation_function_discriminator"]] * \
+                  (len(self.n_neurons_of_hidden_layer_x_discriminator)+1)
 
         """
         params for learning
@@ -351,7 +371,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                    global_step=self.global_step)
 
         """
-        Create the tensorboard summary
+        Create the tensorboard summary and the tf.saver and tf.session vars
         """
         self.tensorboard_summary = \
             self.create_tensorboard_summary(decoder_output=self.decoder_output, encoder_output=self.encoder_output,
@@ -361,6 +381,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                             real_distribution=self.real_distribution,
                                             decoder_output_multiple=self.decoder_output_multiple)
 
+        # for saving the model
+        self.saver = tf.train.Saver()
+
+        self.session = tf.Session()
+
         """
         Variable for the "manual" summary
         """
@@ -369,10 +394,36 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                       "list_of_epochs": []}
         self.learning_rates = {"autoencoder_lr": [], "discriminator_lr": [], "generator_lr": [], "list_of_epochs": []}
 
+        # variables for the minibatch summary image
+        self.minibatch_summary_vars = {"real_dist": None, "latent_representation": None, "discriminator_neg": None,
+                                       "discriminator_pos": None, "batch_x": None, "decoder_output": None,
+                                       "epoch": None, "b": None, "batch_labels": None}
+
         """
         Init all variables         
         """
         self.init = tf.global_variables_initializer()
+
+    def get_requested_operations_by_swagger_results(self):
+        return self.requested_operations_by_swagger_results
+
+    def set_requested_operations_by_swagger_results(self, requested_operations_by_swagger_results):
+        self.requested_operations_by_swagger_results = requested_operations_by_swagger_results
+
+    def get_requested_operations_by_swagger(self):
+        return self.requested_operations_by_swagger
+
+    def add_to_requested_operations_by_swagger(self, requested_operation):
+        self.requested_operations_by_swagger.append(requested_operation)
+
+    def get_minibatch_summary_vars(self):
+        return self.minibatch_summary_vars
+
+    def get_performance_over_time(self):
+        return self.performance_over_time
+
+    def get_learning_rates(self):
+        return self.learning_rates
 
     def get_train_status(self):
         return self.train_status
@@ -408,37 +459,37 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Encoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                latent_variable = aae_helper. \
+                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0], aae_helper. \
                     create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
-                                       bias_init_value=bias_init_values[0])
+                                       bias_init_value=bias_init_values[0]))
                 return latent_variable
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_encoder, aae_helper.
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0], aae_helper.
                                            create_dense_layer(X, self.input_dim,
                                                               self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                               'encoder_dense_layer_1',
                                                               bias_init_value=bias_init_values[0]))
-                latent_variable = aae_helper. \
+                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[-1], aae_helper. \
                     create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0], self.z_dim,
-                                       'encoder_output', bias_init_value=bias_init_values[1])
+                                       'encoder_output', bias_init_value=bias_init_values[1]))
                 return latent_variable
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder,
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0],
                     aae_helper.
                         create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                            'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n_hidden_layers):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder, aae_helper.
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[i], aae_helper.
                                                                                  create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                       'encoder_dense_layer_' + str(i + 1),
                                                       bias_init_value=bias_init_values[i]))
-                latent_variable = aae_helper. \
+                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[-1], aae_helper. \
                     create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                       self.z_dim, 'encoder_output', bias_init_value=bias_init_values[-1])
+                                       self.z_dim, 'encoder_output', bias_init_value=bias_init_values[-1]))
                 return latent_variable
 
     def decoder(self, X, bias_init_values, reuse=False):
@@ -463,37 +514,37 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Decoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
+                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0],
                     aae_helper.create_dense_layer(X, self.z_dim, self.input_dim,
                                                                              'decoder_output',
                                                                              bias_init_value=bias_init_values[0]))
                 return decoder_output
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_decoder, aae_helper.
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0], aae_helper.
                                            create_dense_layer(X, self.z_dim,
                                                               self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                               'decoder_dense_layer_1',
                                                               bias_init_value=bias_init_values[0]))
-                decoder_output = tf.nn.sigmoid(
+                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[-1],
                     aae_helper.
                         create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                            self.input_dim, 'decoder_output', bias_init_value=bias_init_values[1]))
                 return decoder_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0],
                     aae_helper.
                         create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                            'decoder_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(n_hidden_layers - 1, 0, -1):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder,
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[i],
                         aae_helper.
                             create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
                                                bias_init_value=bias_init_values[i]))
-                decoder_output = tf.nn.sigmoid(
+                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[-1],
                     aae_helper.
                         create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                            self.input_dim, 'decoder_output', bias_init_value=bias_init_values[-1]))
@@ -522,35 +573,35 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Discriminator'):
             # there is no hidden layer
             if n__hidden_layers == 0:
-                discriminator_output = aae_helper.\
-                    create_dense_layer(X, self.z_dim, 1, 'discriminator_output', bias_init_value=bias_init_values[0])
+                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0], aae_helper.\
+                    create_dense_layer(X, self.z_dim, 1, 'discriminator_output', bias_init_value=bias_init_values[0]))
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
+                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0],
                                                                  aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
-                discriminator_output = aae_helper\
+                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[-1], aae_helper\
                     .create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
-                                        'discriminator_output', bias_init_value=bias_init_values[1])
+                                        'discriminator_output', bias_init_value=bias_init_values[1]))
                 return discriminator_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
+                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0],
                     aae_helper
                         .create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                            'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
                 for i in range(1, n__hidden_layers):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator,
+                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[i],
                         aae_helper.
                             create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
                                                self.n_neurons_of_hidden_layer_x_discriminator[i],
                                                'discriminator_dense_layer_' + str(i + 1),
                                                bias_init_value=bias_init_values[i]))
 
-                discriminator_output = aae_helper.\
+                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[-1], aae_helper.\
                     create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
-                                       'discriminator_output',  bias_init_value=bias_init_values[-1])
+                                       'discriminator_output',  bias_init_value=bias_init_values[-1]))
                 return discriminator_output
 
     def create_tensorboard_summary(self, decoder_output, encoder_output, autoencoder_loss, discriminator_loss,
@@ -702,6 +753,29 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         if not left_cell:
             plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
+    def generate_image_from_single_point(self, sess, single_point):
+
+        # TODO: deal with return value
+
+        print("\n\ngenerate_image_from_single_point called\n\n")
+
+        single_point = np.reshape(single_point, (1, self.z_dim))
+
+        generated_image = sess.run(self.decoder_output_real_dist, feed_dict={self.decoder_input: single_point})
+        generated_image = np.array(generated_image).reshape(self.input_dim)
+
+        # reshape the image array and display it
+        img = aae_helper.reshape_image_array(self, generated_image)
+
+        if self.color_scale == "gray_scale":
+            plt.imshow(img, cmap="gray")
+        else:
+            plt.imshow(img)
+        # plt.show()
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "testing" + '.png')
+
+        return img
+
     def train(self, is_train_mode_active=True):
         """
         trains the adversarial autoencoder on the MNIST data set or generates the image grid using the previously
@@ -709,6 +783,10 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param is_train_mode_active: whether a autoencoder should be trained or not
         :return:
         """
+
+        # we need a new session, since training has been completed and the old session is closed
+        if not is_train_mode_active:
+            self.session = tf.Session()
 
         saved_model_path = None
 
@@ -718,13 +796,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # Get the data
         data = aae_helper.get_input_data(self.selected_dataset)
 
-        # Saving the model
-        saver = tf.train.Saver()
-
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
 
         step = 0
-        with tf.Session() as sess:
+        # with tf.Session() as sess:
+        with self.session as sess:
 
             # init the tf variables
             sess.run(self.init)
@@ -734,7 +810,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 # creates folders for each run to store the tensorboard files, saved models and the log files.
                 tensorboard_path, saved_model_path, log_path = aae_helper.form_results(self)
-                writer = tf.summary.FileWriter(logdir=tensorboard_path, graph=sess.graph)
+                if self.write_tensorboard:
+                    writer = tf.summary.FileWriter(logdir=tensorboard_path, graph=sess.graph)
 
                 # write the used parameter dictionary to some file
                 json_dictionary = json.dumps(self.parameter_dictionary)
@@ -745,9 +822,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 for epoch in range(self.n_epochs):
 
                     if self.train_status == "stop":
-
-                        self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
-                                          saved_model_path, saver, sess, step)
+                        # end the training
                         break
 
                     # calculate the number of batches based on the batch_size and the size of the train set
@@ -762,6 +837,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # iterate over the batches
                     for b in range(1, n_batches + 1):
+
+                        self.process_requested_swagger_operations(sess, "testing")
 
                         # draw a sample from p(z) and use it as real distribution for the discriminator
                         # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
@@ -794,7 +871,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         sess.run(self.generator_trainer, feed_dict={self.X: batch_x, self.X_target: batch_x})
 
                         # every 5 epochs: write a summary for every 50th minibatch
-                        if epoch % 5 == 0 and b % 50 == 0:
+                        if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output = \
@@ -806,7 +883,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
                                            self.real_distribution: z_real_dist,
                                            self.decoder_input_multiple: z_real_dist})
-                            writer.add_summary(summary, global_step=step)
+                            if self.write_tensorboard:
+                                writer.add_summary(summary, global_step=step)
 
                             latent_representations_current_epoch.extend(latent_representation)
                             labels_current_epoch.extend(batch_labels)
@@ -819,12 +897,23 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
-                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer)))
+                                aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess))
                             self.learning_rates["discriminator_lr"].append(
-                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.discriminator_optimizer)))
+                                aae_helper.get_learning_rate_for_optimizer(self.discriminator_optimizer, sess))
                             self.learning_rates["generator_lr"].append(
-                                sess.run(aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer)))
+                                aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess))
                             self.learning_rates["list_of_epochs"].append(epoch + (b / n_batches))
+
+                            # updates vars for the swagger server
+                            self.minibatch_summary_vars["real_dist"] = real_dist
+                            self.minibatch_summary_vars["latent_representation"] = latent_representation
+                            self.minibatch_summary_vars["discriminator_neg"] = discriminator_neg
+                            self.minibatch_summary_vars["discriminator_pos"] = discriminator_pos
+                            self.minibatch_summary_vars["batch_x"] =  batch_x
+                            self.minibatch_summary_vars["decoder_output"] = decoder_output
+                            self.minibatch_summary_vars["epoch"] = epoch
+                            self.minibatch_summary_vars["b"] = b
+                            self.minibatch_summary_vars["batch_labels"] = batch_labels
 
                             # create the summary image for the current minibatch
                             aae_helper.create_minibatch_summary_image(self, real_dist, latent_representation,
@@ -838,11 +927,11 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 print("Discriminator Loss: {}".format(discriminator_loss))
                                 print("Generator Loss: {}".format(generator_loss))
                                 print('Learning rate autoencoder: {}'.format(
-                                    sess.run(aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer))))
+                                    aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess)))
                                 print('Learning rate discriminator: {}'.format(
-                                    sess.run(aae_helper.get_learning_rate_for_optimizer(self.discriminator_optimizer))))
+                                    aae_helper.get_learning_rate_for_optimizer(self.discriminator_optimizer, sess)))
                                 print('Learning rate generator: {}'.format(
-                                    sess.run(aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer))))
+                                    aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess)))
 
                             autoencoder_loss_final = autoencoder_loss
                             discriminator_loss_final = discriminator_loss
@@ -857,7 +946,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         step += 1
 
                     # every 5 epochs ..
-                    if epoch % 5 == 0:
+                    if epoch % self.summary_image_frequency == 0:
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
                         outer_grid = gridspec.GridSpec(1, 2)
@@ -888,15 +977,54 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 # Get the latest results folder
                 all_results = os.listdir(self.results_path)
                 all_results.sort()
-                saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
-                                                                         + '/Saved_models/'))
+
+                self.saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
+                                                                              + '/Saved_models/'))
+
+                self.process_requested_swagger_operations(sess, "testing")
+
                 self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
 
-            # TODO: param whether model should be saved (?)
+            # TODO: end training has probably only to be called with train=True
+            # end the training
             self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
-                              None, saver, sess, step)
-            # self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
-            #                   saved_model_path, saver, sess, step)
+                              saved_model_path, self.saver, sess, step)
+
+    def process_requested_swagger_operations(self, sess, image_title):
+        """
+        processes the operations requested by swagger
+        :param sess: tensorflow session
+        :param image_title: title of the image
+        :return:
+        """
+
+        # check if any operations to run are requested by swagger
+        if len(self.requested_operations_by_swagger) > 0:
+            # requested_operations_by_swagger is a list of dicts: {"function_name_1": [params],
+            # "function_name_2": [params]}
+            for requested_operation in self.requested_operations_by_swagger:
+                for key, value in requested_operation.items():
+
+                    # get the function name and the function parameters
+                    function_name = key
+                    function_params = value
+
+                    print(function_name)
+                    print(function_params)
+
+                    # call the respective function with the respective parameters
+                    if function_name == "generate_image_grid":
+                        # TODO: return value
+                        self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=image_title,
+                                                 left_cell=None)
+                    elif function_name == "generate_image_from_single_point":
+                        result = self.generate_image_from_single_point(sess, function_params)
+                        self.set_requested_operations_by_swagger_results(result)
+
+                    plt.close('all')
+
+            # reset the list
+            self.requested_operations_by_swagger = []
 
     def end_training(self, autoencoder_loss_final, discriminator_loss_final, generator_loss_final, saved_model_path,
                      saver, sess, step):
@@ -921,6 +1049,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             print("Autoencoder Loss: {}".format(autoencoder_loss_final))
             print("Discriminator Loss: {}".format(discriminator_loss_final))
             print("Generator Loss: {}".format(generator_loss_final))
+            print("#############    FINISHED TRAINING   #############")
 
         # set the final performance
         self.final_performance = {"autoencoder_loss_final": autoencoder_loss_final,
@@ -929,25 +1058,13 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                   "summed_loss_final": autoencoder_loss_final + discriminator_loss_final
                                                        + generator_loss_final}
 
-        def atoi(text):
-            return int(text) if text.isdigit() else text
+        # create the gif for the learning progress
+        aae_helper.create_gif(self)
 
-        def natural_keys(text):
-            '''
-            alist.sort(key=natural_keys) sorts in human order
-            http://nedbatchelder.com/blog/200712/human_sorting.html
-            (See Toothy's implementation in the comments)
-            '''
-            return [atoi(c) for c in re.split('(\d+)', text)]
-
-        result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
-        filenames = glob.glob(result_path + "*_latent_space_class_distribution.png")
-        filenames.sort(key=natural_keys)
-        images = []
-        for filename in filenames:
-            images.append(imageio.imread(filename))
-        imageio.mimwrite(result_path + 'latent_space_class_distribution.gif', images, duration=1.0)
+        # training has stopped
+        self.train_status = "stop"
 
         # close the tensorflow session
         sess.close()
         # tf.reset_default_graph()
+

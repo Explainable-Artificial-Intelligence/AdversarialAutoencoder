@@ -173,7 +173,7 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
             adv_autoencoder = SemiSupervisedAdversarialAutoencoder(random_param_combination)
 
         adv_autoencoder.train(True)
-        # adv_autoencoder.train(False)
+        adv_autoencoder.train(False)
 
         # get the performance
         performance = adv_autoencoder.get_final_performance()
@@ -257,17 +257,17 @@ def testing():
     # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\Good_Results\\2018-02-13_10_48_53_SVHN\\log\\params.txt", "Supervised")
     # aae.train(True)
 
-    do_randomsearch(2, selected_autoencoder="Unsupervised", selected_dataset="SVHN", n_epochs=21, verbose=True,
-                    z_dim=2,
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="cifar10", n_epochs=6, verbose=True,
+                    z_dim=2, batch_size=100, save_final_model=True,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,
                     learning_rate_generator=0.0001,
-                    activation_function_encoder='relu',
+                    activation_function_encoder=['relu']*4,
                     activation_function_decoder='relu',
                     activation_function_discriminator='relu',
-                    decaying_learning_rate_name_autoencoder="piecewise_constant",
-                    decaying_learning_rate_name_discriminator="piecewise_constant",
-                    decaying_learning_rate_name_generator="piecewise_constant",
+                    decaying_learning_rate_name_autoencoder="static",
+                    decaying_learning_rate_name_discriminator="static",
+                    decaying_learning_rate_name_generator="static",
                     AdamOptimizer_beta1_autoencoder=0.5,
                     AdamOptimizer_beta1_discriminator=0.5,
                     AdamOptimizer_beta1_generator=0.5,

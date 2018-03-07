@@ -1,10 +1,14 @@
 """
     Holds the functions shared by all three Autoencoders (Unsupervised, Supervised and SemiSupervised).
 """
+import glob
+
+import imageio
 import tensorflow as tf
 import numpy as np
 import datetime
 import os
+import re
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
@@ -269,7 +273,7 @@ def reshape_tensor_to_rgb_image(image_array, input_dim_x, input_dim_y):
     return rgb_image
 
 
-def form_results(self):
+def form_results(aae_class):
     """
     Forms folders for each run to store the tensorboard files, saved models and the log files.
     :return: three strings pointing to tensorboard, saved models and log paths respectively.
@@ -278,16 +282,16 @@ def form_results(self):
         replace(" ", ":").replace(":", "_")
 
     folder_name = "/{0}_{1}". \
-        format(date, self.selected_dataset)
-    self.result_folder_name = folder_name
-    tensorboard_path = self.results_path + folder_name + '/Tensorboard'
-    saved_model_path = self.results_path + folder_name + '/Saved_models/'
-    log_path = self.results_path + folder_name + '/log'
+        format(date, aae_class.selected_dataset)
+    aae_class.result_folder_name = folder_name
+    tensorboard_path = aae_class.results_path + folder_name + '/Tensorboard'
+    saved_model_path = aae_class.results_path + folder_name + '/Saved_models/'
+    log_path = aae_class.results_path + folder_name + '/log'
 
-    if not os.path.exists(self.results_path):
-        os.mkdir(self.results_path)
-    if not os.path.exists(self.results_path + folder_name):
-        os.mkdir(self.results_path + folder_name)
+    if not os.path.exists(aae_class.results_path):
+        os.mkdir(aae_class.results_path)
+    if not os.path.exists(aae_class.results_path + folder_name):
+        os.mkdir(aae_class.results_path + folder_name)
         os.mkdir(tensorboard_path)
         os.mkdir(saved_model_path)
         os.mkdir(log_path)
@@ -344,7 +348,8 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
         plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label))
 
     if combined_plot:
-        plt.title("Epoch: " + str(epoch))
+        plt.suptitle("Epoch: " + str(epoch))
+        # plt.title("Epoch: " + str(epoch))
 
     plt.legend()
     plt.savefig(result_path + str(epoch) + "_latent_space_class_distribution" + '.png')
@@ -354,13 +359,14 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
 
-def reshape_image_array(aae_class, img_array):
+def reshape_image_array(aae_class, img_array, is_array_of_arrays=False):
     """
     reshapes the image array based on the color scale:
         - gray scale: [input_dim_x, input_dim_y]
         - rgb scale: [input_dim_x, input_dim_y, 3]
     :param aae_class: AAE instance to access some important fields from it
     :param img_array: array/list of the image
+    :param is_array_of_arrays: whether we have an array of arrays or not
     :return: reshaped np.array
     """
 
@@ -371,17 +377,30 @@ def reshape_image_array(aae_class, img_array):
     else:
         image_array = np.array(img_array)
         n_colored_pixels_per_channel = aae_class.input_dim_x * aae_class.input_dim_y
-        # first n_colored_pixels_per_channel encode red
-        red_pixels = image_array[:n_colored_pixels_per_channel].reshape(aae_class.input_dim_x,
-                                                                        aae_class.input_dim_y,
-                                                                        1)
-        # next n_colored_pixels_per_channel encode green
-        green_pixels = image_array[n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2] \
-            .reshape(aae_class.input_dim_x, aae_class.input_dim_y, 1)
-        # last n_colored_pixels_per_channel encode blue
-        blue_pixels = image_array[n_colored_pixels_per_channel * 2:].reshape(
-            aae_class.input_dim_x,
-            aae_class.input_dim_y, 1)
+
+        if is_array_of_arrays:
+            # first n_colored_pixels_per_channel encode red
+            red_pixels = image_array[:, :n_colored_pixels_per_channel].reshape(aae_class.input_dim_x,
+                                                                               aae_class.input_dim_y, 1)
+            # next n_colored_pixels_per_channel encode green
+            green_pixels = image_array[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2] \
+                .reshape(aae_class.input_dim_x, aae_class.input_dim_y, 1)
+            # last n_colored_pixels_per_channel encode blue
+            blue_pixels = image_array[:, n_colored_pixels_per_channel * 2:].reshape(aae_class.input_dim_x,
+                                                                                    aae_class.input_dim_y, 1)
+        else:
+            # first n_colored_pixels_per_channel encode red
+            red_pixels = image_array[:n_colored_pixels_per_channel].reshape(aae_class.input_dim_x,
+                                                                            aae_class.input_dim_y,
+                                                                            1)
+            # next n_colored_pixels_per_channel encode green
+            green_pixels = image_array[n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2] \
+                .reshape(aae_class.input_dim_x, aae_class.input_dim_y, 1)
+            # last n_colored_pixels_per_channel encode blue
+            blue_pixels = image_array[n_colored_pixels_per_channel * 2:].reshape(
+                aae_class.input_dim_x,
+                aae_class.input_dim_y, 1)
+
         # concatenate the color arrays into one array
         img = np.concatenate([red_pixels, green_pixels, blue_pixels], 2)
 
@@ -412,14 +431,20 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     batch_labels = np.array(batch_labels)
 
     # convert one hot vectors to integer labels
-    int_labels = np.argmax(batch_labels, axis=1)
+    batch_integer_labels = np.argmax(batch_labels, axis=1)
 
     # get the number of classes
     n_classes = batch_labels.shape[1]
 
+    # calculate the total losses
+    total_losses = [sum(x) for x in zip(aae_class.performance_over_time["autoencoder_losses"],
+                                        aae_class.performance_over_time["discriminator_losses"],
+                                        aae_class.performance_over_time["generator_losses"])]
+
     # increase figure size
     plt.rcParams["figure.figsize"] = (15, 20)
 
+    # create the subplots
     plt.subplots(nrows=4, ncols=3)
 
     """
@@ -443,26 +468,32 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     plt.title("generator_loss")
     plt.xlabel("epoch")
 
-    """
-    plot the learning rates over time
-    """
     plt.subplot(4, 3, 4)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["autoencoder_lr"])
-    plt.title("autoencoder_lr")
+    plt.plot(aae_class.performance_over_time["list_of_epochs"],
+             total_losses)
+    plt.title("total loss")
     plt.xlabel("epoch")
 
+    """
+    plot one input image and its reconstruction
+    """
+    # plot one input image..
     plt.subplot(4, 3, 5)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["discriminator_lr"])
-    plt.title("discriminator_lr")
-    plt.xlabel("epoch")
+    real_img = batch_x[0, :]
+    img = reshape_image_array(aae_class, real_img)
+    if aae_class.color_scale == "gray_scale":
+        plt.imshow(img, cmap="gray")
+    else:
+        plt.imshow(img)
 
+    # .. and its reconstruction
     plt.subplot(4, 3, 6)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["generator_lr"])
-    plt.title("generator_lr")
-    plt.xlabel("epoch")
+    created_img = decoder_output[0, :]
+    img = reshape_image_array(aae_class, created_img)
+    if aae_class.color_scale == "gray_scale":
+        plt.imshow(img, cmap="gray")
+    else:
+        plt.imshow(img)
 
     """
     plot the encoder and the real gaussian distribution
@@ -476,6 +507,7 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     plt.title("real dist")
 
     # plot the latent representation
+    # TODO: pca for z_dim > 2
     plt.subplot(4, 3, 8)
     if aae_class.z_dim > 2:
         plt.hist(latent_representation.flatten())
@@ -483,7 +515,7 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
         # plot the different classes on the latent space
         for class_label in range(n_classes):
             # get the points corresponding to the same classes
-            points_for_current_class_label = latent_representation[np.where(int_labels == class_label)]
+            points_for_current_class_label = latent_representation[np.where(batch_integer_labels == class_label)]
             # plot them
             plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
                         label=str(class_label))
@@ -497,25 +529,25 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
     plt.title("discriminator distr.")
 
     """
-    plot one input image and its reconstruction
+    plot the learning rates over time
     """
-    # plot one input image..
-    plt.subplot(4, 3, 11)
-    real_img = batch_x[0, :]
-    img = reshape_image_array(aae_class, real_img)
-    if aae_class.color_scale == "gray_scale":
-        plt.imshow(img, cmap="gray")
-    else:
-        plt.imshow(img)
+    plt.subplot(4, 3, 10)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["autoencoder_lr"])
+    plt.title("autoencoder_lr")
+    plt.xlabel("epoch")
 
-    # .. and its reconstruction
+    plt.subplot(4, 3, 11)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["discriminator_lr"])
+    plt.title("discriminator_lr")
+    plt.xlabel("epoch")
+
     plt.subplot(4, 3, 12)
-    created_img = decoder_output[0, :]
-    img = reshape_image_array(aae_class, created_img)
-    if aae_class.color_scale == "gray_scale":
-        plt.imshow(img, cmap="gray")
-    else:
-        plt.imshow(img)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["generator_lr"])
+    plt.title("generator_lr")
+    plt.xlabel("epoch")
 
     # save the figure in the results folder
     plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch)
@@ -527,7 +559,11 @@ def create_minibatch_summary_image(aae_class, real_dist, latent_representation, 
 
 
 def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_representation, batch_x, decoder_output,
-                                                   epoch, mini_batch_i, real_cat_dist, encoder_cat_dist):
+                                                   epoch, mini_batch_i, real_cat_dist, encoder_cat_dist, batch_labels,
+                                                   discriminator_gaussian_neg,
+                                                   discriminator_gaussian_pos,
+                                                   discriminator_cat_neg,
+                                                   discriminator_cat_pos):
     """
     creates a summary image displaying the losses and the learning rates over time, the real distribution and the latent
     representation, the discriminator outputs (pos and neg) and one input image and its reconstruction image
@@ -543,9 +579,29 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
     :return:
     """
 
+    # convert lists to numpy array
+    latent_representation = np.array(latent_representation)
+    batch_labels = np.array(batch_labels)
+
+    # convert one hot vectors to integer labels
+    batch_integer_labels = np.argmax(batch_labels, axis=1)
+    real_cat_dist_integer_labels = np.argmax(real_cat_dist, axis=1)
+    encoder_cat_dist_integer_labels = np.argmax(encoder_cat_dist, axis=1)
+
+    # get the number of classes
+    n_classes = batch_labels.shape[1]
+
+    # calculate the total losses
+    total_losses = [sum(x) for x in zip(aae_class.performance_over_time["autoencoder_losses"],
+                                        aae_class.performance_over_time["discriminator_gaussian_losses"],
+                                        aae_class.performance_over_time["discriminator_categorical_losses"],
+                                        aae_class.performance_over_time["generator_losses"],
+                                        aae_class.performance_over_time["supervised_encoder_loss"])]
+
     # increase figure size
     plt.rcParams["figure.figsize"] = (15, 20)
 
+    # create the subplots
     plt.subplots(nrows=5, ncols=4)
 
     """
@@ -581,44 +637,17 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
     plt.title("supervised_encoder_loss")
     plt.xlabel("epoch")
 
-    """
-    plot the learning rates over time
-    """
     plt.subplot(5, 4, 6)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["autoencoder_lr"])
-    plt.title("autoencoder_lr")
-    plt.xlabel("epoch")
-
-    plt.subplot(5, 4, 7)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["discriminator_g_lr"])
-    plt.title("discriminator_g_lr")
-    plt.xlabel("epoch")
-
-    plt.subplot(5, 4, 8)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["discriminator_c_lr"])
-    plt.title("discriminator_c_lr")
-    plt.xlabel("epoch")
-
-    plt.subplot(5, 4, 9)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["generator_lr"])
-    plt.title("generator_lr")
-    plt.xlabel("epoch")
-
-    plt.subplot(5, 4, 10)
-    plt.plot(aae_class.learning_rates["list_of_epochs"],
-             aae_class.learning_rates["supervised_encoder_lr"])
-    plt.title("supervised_encoder_lr")
+    plt.plot(aae_class.performance_over_time["list_of_epochs"],
+             total_losses)
+    plt.title("total loss")
     plt.xlabel("epoch")
 
     """
     plot one input image and its reconstruction
     """
     # plot one input image..
-    plt.subplot(5, 4, 11)
+    plt.subplot(5, 4, 7)
     real_img = batch_x[0, :]
     img = reshape_image_array(aae_class, real_img)
     if aae_class.color_scale == "gray_scale":
@@ -627,7 +656,7 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
         plt.imshow(img)
 
     # .. and its reconstruction
-    plt.subplot(5, 4, 12)
+    plt.subplot(5, 4, 8)
     created_img = decoder_output[0, :]
     img = reshape_image_array(aae_class, created_img)
     if aae_class.color_scale == "gray_scale":
@@ -638,35 +667,27 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
     """
     plot the accuracy
     """
-    if len(aae_class.performance_over_time["accuracy"]) > 0:    # for the first epoch we don't not have accuracy yet
-        plt.subplot(5, 4, 13)
+    if len(aae_class.performance_over_time["accuracy"]) > 0:  # for the first epoch we don't not have accuracy yet
+        plt.subplot(5, 4, 9)
         plt.plot(aae_class.performance_over_time["accuracy_epochs"],
                  aae_class.performance_over_time["accuracy"])
         plt.title("accuracy")
         plt.xlabel("epoch")
 
     """
-    plot the encoder and the real categorical distribution 
+    plot the batch labels and the predicted labels
     """
-    plt.subplot(5, 4, 15)
-    if aae_class.z_dim > 2:
-        plt.hist(real_cat_dist.flatten())
-    else:
-        plt.scatter(real_cat_dist[:, 0], real_cat_dist[:, 1])
-    plt.title("real cat dist")
-
-    plt.subplot(5, 4, 16)
-    if aae_class.z_dim > 2:
-        plt.hist(encoder_cat_dist.flatten())
-    else:
-        plt.scatter(encoder_cat_dist[:, 0], encoder_cat_dist[:, 1])
-    plt.title("encoder cat dist")
+    plt.subplot(5, 4, 10)
+    plt.hist(batch_integer_labels, alpha=0.5, label="batch labels", color="#d95f02")
+    plt.hist(encoder_cat_dist_integer_labels, alpha=0.5, label="predicted labels", color="#1b9e77")
+    plt.legend()
+    plt.title("label prediction")
 
     """
     plot the encoder and the real gaussian distribution
     """
     # plot the real distribution
-    plt.subplot(5, 4, 17)
+    plt.subplot(5, 4, 11)
     if aae_class.z_dim > 2:
         plt.hist(real_dist.flatten())
     else:
@@ -674,12 +695,74 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
     plt.title("real dist")
 
     # plot the latent representation
-    plt.subplot(5, 4, 18)
+    # TODO: pca for z_dim > 2
+    plt.subplot(5, 4, 12)
     if aae_class.z_dim > 2:
         plt.hist(latent_representation.flatten())
     else:
-        plt.scatter(latent_representation[:, 0], latent_representation[:, 1])
+        # plot the different classes on the latent space
+        for class_label in range(n_classes):
+            # get the points corresponding to the same classes
+            points_for_current_class_label = latent_representation[np.where(batch_integer_labels == class_label)]
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label))
+    plt.legend()
     plt.title("encoder dist")
+
+    """
+    plot the discriminator outputs
+    """
+    plt.subplot(5, 4, 13)
+    plt.hist(discriminator_gaussian_neg.flatten(), alpha=0.5, label="neg", color="#d95f02")
+    plt.hist(discriminator_gaussian_pos.flatten(), alpha=0.5, label="pos", color="#1b9e77")
+    plt.title("discriminator gaussian")
+    plt.legend()
+
+    print(discriminator_gaussian_neg[0])
+    print(discriminator_gaussian_pos[0])
+
+    plt.subplot(5, 4, 14)
+    plt.hist(discriminator_cat_neg.flatten(), alpha=0.5, label="neg", color="#d95f02")
+    plt.hist(discriminator_cat_pos.flatten(), alpha=0.5, label="pos", color="#1b9e77")
+    plt.title("discriminator categorical")
+    plt.legend()
+
+    print(discriminator_cat_neg[0])
+    print(discriminator_cat_pos[0])
+
+    """
+    plot the learning rates over time
+    """
+    plt.subplot(5, 4, 16)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["autoencoder_lr"])
+    plt.title("autoencoder_lr")
+    plt.xlabel("epoch")
+
+    plt.subplot(5, 4, 17)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["discriminator_g_lr"])
+    plt.title("discriminator_g_lr")
+    plt.xlabel("epoch")
+
+    plt.subplot(5, 4, 18)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["discriminator_c_lr"])
+    plt.title("discriminator_c_lr")
+    plt.xlabel("epoch")
+
+    plt.subplot(5, 4, 19)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["generator_lr"])
+    plt.title("generator_lr")
+    plt.xlabel("epoch")
+
+    plt.subplot(5, 4, 20)
+    plt.plot(aae_class.learning_rates["list_of_epochs"],
+             aae_class.learning_rates["supervised_encoder_lr"])
+    plt.title("supervised_encoder_lr")
+    plt.xlabel("epoch")
 
     # save the figure in the results folder
     plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch)
@@ -690,17 +773,51 @@ def create_minibatch_summary_image_semi_supervised(aae_class, real_dist, latent_
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
 
-def get_learning_rate_for_optimizer(optimizer):
+def get_learning_rate_for_optimizer(optimizer, sess):
     """
     returns the current learning rate for the provided optimizer
     :param optimizer: tf.train.Optimizer
+    :param sess: tf.session
     :return:
     """
     try:
-        return optimizer._lr
+        if isinstance(optimizer._lr , float):
+            return optimizer._lr
+        else:
+            return sess.run(optimizer._lr )
     except AttributeError:
-        return optimizer._learning_rate
+        if isinstance(optimizer._learning_rate , float):
+            return optimizer._learning_rate
+        else:
+            return sess.run(optimizer._lr )
 
+
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    http://nedbatchelder.com/blog/200712/human_sorting.html
+    (See Toothy's implementation in the comments)
+    '''
+    return [atoi(c) for c in re.split('(\d+)', text)]
+
+
+def create_gif(aae_class):
+    """
+    creates a gif showing the learning progress on the latent space and the class distribution on it
+    :param aae_class: instance of (Un/Semi)-supervised adversarial autoencoder, holding the parameters
+    :return:
+    """
+    result_path = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/'
+    filenames = glob.glob(result_path + "*_latent_space_class_distribution.png")
+    filenames.sort(key=natural_keys)
+    images = []
+    for filename in filenames:
+        images.append(imageio.imread(filename))
+    imageio.mimwrite(result_path + 'latent_space_class_distribution.gif', images, duration=1.0)
 
 # TODO: maybe generate image grid unsupervised
 # TODO: maybe generate image grid (semi-)supervised

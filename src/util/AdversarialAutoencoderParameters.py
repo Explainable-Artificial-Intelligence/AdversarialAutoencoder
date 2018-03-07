@@ -4,9 +4,25 @@ import itertools
 from util.Distributions import draw_from_np_distribution
 
 
+def get_result_path_for_selected_autoencoder(selected_autoencoder):
+    """
+    returns the result path based on the selected autoencoder
+    :param selected_autoencoder: ["Unsupervised", "Supervised", "SemiSupervised"]
+    :return: string, where to save the result files for training the autoencoder
+    """
+    if selected_autoencoder == "Unsupervised":
+        return '../results/Unsupervised'
+    elif selected_autoencoder == "Supervised":
+        return '../results/Supervised'
+    elif selected_autoencoder == "SemiSupervised":
+        return '../results/SemiSupervised'
+
+
 class AdversarialAutoencoderParameters:
     def __init__(self, **kwargs):
         self.parameters = kwargs
+
+    # TODO: remove static methods from class
 
     @staticmethod
     def get_default_parameters_mnist():
@@ -14,12 +30,18 @@ class AdversarialAutoencoderParameters:
         returns the default parameters for the MNIST dataset
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
-        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2,
-                'color_scale': "gray_scale", 'verbose': False, 'save_final_model': False,
+        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2, 'n_classes': 10,
+                'color_scale': "gray_scale", 'verbose': False, 'save_final_model': False, 'write_tensorboard': False,
+                'n_labeled': 1000,  # for semi-supervised
+                'summary_image_frequency': 5,   # create a summary image of the learning process every 5 epochs
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],    # 1000, 500, 250, 125
                 'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
+                'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
+                'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
+                'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
                 'activation_function_encoder': 'relu',
                 'activation_function_decoder': 'relu',
                 'activation_function_discriminator': 'relu',
@@ -28,9 +50,9 @@ class AdversarialAutoencoderParameters:
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
-                'decaying_learning_rate_name_autoencoder': None,
-                'decaying_learning_rate_name_discriminator': None,
-                'decaying_learning_rate_name_generator': None,
+                'decaying_learning_rate_name_autoencoder': "static",
+                'decaying_learning_rate_name_discriminator': "static",
+                'decaying_learning_rate_name_generator': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer',
                 'optimizer_generator': 'AdamOptimizer',
@@ -91,12 +113,18 @@ class AdversarialAutoencoderParameters:
         returns the default parameters for the MNIST dataset
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
-        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
-                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False,
+        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2, 'n_classes': 10,
+                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False, 'write_tensorboard': False,
+                'n_labeled': 1000,  # for semi-supervised
+                'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
+                'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
+                'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
+                'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
                 'activation_function_encoder': 'relu',
                 'activation_function_decoder': 'relu',
                 'activation_function_discriminator': 'relu',
@@ -105,9 +133,9 @@ class AdversarialAutoencoderParameters:
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
-                'decaying_learning_rate_name_autoencoder': None,
-                'decaying_learning_rate_name_discriminator': None,
-                'decaying_learning_rate_name_generator': None,
+                'decaying_learning_rate_name_autoencoder': "static",
+                'decaying_learning_rate_name_discriminator': "static",
+                'decaying_learning_rate_name_generator': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
@@ -167,12 +195,18 @@ class AdversarialAutoencoderParameters:
         returns the default parameters for the MNIST dataset
         :return: dictionary holding the parameters needed to create the Autoencoder
         """
-        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2,
-                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False,
+        return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2, 'n_classes': 10,
+                'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False, 'write_tensorboard': False,
+                'n_labeled': 1000,  # for semi-supervised
+                'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
                 'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
                 'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
+                'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],    # for semi-supervised
+                'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],    # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
+                'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
                 'activation_function_encoder': 'relu',
                 'activation_function_decoder': 'relu',
                 'activation_function_discriminator': 'relu',
@@ -181,9 +215,9 @@ class AdversarialAutoencoderParameters:
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
-                'decaying_learning_rate_name_autoencoder': None,
-                'decaying_learning_rate_name_discriminator': None,
-                'decaying_learning_rate_name_generator': None,
+                'decaying_learning_rate_name_autoencoder': "static",
+                'decaying_learning_rate_name_discriminator': "static",
+                'decaying_learning_rate_name_generator': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer',
                 'optimizer_generator': 'AdamOptimizer',
@@ -237,20 +271,6 @@ class AdversarialAutoencoderParameters:
                 'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
                 'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
                 'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss'}
-
-    @staticmethod
-    def get_result_path_for_selected_autoencoder(selected_autoencoder):
-        """
-        returns the result path based on the selected autoencoder
-        :param selected_autoencoder: ["Unsupervised", "Supervised", "SemiSupervised"]
-        :return: string, where to save the result files for training the autoencoder
-        """
-        if selected_autoencoder == "Unsupervised":
-            return '../results/Unsupervised'
-        elif selected_autoencoder == "Supervised":
-            return '../results/Supervised'
-        elif selected_autoencoder == "SemiSupervised":
-            return '../results/SemiSupervised'
 
     @staticmethod
     def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):
@@ -313,7 +333,7 @@ class AdversarialAutoencoderParameters:
             raise NotImplementedError
 
         param_dict["selected_dataset"] = selected_dataset
-        param_dict["results_path"] = self.get_result_path_for_selected_autoencoder(selected_autoencoder)
+        param_dict["results_path"] = get_result_path_for_selected_autoencoder(selected_autoencoder)
         return param_dict
 
     def get_gridsearch_parameters(self, selected_autoencoder, selected_dataset, *args, **kwargs):
