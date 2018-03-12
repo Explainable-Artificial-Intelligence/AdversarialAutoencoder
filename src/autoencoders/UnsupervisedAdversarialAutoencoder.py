@@ -643,7 +643,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         summary_op = tf.summary.merge_all()
         return summary_op
 
-    def generate_image_grid(self, sess, op, epoch, left_cell=None):
+    def generate_image_grid(self, sess, op, epoch, left_cell=None, save_image_grid=True):
         """
         Generates and saves a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
@@ -652,6 +652,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
         and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
         to be plotted and not the "combinated" image (image grid + class distr. on latent space).
+        :param save_image_grid: whether to save the image grid
         :return:
         """
 
@@ -667,6 +668,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             plt.subplot()
             gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
 
+        list_of_images_for_swagger = []
+
         # iterate over the image grid
         for i, g in enumerate(gs):
 
@@ -681,6 +684,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
             # reshape the image array and display it
             img = aae_helper.reshape_image_array(self, x)
+            list_of_images_for_swagger.append(img)
             if self.color_scale == "gray_scale":
                 plt.imshow(img, cmap="gray")
             else:
@@ -698,11 +702,14 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             if ax.is_last_row():
                 ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
 
-        if not left_cell:
+        if not left_cell and save_image_grid:
             # save the created image grid
             plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
-    def generate_image_grid_z_dim(self, sess, op, epoch, image_grid_shape=(10, 10), left_cell=None):
+        return list_of_images_for_swagger
+
+    def generate_image_grid_z_dim(self, sess, op, epoch, image_grid_shape=(10, 10), left_cell=None,
+                                  save_image_grid=True):
         """
         Generates a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
@@ -712,6 +719,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
         and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
         to be plotted and not the "combinated" image (image grid + class distr. on latent space).
+        :param save_image_grid: whether to save the image grid
         :return: None, displays a matplotlib window with all the merged images.
         """
 
@@ -750,7 +758,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
             ax.set_yticks([])
             ax.set_aspect('auto')
 
-        if not left_cell:
+        if not left_cell and save_image_grid:
             plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
     def generate_image_from_single_point(self, sess, single_point):
@@ -797,6 +805,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         data = aae_helper.get_input_data(self.selected_dataset)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
+        epochs_completed = 0
 
         step = 0
         # with tf.Session() as sess:
@@ -821,7 +830,7 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 # we want n_epochs iterations
                 for epoch in range(self.n_epochs):
 
-                    if self.train_status == "stop":
+                    if self.train_status == "stop" and epoch > 0:
                         # end the training
                         break
 
@@ -945,6 +954,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         step += 1
 
+                    epochs_completed += 1
+
                     # every 5 epochs ..
                     if epoch % self.summary_image_frequency == 0:
                         # increase figure size
@@ -986,9 +997,12 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
 
             # TODO: end training has probably only to be called with train=True
-            # end the training
-            self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
-                              saved_model_path, self.saver, sess, step)
+            if epochs_completed > 0:
+                # end the training
+                self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
+                                  saved_model_path, self.saver, sess, step)
+
+        tf.reset_default_graph()
 
     def process_requested_swagger_operations(self, sess, image_title):
         """
@@ -997,6 +1011,8 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param image_title: title of the image
         :return:
         """
+
+        # TODO: disable saving the image for the generate_image_from_single_point
 
         # check if any operations to run are requested by swagger
         if len(self.requested_operations_by_swagger) > 0:
@@ -1014,9 +1030,9 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # call the respective function with the respective parameters
                     if function_name == "generate_image_grid":
-                        # TODO: return value
-                        self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=image_title,
-                                                 left_cell=None)
+                        result = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=image_title,
+                                                          left_cell=None, save_image_grid=False)
+                        self.set_requested_operations_by_swagger_results(result)
                     elif function_name == "generate_image_from_single_point":
                         result = self.generate_image_from_single_point(sess, function_params)
                         self.set_requested_operations_by_swagger_results(result)
@@ -1066,5 +1082,4 @@ class AdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # close the tensorflow session
         sess.close()
-        # tf.reset_default_graph()
 

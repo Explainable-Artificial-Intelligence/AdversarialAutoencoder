@@ -405,6 +405,12 @@ paths:
             items:
               type: "number"
               format: "double"
+        400:
+          description: "Invalid dimensions"
+        404:
+          description: "Autoencoder not found"
+        412:
+          description: "Wrong Autoencoder"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
 
   /Visualize/GenerateImageFromSinglePointAndSingleLabel:
@@ -430,8 +436,13 @@ paths:
             items:
               type: "number"
               format: "double"
+        400:
+          description: "Invalid input"
+        404:
+          description: "Autoencoder not found"
+        412:
+          description: "Wrong Autoencoder"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
-
 
   /Visualize/GenerateImageGrid:
     get:
@@ -441,136 +452,112 @@ paths:
       responses:
         200:
           description: "success"
+          schema:
+            type: "array"
+            items:
+              type: "number"
+              format: "double"
+        404:
+          description: "Autoencoder not found"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
 
-  /Tune:
-    get:
+  /Tune/runRandomSearch:
+    post:
       tags: [Tune]
-      operationId: swagger_operations.tune
-      summary: Get all test
+      operationId: run_randomsearch
+      summary: Runs a random search for the provided parameters.
+      description: Runs a random search by testing n different parameter combinations.
       parameters:
-        - name: animal_type
-          in: query
+        - in: "query"
+          name: "selected_autoencoder"
           type: string
-          pattern: "^[a-zA-Z0-9]*$"
-        - name: limit
+          enum: ["Unsupervised", "Supervised", "SemiSupervised"]
+          description: what autoencoder to use
+          default: "Unsupervised"
+          format: string
+        - in: "body"
+          name: "aae_parameters"
+          description: "object with all tunable parameters"
+          required: true
+          schema:
+            $ref: "#/definitions/ParameterSet"
+        - name: n_randomized_parameter_combinations
           in: query
+          description: how many parameter combinations should be tested
           type: integer
-          minimum: 0
-          default: 100
+          minimum: 1
+          default: 5
       responses:
         200:
-          description: Return pets
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Pet'
+          description: "Random search successfully started."
+        404:
+          description: "Not found error"
+        415:
+          description: "File parsing error"
+      x-swagger-router-controller: "swagger_server.controllers.tune_controller"
 
-  /pets:
-    get:
-      tags: [Pets]
-      operationId: swagger_operations.get_pets
-      summary: Get all pets
+  /Tune/runGridSearch:
+    post:
+      tags: [Tune]
+      operationId: run_gridsearch
+      summary: Runs a grid search for the provided parameters.
+      description: Runs a grid search by testing different parameter combinations.
       parameters:
-        - name: animal_type
-          in: query
+        - in: "query"
+          name: "selected_autoencoder"
           type: string
-          pattern: "^[a-zA-Z0-9]*$"
-        - name: limit
-          in: query
-          type: integer
-          minimum: 0
-          default: 100
+          enum: ["Unsupervised", "Supervised", "SemiSupervised"]
+          description: what autoencoder to use
+          default: "Unsupervised"
+          format: string
+        - in: "body"
+          name: "aae_parameters"
+          description: "object with all tunable parameters"
+          required: true
+          schema:
+            $ref: "#/definitions/ParameterSetList"
       responses:
         200:
-          description: Return pets
-          schema:
-            type: array
-            items:
-              $ref: '#/definitions/Pet'
-  /pets/{pet_id}:
-    get:
-      tags: [Pets]
-      operationId: swagger_operations.get_pet
-      summary: Get a single pet
-      parameters:
-        - $ref: '#/parameters/pet_id'
-      responses:
-        200:
-          description: Return pet
-          schema:
-            $ref: '#/definitions/Pet'
+          description: "Grid search successfully started."
         404:
-          description: Pet does not exist
-    put:
-      tags: [Pets]
-      operationId: swagger_operations.put_pet
-      summary: Create or update a pet
-      parameters:
-        - $ref: '#/parameters/pet_id'
-        - name: pet
-          in: body
-          schema:
-            $ref: '#/definitions/Pet'
-      responses:
-        200:
-          description: Pet updated
-        201:
-          description: New pet created
-    delete:
-      tags: [Pets]
-      operationId: swagger_operations.delete_pet
-      summary: Remove a pet
-      parameters:
-        - $ref: '#/parameters/pet_id'
-      responses:
-        204:
-          description: Pet was deleted
-        404:
-          description: Pet does not exist
+          description: "Not found error"
+        415:
+          description: "File parsing error"
+      x-swagger-router-controller: "swagger_server.controllers.tune_controller"
 
+  /Tune/stopTuning:
+      post:
+        tags: [Tune]
+        summary: stops the tuning
+        description: stops the training of the adv autoencoder
+        operationId: stop_tuning
+        responses:
+          200:
+            description: "Tuning stopped"
+          404:
+            description: "No autoencoder found"
+        x-swagger-router-controller: "swagger_server.controllers.tune_controller"
 
-parameters:
-  pet_id:
-    name: pet_id
-    description: Pet's Unique identifier
-    in: path
-    type: string
-    required: true
-    pattern: "^[a-zA-Z0-9-]+$"
+  /Tune/getTuningResults:
+      post:
+        tags: [Tune]
+        summary: returns the tuning results
+        description: returns the tuning results ordered by their total loss
+        operationId: get_tuning_results
+        responses:
+          200:
+            description: success
+            schema:
+              type: array
+              items:
+                type: object
+                additionalProperties:
+                  type: string
+          404:
+            description: "No results found"
+        x-swagger-router-controller: "swagger_server.controllers.tune_controller"
 
 definitions:
-  Pet:
-    type: object
-    required:
-      - name
-      - animal_type
-    properties:
-      id:
-        type: string
-        description: Unique identifier
-        example: "123"
-        readOnly: true
-      name:
-        type: string
-        description: Pet's name
-        example: "Susie"
-        minLength: 1
-        maxLength: 100
-      animal_type:
-        type: string
-        description: Kind of animal
-        example: "cat"
-        minLength: 1
-      tags:
-        type: object
-        description: Custom tags
-      created:
-        type: string
-        format: date-time
-        description: Creation time
-        example: "2015-07-07T15:49:51.230+02:00"
-        readOnly: true
   ParameterSet:
     type: "object"
     properties:
@@ -1001,6 +988,674 @@ definitions:
       loss_function_generator:
         type: "string"
         example: "hinge_loss"
+  ParameterSetList:
+    type: "object"
+    properties:
+      batch_size:
+        type: "array"
+        example:
+        - 100
+        items:
+          type: "integer"
+          format: "int32"
+      n_epochs:
+        type: "array"
+        example:
+        - 10
+        items:
+          type: "integer"
+          format: "int32"
+      input_dim_x:
+        type: "array"
+        example:
+        - 28
+        items:
+          type: "integer"
+          format: "int32"
+      input_dim_y:
+        type: "array"
+        example:
+        - 28
+        items:
+          type: "integer"
+          format: "int32"
+      z_dim:
+        type: "array"
+        example:
+        - 2
+        items:
+          type: "integer"
+          format: "int32"
+      n_classes:
+        type: "array"
+        example:
+        - 10
+        items:
+          type: "integer"
+          format: "int32"
+      color_scale:
+        type: "array"
+        example:
+        - gray_scale
+        items:
+          type: "string"
+      verbose:
+        type: "array"
+        example:
+        - True
+        items:
+          type: "boolean"
+      save_final_model:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      write_tensorboard:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      n_labeled:
+        type: "array"
+        example:
+        - 1000
+        items:
+          type: "integer"
+          format: "int32"
+      summary_image_frequency:
+        type: "array"
+        example:
+        - 5
+        items:
+          type: "integer"
+          format: "int32"
+      n_neurons_of_hidden_layer_x_autoencoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 1000
+          - 500
+          - 250
+          - 125
+          items:
+            type: "integer"
+            format: "int32"
+      n_neurons_of_hidden_layer_x_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 500
+          - 250
+          - 125
+          items:
+            type: "integer"
+            format: "int32"
+      n_neurons_of_hidden_layer_x_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 1000
+          - 1000
+          items:
+            type: "integer"
+            format: "int32"
+      n_neurons_of_hidden_layer_x_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 1000
+          - 1000
+          items:
+            type: "integer"
+            format: "int32"
+      bias_init_value_of_hidden_layer_x_autoencoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 0.0
+          - 0.0
+          - 0.0
+          - 0.0
+          - 0.0
+          items:
+            type: "number"
+            format: "double"
+      bias_init_value_of_hidden_layer_x_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 0.0
+          - 0.0
+          - 0.0
+          - 0.0
+          items:
+            type: "number"
+            format: "double"
+      bias_init_value_of_hidden_layer_x_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 0.0
+          - 0.0
+          - 0.0
+          items:
+            type: "number"
+            format: "double"
+      bias_init_value_of_hidden_layer_x_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 0.0
+          - 0.0
+          - 0.0
+          items:
+            type: "number"
+            format: "double"
+      activation_function_encoder:
+        type: "array"
+        example:
+        - relu
+        items:
+          type: "string"
+      activation_function_decoder:
+        type: "array"
+        example:
+        - relu
+        items:
+          type: "string"
+      activation_function_discriminator:
+        type: "array"
+        example:
+        - relu
+        items:
+          type: "string"
+      activation_function_discriminator_c:
+        type: "array"
+        example:
+        - relu
+        items:
+          type: "string"
+      activation_function_discriminator_g:
+        type: "array"
+        example:
+        - relu
+        items:
+          type: "string"
+      learning_rate_autoencoder:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      learning_rate_discriminator:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      learning_rate_generator:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      decaying_learning_rate_name_autoencoder:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
+      decaying_learning_rate_name_discriminator:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
+      decaying_learning_rate_name_generator:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
+      optimizer_autoencoder:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
+      optimizer_discriminator:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
+      optimizer_generator:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
+      AdadeltaOptimizer_rho_autoencoder:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_autoencoder:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      AdadeltaOptimizer_rho_discriminator:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_discriminator:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      AdadeltaOptimizer_rho_generator:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_generator:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_autoencoder:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_discriminator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_generator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      MomentumOptimizer_momentum_autoencoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_autoencoder:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      MomentumOptimizer_momentum_discriminator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_discriminator:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      MomentumOptimizer_momentum_generator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_generator:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      AdamOptimizer_beta1_autoencoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_autoencoder:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_autoencoder:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      AdamOptimizer_beta1_discriminator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_discriminator:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_discriminator:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      AdamOptimizer_beta1_generator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_generator:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_generator:
+        type: "array"
+        example:
+        - 0.0000001
+        items:
+          format: "double"
+      FtrlOptimizer_learning_rate_power_autoencoder:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_autoencoder:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_learning_rate_power_discriminator:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_discriminator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_learning_rate_power_generator:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_generator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_autoencoder:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_discriminator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_generator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_decay_autoencoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_autoencoder:
+        type: "array"
+        example:
+        - 0.000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_autoencoder:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      RMSPropOptimizer_decay_discriminator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_discriminator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_discriminator:
+        type: "array"
+        example:
+        - 0.000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_discriminator:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      RMSPropOptimizer_decay_generator:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_generator:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_generator:
+        type: "array"
+        example:
+        - 0.000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_generator:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      loss_function_discriminator:
+        type: "array"
+        example:
+        - sigmoid_cross_entropy
+        items:
+          type: "string"
+      loss_function_generator:
+        type: "array"
+        example:
+        - hinge_loss
+        items:
+          type: "string"
+
+
+
 
 securityDefinitions:
   oauth2:

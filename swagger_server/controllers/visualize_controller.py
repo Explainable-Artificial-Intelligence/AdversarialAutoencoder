@@ -128,20 +128,37 @@ def generate_image_grid():
     :rtype:
     """
 
-    # TODO:
-
-    # if connexion.request.is_json:
+    # check if we have an autoencoder
+    if not Storage.get_aae():
+        return "Error: autoencoder not found", 404
 
     # get the autoencoder
     aae = Storage.get_aae()
 
-    # check if we have an autoencoder
-    if not aae:
-        return "Error: no autoencoder found", 404
+    # we don't need a parameter for the image grid
+    operation = {"generate_image_grid": ""}
+    aae.add_to_requested_operations_by_swagger(operation)
 
-    aae.image_grid_wrapper()
+    # training is still in progress
+    if aae.get_train_status() == "stop":
+        #
+        aae.train(False)
 
-    return 'do some magic!'
+    # wait for the response from the aae
+    while aae.get_requested_operations_by_swagger_results() is None:
+        # wait for 200 ms, then check again
+        time.sleep(0.2)
+
+    # aae has responded
+    result = aae.get_requested_operations_by_swagger_results()
+
+    # reset the variable holding the results
+    aae.set_requested_operations_by_swagger_results(None)
+
+    # we need to convert it, since np arrays are not json serializable
+    result = [a.astype("float64").tolist() for a in result]
+
+    return result, 200
 
 
 
