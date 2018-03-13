@@ -13,6 +13,7 @@ from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 import util.AdversarialAutoencoderHelperFunctions as aae_helper
+from swagger_server.utils.Storage import Storage
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
 
 
@@ -487,6 +488,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # for saving the model
         self.saver = tf.train.Saver()
 
+        # holds the tensorflow session
         self.session = tf.Session()
 
         """
@@ -512,6 +514,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         Init all variables         
         """
         self.init = tf.global_variables_initializer()
+
+    @staticmethod
+    def reset_graph():
+        tf.reset_default_graph()
 
     def get_requested_operations_by_swagger_results(self):
         return self.requested_operations_by_swagger_results
@@ -957,9 +963,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "testing" + '.png')
 
-
         return img
-
 
     def train(self, is_train_mode_active=True):
         """
@@ -978,8 +982,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         latent_representations_current_epoch = []
         labels_current_epoch = []
 
-        # Get the data
-        data = aae_helper.get_input_data(self.selected_dataset)
+        # Get the data from the storage class, we have data stored
+        if Storage.get_all_input_data():
+            data = Storage.get_all_input_data()
+        else:
+            data = aae_helper.get_input_data(self.selected_dataset)
 
         autoencoder_loss_final = 0
         discriminator_loss_g_final = 0
@@ -1025,7 +1032,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                     # iterate over the batches
                     for b in range(1, n_batches + 1):
 
-                        self.process_requested_swagger_operations(sess, "testing")
+                        self.process_requested_swagger_operations(sess)
 
                         # draw a sample from p(z) and use it as real distribution for the discriminator
                         z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size,
@@ -1252,7 +1259,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 self.saver.restore(sess, save_path=tf.train.latest_checkpoint(self.results_path + '/' + all_results[-1]
                                                                               + '/Saved_models/'))
 
-                self.process_requested_swagger_operations(sess, "testing")
+                self.process_requested_swagger_operations(sess)
 
                 self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
 
@@ -1262,10 +1269,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                   generator_loss_final, supervised_encoder_loss_final, accuracy,
                                   saved_model_path, self.saver, sess, step)
 
-        tf.reset_default_graph()
-
-
-    def process_requested_swagger_operations(self, sess, image_title):
+    def process_requested_swagger_operations(self, sess):
         """
         processes the operations requested by swagger
         :param sess: tensorflow session
@@ -1289,7 +1293,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # call the respective function with the respective parameters
                     if function_name == "generate_image_grid":
-                        result = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=image_title,
+                        result = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=None,
                                                           left_cell=None, save_image_grid=False)
                         self.set_requested_operations_by_swagger_results(result)
                     elif function_name == "generate_image_from_single_point_and_single_label":

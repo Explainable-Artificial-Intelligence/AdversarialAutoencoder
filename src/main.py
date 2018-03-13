@@ -16,7 +16,7 @@ def testing():
     # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\Good_Results\\2018-02-13_10_48_53_SVHN\\log\\params.txt", "Supervised")
     # aae.train(True)
 
-    do_randomsearch(1, selected_autoencoder="Supervised", selected_dataset="cifar10", n_epochs=6, verbose=True,
+    do_randomsearch(1, selected_autoencoder="Unsupervised", selected_dataset="cifar10", n_epochs=1, verbose=True,
                     z_dim=2, batch_size=100, save_final_model=True,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,

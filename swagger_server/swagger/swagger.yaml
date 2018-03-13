@@ -299,6 +299,19 @@ paths:
           description: "No autoencoder to found"
       x-swagger-router-controller: "swagger_server.controllers.train_controller"
 
+  /Train/resetTensorflowGraph:
+    post:
+      tags: [Train]
+      operationId: reset_tensorflow_graph
+      summary: Resets the tensorflow graph.
+      description: Resets the tensorflow graph for the current autoencoder.
+      responses:
+        200:
+          description: "Graph successfully reset."
+        404:
+          description: "Not found error"
+      x-swagger-router-controller: "swagger_server.controllers.train_controller"
+
   /Train/getMinibatchSummaryVars:
     get:
       tags: [Train]

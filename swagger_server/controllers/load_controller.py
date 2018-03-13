@@ -1,3 +1,5 @@
+from tensorflow.contrib.learn.python.learn.datasets import base
+
 from src.util.DataLoading import get_input_data
 from swagger_server.utils.Storage import Storage
 
@@ -15,9 +17,8 @@ def load_data_set(dataset_name):
     # TODO: filepath for custom dataset
     dataset = get_input_data(dataset_name, filepath="../data")
 
-    Storage.set_input_data(dataset.train, "train")
-    Storage.set_input_data(dataset.test, "test")
-    Storage.set_input_data(dataset.validation, "validation")
+    # store the data in the storage class
+    Storage.set_input_data(dataset)
     Storage.set_selected_dataset(dataset_name)
 
     return "data successfully loaded", 200

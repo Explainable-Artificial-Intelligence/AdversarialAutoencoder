@@ -1,5 +1,3 @@
-import connexion
-import numpy as np
 import time
 
 from swagger_server.utils.Storage import Storage
@@ -7,12 +5,9 @@ from swagger_server.utils.Storage import Storage
 
 def generate_image_from_single_point(single_point):
     """
-    generates the AE output from a given point of the sample distribution
-
-    :param
-    :type
-
-    :rtype:
+    generates the aae output from a given point on the latent space
+    :param single_point: point on the latent space
+    :return: 2 or 3D (depending on colorscale) list holding the image pixels
     """
 
     if not Storage.get_aae_parameters():
@@ -60,12 +55,10 @@ def generate_image_from_single_point(single_point):
 
 def generate_image_from_single_point_and_single_label(single_point, class_label):
     """
-    generates the AE output from a given point of the sample distribution
-
-    :param
-    :type
-
-    :rtype:
+    generates the aae output from a given point on the latent space and a given class label
+    :param single_point: point on the latent space
+    :param class_label: integer
+    :return: 2 or 3D (depending on colorscale) list holding the image pixels
     """
 
     if not Storage.get_aae_parameters():
@@ -120,12 +113,8 @@ def generate_image_from_single_point_and_single_label(single_point, class_label)
 
 def generate_image_grid():
     """
-    generates the AE output from a given point of the sample distribution
-
-    :param
-    :type
-
-    :rtype:
+    generates the image grid by sampling the latent space and returning
+    :return:
     """
 
     # check if we have an autoencoder

@@ -72,12 +72,16 @@ class Storage(object):
         return cls.selected_dataset
 
     @classmethod
-    def set_input_data(cls, train_data, dataset_name="train"):
-        cls.input_data[dataset_name] = train_data
+    def set_input_data(cls, train_data):
+        cls.input_data = train_data
 
     @classmethod
     def get_input_data(cls, dataset_name="train"):
-        return cls.input_data[dataset_name]
+        return getattr(cls.input_data, dataset_name)
+
+    @classmethod
+    def get_all_input_data(cls):
+        return cls.input_data
 
     @classmethod
     def set_aae(cls, cae):

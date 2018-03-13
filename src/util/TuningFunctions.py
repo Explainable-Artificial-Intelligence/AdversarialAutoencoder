@@ -119,6 +119,9 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
                                    "performance": performance, "folder_name": folder_name}
             performance_for_parameter_combination.append(current_performance)
 
+            # reset the tensorflow graph
+            adv_autoencoder.reset_graph()
+
     # sort combinations by their performance
     sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])
 
@@ -225,6 +228,9 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
             current_performance = {"parameter_combination": random_param_combination,
                                    "performance": performance, "folder_name": folder_name}
             performance_for_parameter_combination.append(current_performance)
+
+            # reset the tensorflow graph
+            adv_autoencoder.reset_graph()
 
     # sort combinations by their performance
     sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])

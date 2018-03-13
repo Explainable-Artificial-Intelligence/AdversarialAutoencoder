@@ -299,3 +299,20 @@ def get_minibatch_summary_vars():
     # TODO
     return minibatch_summary_vars_dict, 200
 
+
+def reset_tensorflow_graph():
+    """
+    resets the tensorflow graph to enable training another autoencoder
+    :return:
+    """
+
+    # get the adversarial autoencoder
+    aae = Storage.get_aae()
+
+    # check if we have an autoencoder
+    if not aae:
+        return "Error: no autoencoder found", 404
+
+    aae.reset_graph()
+
+    return "Graph successfully reset", 200
