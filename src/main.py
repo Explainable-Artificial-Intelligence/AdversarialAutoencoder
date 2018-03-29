@@ -1,4 +1,4 @@
-from util.TuningFunctions import do_randomsearch, do_gridsearch
+from util.TuningFunctions import do_randomsearch, do_gridsearch, init_aae_with_params_file
 
 
 def testing():
@@ -13,17 +13,18 @@ def testing():
     activation_functions = ["relu", "relu6", "crelu", "elu", "softplus", "softsign", "sigmoid", "tanh", "linear"]
 
 
-    # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\Good_Results\\2018-02-13_10_48_53_SVHN\\log\\params.txt", "Supervised")
+    # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params.txt", "Supervised")
+    # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params_activation_functions_modified.txt", "Supervised")
     # aae.train(True)
 
-    do_randomsearch(1, selected_autoencoder="Unsupervised", selected_dataset="cifar10", n_epochs=1, verbose=True,
+    do_randomsearch(2, selected_autoencoder="Supervised", selected_dataset="MNIST", n_epochs=1, verbose=True,
                     z_dim=2, batch_size=100, save_final_model=True,
                     learning_rate_autoencoder=0.0001,
                     learning_rate_discriminator=0.0001,
                     learning_rate_generator=0.0001,
-                    activation_function_encoder=['relu']*4,
-                    activation_function_decoder='relu',
-                    activation_function_discriminator='relu',
+                    # activation_function_encoder=['relu']*4,
+                    # activation_function_decoder='relu',
+                    # activation_function_discriminator='relu',
                     decaying_learning_rate_name_autoencoder="static",
                     decaying_learning_rate_name_discriminator="static",
                     decaying_learning_rate_name_generator="static",

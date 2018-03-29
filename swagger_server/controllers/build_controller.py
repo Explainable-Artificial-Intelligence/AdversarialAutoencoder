@@ -5,7 +5,7 @@ from swagger_server.utils.Storage import Storage
 
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
-from autoencoders.UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
+from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
 from util.AdversarialAutoencoderParameters import get_result_path_for_selected_autoencoder
 
 
@@ -49,13 +49,15 @@ def build_aae(aae_parameters, selected_autoencoder):
         elif selected_dataset == "custom":
             return "Error: not implemented", 404
 
-        # TODO: take default params from adv autoencoder class and modify parameters according to swagger params
+        if Storage.get_aae() is not None:
+            # reset the tensorflow graph
+            Storage.get_aae().reset_graph()
 
         # create the AAE with the current parameters
         adv_autoencoder = None
         try:
             if selected_autoencoder == "Unsupervised":
-                adv_autoencoder = AdversarialAutoencoder(aae_parameters)
+                adv_autoencoder = UnsupervisedAdversarialAutoencoder(aae_parameters)
             elif selected_autoencoder == "Supervised":
                 adv_autoencoder = SupervisedAdversarialAutoencoder(aae_parameters)
             elif selected_autoencoder == "SemiSupervised":

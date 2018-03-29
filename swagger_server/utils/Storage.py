@@ -10,6 +10,14 @@ class Storage(object):
     # stores the data set used: ["MNIST", "SVHN", "cifar10", "custom"]
     selected_dataset = None
 
+    # number of channels based on the data set
+    # TODO: deal with svhn and gray scale
+    n_channels = None
+
+    #
+    input_dim_x = None
+    input_dim_y = None
+
     # stores the data in this dictionary; default keys: train, test and validation
     # train images/labels can then be accessed like this: input_data.train.images/input_data.train.labels
     input_data = {}
@@ -26,8 +34,15 @@ class Storage(object):
     # holds the thread for training the autoencoder
     aae_thread = None
 
-    # holds the tuning results
+    # holds the tuning results [{"parameter_combination": random_param_combination,
+    #                            "performance": performance, "folder_name": folder_name}, ...]
     tuning_results = None
+
+    # holds the performance over time of the autoencoders trained for tuning
+    tuning_results_performance_over_time = {}
+
+    # holds the learning rates over time of the autoencoders trained for tuning
+    tuning_results_learning_rates_over_time = {}
 
     # TODO: check which one are needed
     input_batch_indices = {}
@@ -38,6 +53,34 @@ class Storage(object):
     tuning_ANNs = []
     tuning_thread = threading.Thread()
     tuning_queue = object()
+
+    @classmethod
+    def get_tuning_results_learning_rates_over_time(cls):
+        return cls.tuning_results_learning_rates_over_time
+
+    @classmethod
+    def set_tuning_results_learning_rates_over_time(cls, tuning_results_learning_rates_over_time):
+        cls.tuning_results_learning_rates_over_time = tuning_results_learning_rates_over_time
+
+    @classmethod
+    def get_tuning_results_performance_over_time(cls):
+        return cls.tuning_results_performance_over_time
+
+    @classmethod
+    def set_tuning_results_performance_over_time(cls, tuning_results_performance_over_time):
+        cls.tuning_results_performance_over_time = tuning_results_performance_over_time
+
+    @classmethod
+    def get_input_dim_x(cls):
+        return cls.input_dim_x
+
+    @classmethod
+    def get_input_dim_y(cls):
+        return cls.input_dim_y
+
+    @classmethod
+    def get_n_channels(cls):
+        return cls.n_channels
 
     @classmethod
     def set_tuning_results(cls, tuning_results):
@@ -65,6 +108,14 @@ class Storage(object):
 
     @classmethod
     def set_selected_dataset(cls, selected_dataset):
+        if selected_dataset == "MNIST":
+            cls.n_channels = 1
+            cls.input_dim_x = 28
+            cls.input_dim_y = 28
+        elif selected_dataset == "SVHN" or selected_dataset == "cifar10":
+            cls.n_channels = 3
+            cls.input_dim_x = 32
+            cls.input_dim_y = 32
         cls.selected_dataset = selected_dataset
 
     @classmethod

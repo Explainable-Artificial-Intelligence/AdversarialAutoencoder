@@ -1,12 +1,14 @@
 import gzip
+import collections
 
 import imageio as imageio
 import numpy as np
 import pandas
+from six.moves import xrange  # pylint: disable=redefined-builtin
 from tensorflow.contrib.learn.python.learn.datasets import base
-from tensorflow.contrib.learn.python.learn.datasets.mnist import DataSet
 from tensorflow.python.framework import dtypes
 from tensorflow.python.platform import gfile
+from tensorflow.python.framework import random_seed
 import tensorflow as tf
 import glob
 import matplotlib.pyplot as plt
@@ -15,12 +17,178 @@ from six.moves import cPickle
 
 import timeit
 
+
+Datasets = collections.namedtuple('Datasets', ['train', 'validation', 'test'])
+
+
+class DataSet(object):
+    def __init__(self,
+                 images,
+                 labels,
+                 fake_data=False,
+                 one_hot=False,
+                 dtype=dtypes.float32,
+                 reshape=True,
+                 seed=None):
+        """Construct a DataSet.
+        one_hot arg is used only if fake_data is true.    `dtype` can be either
+        `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
+        `[0, 1]`.    Seed arg provides for convenient deterministic testing.
+        """
+        seed1, seed2 = random_seed.get_seed(seed)
+        # If op level seed is not set, use whatever graph level seed is returned
+        np.random.seed(seed1 if seed is None else seed2)
+        dtype = dtypes.as_dtype(dtype).base_dtype
+        if dtype not in (dtypes.uint8, dtypes.float32):
+            raise TypeError('Invalid image dtype %r, expected uint8 or float32' %
+                            dtype)
+        if fake_data:
+            self._num_examples = 10000
+            self.one_hot = one_hot
+        else:
+            assert images.shape[0] == labels.shape[0], (
+                'images.shape: %s labels.shape: %s' % (images.shape, labels.shape))
+            self._num_examples = images.shape[0]
+
+            # Convert shape from [num examples, rows, columns, depth]
+            # to [num examples, rows*columns] (assuming depth == 1)
+            if reshape:
+                assert images.shape[3] == 1
+                images = images.reshape(images.shape[0],
+                                        images.shape[1] * images.shape[2])
+            if dtype == dtypes.float32:
+                # Convert from [0, 255] -> [0.0, 1.0].
+                images = images.astype(np.float32)
+                images = np.multiply(images, 1.0 / 255.0)
+        self._images = images
+        self._labels = labels
+        self._epochs_completed = 0
+        self._index_in_epoch = 0
+
+    @property
+    def images(self):
+        return self._images
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @property
+    def num_examples(self):
+        return self._num_examples
+
+    @property
+    def epochs_completed(self):
+        return self._epochs_completed
+
+    def next_batch(self, batch_size, fake_data=False, shuffle=True):
+        """Return the next `batch_size` examples from this data set."""
+        if fake_data:
+            fake_image = [1] * 784
+            if self.one_hot:
+                fake_label = [1] + [0] * 9
+            else:
+                fake_label = 0
+            return [fake_image for _ in xrange(batch_size)], [
+                fake_label for _ in xrange(batch_size)
+            ]
+        start = self._index_in_epoch
+        # Shuffle for the first epoch
+        if self._epochs_completed == 0 and start == 0 and shuffle:
+            perm0 = np.arange(self._num_examples)
+            np.random.shuffle(perm0)
+            self._images = self.images[perm0]
+            self._labels = self.labels[perm0]
+        # Go to the next epoch
+        if start + batch_size > self._num_examples:
+            # Finished epoch
+            self._epochs_completed += 1
+            # Get the rest examples in this epoch
+            rest_num_examples = self._num_examples - start
+            images_rest_part = self._images[start:self._num_examples]
+            labels_rest_part = self._labels[start:self._num_examples]
+            # Shuffle the data
+            if shuffle:
+                perm = np.arange(self._num_examples)
+                np.random.shuffle(perm)
+                self._images = self.images[perm]
+                self._labels = self.labels[perm]
+            # Start next epoch
+            start = 0
+            self._index_in_epoch = batch_size - rest_num_examples
+            end = self._index_in_epoch
+            images_new_part = self._images[start:end]
+            labels_new_part = self._labels[start:end]
+            return np.concatenate((images_rest_part, images_new_part), axis=0), np.concatenate(
+                (labels_rest_part, labels_new_part), axis=0)
+        else:
+            self._index_in_epoch += batch_size
+            end = self._index_in_epoch
+            return self._images[start:end], self._labels[start:end]
+
+    def get_class_specific_batch(self, batch_size, class_label, n_classes=10, shuffle=True):
+        """
+        returns "batch_size" images and labels specific for the class with label=class_label
+        :param batch_size: number of images/labels to return
+        :param class_label: integer label of class we want to get the samples for
+        :param n_classes: number of classes the dataset contains
+        :param shuffle: whether to shuffle the data or not
+        :return:
+        """
+
+        # holds the class specific images
+        class_specific_images = []
+
+        # TODO: speed up code
+
+        while len(class_specific_images) < batch_size:
+            next_image, next_label_one_hot = self.next_batch(1, shuffle=shuffle)
+            # convert label to integer label
+            next_label_int = np.argmax(next_label_one_hot, 1)[0]
+            # check if it fits
+            if next_label_int == class_label:
+                class_specific_images.append(next_image)
+
+        # return a numpy array of the images and a numpy array of the one hot labels
+        return np.vstack(class_specific_images), np.eye(n_classes)[[class_label]*batch_size]
+
+    def get_color_specific_image_combinations(self, batch_size, label_red, label_green, label_blue,
+                                              input_dim_x, input_dim_y, shuffle=True):
+
+        # calculate the number of pixel per channel
+        n_colored_pixels_per_channel = input_dim_x * input_dim_y
+
+        # TODO:
+        # check the data set used (works only for SVHN or cifar10)
+
+        # get batch_size images for the red channel
+        red_channel_images, labels = self.get_class_specific_batch(batch_size, class_label=label_red, shuffle=shuffle)
+
+        # get batch_size images for the red channel
+        green_channel_images, _ = self.get_class_specific_batch(batch_size, class_label=label_green, shuffle=shuffle)
+
+        # get batch_size images for the red channel
+        blue_channel_images, _ = self.get_class_specific_batch(batch_size, class_label=label_blue, shuffle=shuffle)
+
+        # first n_colored_pixels_per_channel encode red
+        red_pixels = red_channel_images[:, :n_colored_pixels_per_channel]
+        # next n_colored_pixels_per_channel encode green
+        green_pixels = green_channel_images[:, n_colored_pixels_per_channel:n_colored_pixels_per_channel * 2]
+        # last n_colored_pixels_per_channel encode blue
+        blue_pixels = blue_channel_images[:, n_colored_pixels_per_channel * 2:]
+
+        # concatenate the color arrays into one array
+        imgs = np.concatenate([red_pixels, green_pixels, blue_pixels], 1)
+        # imgs = np.concatenate([red_pixels, green_pixels, blue_pixels], 2)
+
+        return imgs, labels
+
 """
 https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/datasets/mnist.py
 """
 
 
-def get_input_data(selected_dataset, filepath="../data"):
+def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale"):
     """
     returns the input data set based on self.selected_dataset
     :return: object holding the train data, the test data and the validation data
@@ -31,7 +199,10 @@ def get_input_data(selected_dataset, filepath="../data"):
         return read_mnist_data_from_ubyte(filepath, one_hot=True)
     # Street View House Numbers
     elif selected_dataset == "SVHN":
-        return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000)
+        if color_scale == "gray_scale":
+            return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000, grey_scale=True)
+        else:
+            return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000)
     elif selected_dataset == "cifar10":
         return read_cifar10(filepath, one_hot=True, validation_size=5000)
     elif selected_dataset == "custom":
@@ -147,7 +318,7 @@ def read_cifar10(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, 
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
-    return base.Datasets(train=train, validation=validation, test=test)
+    return Datasets(train=train, validation=validation, test=test)
 
 
 """
@@ -257,7 +428,7 @@ def read_svhn_from_mat(data_dir, one_hot=False, num_classes=10, dtype=dtypes.flo
     test, train, validation = create_dataset(dtype, num_classes, False, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
-    return base.Datasets(train=train, validation=validation, test=test)
+    return Datasets(train=train, validation=validation, test=test)
 
 
 """
@@ -383,7 +554,7 @@ def read_mnist_data_from_ubyte(data_dir, one_hot=False, num_classes=10, dtype=dt
     test, train, validation = create_dataset(dtype, num_classes, False, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
-    return base.Datasets(train=train, validation=validation, test=test)
+    return Datasets(train=train, validation=validation, test=test)
 
 
 """
@@ -431,7 +602,7 @@ def read_csv_data_set(data_dir, one_hot=False, num_classes=10, dtype=dtypes.floa
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
-    return base.Datasets(train=train, validation=validation, test=test)
+    return Datasets(train=train, validation=validation, test=test)
 
 
 """
@@ -493,7 +664,7 @@ def read_mnist_from_png(data_dir, one_hot=False, num_classes=10, dtype=dtypes.fl
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
                                              train_images, train_labels, validation_size)
 
-    return base.Datasets(train=train, validation=validation, test=test)
+    return Datasets(train=train, validation=validation, test=test)
 
 
 def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels, train_images, train_labels,

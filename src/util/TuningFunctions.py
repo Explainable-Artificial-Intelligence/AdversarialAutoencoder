@@ -1,11 +1,13 @@
 import json
 
+import datetime
+
 import util.AdversarialAutoencoderParameters as aae_params
 import numpy as np
 
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
-from autoencoders.UnsupervisedAdversarialAutoencoder import AdversarialAutoencoder
+from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
 from swagger_server.utils.Storage import Storage
 
 
@@ -32,10 +34,16 @@ def init_aae_with_params_file(params_filename, used_aae):
     # get the used parameters from the params.txt file
     used_params = json.load(open(params_filename))
 
+    # compability with old params file
+    if used_params.get("write_tensorboard") is None:
+        used_params["write_tensorboard"] = False
+    if used_params.get("summary_image_frequency") is None:
+        used_params["summary_image_frequency"] = 10
+
     # create the AAE and train it with the used parameters
     adv_autoencoder = None
     if used_aae == "Unsupervised":
-        adv_autoencoder = AdversarialAutoencoder(used_params)
+        adv_autoencoder = UnsupervisedAdversarialAutoencoder(used_params)
     elif used_aae == "Supervised":
         adv_autoencoder = SupervisedAdversarialAutoencoder(used_params)
     elif used_aae == "SemiSupervised":
@@ -68,6 +76,12 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
 
     print("Doing grid search..")
 
+    log_result_path = "../results/Logs/GridSearch"
+    date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S").replace(" ", ":").replace(":", "_")
+    log_file_name = log_result_path + "/{0}_{1}_log.txt".format(date, selected_dataset)
+
+    print("Log will be saved at location " + log_file_name)
+
     # iterate over the parameter combinations
     gridsearch_parameter_combinations = \
         aae_params.get_gridsearch_parameters(*args, selected_autoencoder=selected_autoencoder,
@@ -92,11 +106,15 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
 
             # create the AAE and train it with the current parameters
             if selected_autoencoder == "Unsupervised":
-                adv_autoencoder = AdversarialAutoencoder(gridsearch_parameter_combination)
+                adv_autoencoder = UnsupervisedAdversarialAutoencoder(gridsearch_parameter_combination)
             elif selected_autoencoder == "Supervised":
                 adv_autoencoder = SupervisedAdversarialAutoencoder(gridsearch_parameter_combination)
             elif selected_autoencoder == "SemiSupervised":
                 adv_autoencoder = SemiSupervisedAdversarialAutoencoder(gridsearch_parameter_combination)
+
+            # we want to include the results from our previous runs on the minibatch summary images
+            adv_autoencoder.set_include_tuning_performance(True)
+
             # set the autoencoder for the swagger server
             Storage.set_aae(adv_autoencoder)
 
@@ -119,6 +137,13 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
                                    "performance": performance, "folder_name": folder_name}
             performance_for_parameter_combination.append(current_performance)
 
+            # store the performance over time of the current autoencoder
+            Storage.get_tuning_results_performance_over_time()[folder_name] = \
+                adv_autoencoder.get_performance_over_time()
+
+            # store the learning rates over time of the current autoencoder
+            Storage.get_tuning_results_learning_rates_over_time()[folder_name] = adv_autoencoder.get_learning_rates()
+
             # reset the tensorflow graph
             adv_autoencoder.reset_graph()
 
@@ -130,11 +155,15 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
 
     print("#" * 20)
 
+    # create a new log file
+    with open(log_file_name, 'w') as log:
+        log.write("")
+
     for comb in sorted_list:
         print("performance:", comb["performance"])
         print("folder name:", comb["folder_name"])
         print()
-        with open('gridsearch_log.txt', 'a') as log:
+        with open(log_file_name, 'a') as log:
             log.write("performance: {}\n".format(comb["performance"]))
             log.write("folder name: {}\n".format(comb["folder_name"]))
 
@@ -143,7 +172,7 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
     print("best performance:", sorted_list[0]["performance"])
     print("folder name:", sorted_list[0]["folder_name"])
 
-    with open('gridsearch_log.txt', 'a') as log:
+    with open(log_file_name, 'a') as log:
         log.write("best param combination: {}\n".format(sorted_list[0]["parameter_combination"]))
         log.write("best performance: {}\n".format(sorted_list[0]["performance"]))
         log.write("folder name: {}\n".format(sorted_list[0]["folder_name"]))
@@ -173,6 +202,12 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
 
     print("Doing random search..")
 
+    log_result_path = "../results/Logs/RandomSearch"
+    date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S").replace(" ", ":").replace(":", "_")
+    log_file_name = log_result_path + "/{0}_{1}_log.txt".format(date, selected_dataset)
+
+    print("Log will be saved at location " + log_file_name)
+
     # get some random parameter combinations
     random_param_combinations = \
         [aae_params.get_randomized_parameters(*args, selected_autoencoder=selected_autoencoder,
@@ -201,11 +236,14 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
 
             # create the AAE and train it with the current parameters
             if selected_autoencoder == "Unsupervised":
-                adv_autoencoder = AdversarialAutoencoder(random_param_combination)
+                adv_autoencoder = UnsupervisedAdversarialAutoencoder(random_param_combination)
             elif selected_autoencoder == "Supervised":
                 adv_autoencoder = SupervisedAdversarialAutoencoder(random_param_combination)
             elif selected_autoencoder == "SemiSupervised":
                 adv_autoencoder = SemiSupervisedAdversarialAutoencoder(random_param_combination)
+
+            # we want to include the results from our previous runs on the minibatch summary images
+            adv_autoencoder.set_include_tuning_performance(True)
 
             # set the autoencoder for the swagger server
             Storage.set_aae(adv_autoencoder)
@@ -224,10 +262,18 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
 
             folder_name = adv_autoencoder.get_result_folder_name()
 
-            # store the param_comb and the performance in the list
+            # store the parameter combination and the performance in the list
             current_performance = {"parameter_combination": random_param_combination,
                                    "performance": performance, "folder_name": folder_name}
             performance_for_parameter_combination.append(current_performance)
+
+            # store the performance over time of the current autoencoder
+            Storage.get_tuning_results_performance_over_time()[folder_name] \
+                = adv_autoencoder.get_performance_over_time()
+
+            # store the learning rates over time of the current autoencoder
+            Storage.get_tuning_results_learning_rates_over_time()[folder_name] \
+                = adv_autoencoder.get_learning_rates()
 
             # reset the tensorflow graph
             adv_autoencoder.reset_graph()
@@ -235,16 +281,22 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
     # sort combinations by their performance
     sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])
 
-    # save the tuning results for the swagger server
+    # store the tuning results for the swagger server
     Storage.set_tuning_results(performance_for_parameter_combination)
 
     print("#" * 20)
+
+    print(Storage.get_tuning_results_performance_over_time())
+
+    # create a new log file
+    with open(log_file_name, 'w') as log:
+        log.write("")
 
     for comb in sorted_list:
         print("performance:", comb["performance"])
         print("folder name:", comb["folder_name"])
         print()
-        with open('random_search_log.txt', 'a') as log:
+        with open(log_file_name, 'a') as log:
             log.write("performance: {}\n".format(comb["performance"]))
             log.write("folder name: {}\n".format(comb["folder_name"]))
 
@@ -253,7 +305,7 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
     print("best performance:", sorted_list[0]["performance"])
     print("folder name:", sorted_list[0]["folder_name"])
 
-    with open('random_search_log.txt', 'a') as log:
+    with open(log_file_name, 'a') as log:
         log.write("best param combination: {}\n".format(sorted_list[0]["parameter_combination"]))
         log.write("best performance: {}\n".format(sorted_list[0]["performance"]))
         log.write("folder name: {}\n".format(sorted_list[0]["folder_name"]))

@@ -131,7 +131,7 @@ def run_gridsearch(aae_parameters, selected_autoencoder):
         Storage.set_aae_parameters(aae_parameters)
         Storage.set_selected_autoencoder(selected_autoencoder)
 
-        return "Success: random search has started", 200
+        return "Success: grid search has started", 200
 
     return 'Error: parameters not in .json format', 415
 

@@ -11,7 +11,7 @@ security:
   # (only active if the TOKENINFO_URL environment variable is set)
   - oauth2: [uid]
 paths:
-  /Load/load_dataset:
+  /Load/loadDataset:
     get:
       tags: [Load]
       summary: "Load a data set"
@@ -35,7 +35,7 @@ paths:
           description: "File parsing error"
       x-swagger-router-controller: "swagger_server.controllers.load_controller"
 
-  /Load/get_single_image:
+  /Load/getSingleImage:
     get:
       tags: [Load]
       operationId: get_single_image
@@ -66,7 +66,35 @@ paths:
           description: "Index out of bounds"
       x-swagger-router-controller: "swagger_server.controllers.load_controller"
 
-  /Load/get_single_label:
+  /Load/getSingleImageAsByteString:
+    get:
+      tags: [Load]
+      operationId: get_single_image_as_byte_string
+      summary: get a single image as byte string
+      parameters:
+        - name: image_id
+          in: query
+          type: integer
+          description: id of the image to return
+          default: 1
+        - name: data_subset_name
+          in: query
+          type: string
+          default: "train"
+          enum: [train, test, validation]
+          description: whether to return a train image, a test image or a validation image
+      responses:
+        200:
+          description: "Image successfully loaded"
+          schema:
+            type: string
+        404:
+          description: "No data found"
+        415:
+          description: "Index out of bounds"
+      x-swagger-router-controller: "swagger_server.controllers.load_controller"
+
+  /Load/getSingleLabel:
     get:
       tags: [Load]
       operationId: get_single_label
@@ -98,7 +126,7 @@ paths:
           description: "Index out of bounds"
       x-swagger-router-controller: "swagger_server.controllers.load_controller"
 
-  /Load/get_data_batch:
+  /Load/getDataBatch:
     get:
       tags: [Load]
       operationId: get_data_batch
@@ -128,6 +156,46 @@ paths:
                 items:
                   type: "number"
                   format: "double"
+              labels:
+                type: array
+                items:
+                  type: "integer"
+                  format: "int32"
+        404:
+          description: "No data found"
+        415:
+          description: "Index out of bounds"
+      x-swagger-router-controller: "swagger_server.controllers.load_controller"
+
+  /Load/getDataBatchAsByteString:
+    get:
+      tags: [Load]
+      operationId: get_data_batch_as_byte_string
+      summary: get the next batch as byte string
+      parameters:
+        - name: batch_size
+          in: query
+          type: "integer"
+          description: size of the batch
+          default: 100
+          format: "int32"
+        - name: data_subset_name
+          in: query
+          type: string
+          enum: [train, test, validation]
+          description: whether to return from the train, test or the validation set
+          default: "train"
+      responses:
+        200:
+          description: "label successfully returned"
+          schema:
+            type: object
+            required: [images, labels]
+            properties:
+              images:
+                type: array
+                items:
+                  type: "string"
               labels:
                 type: array
                 items:
@@ -360,7 +428,6 @@ paths:
                 type: array
                 items:
                   type: "number"
-
               batch_X_unlabeled:
                 type: array
                 items:
@@ -422,6 +489,34 @@ paths:
           description: "Invalid dimensions"
         404:
           description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+        412:
+          description: "Wrong Autoencoder"
+      x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
+
+  /Visualize/GenerateImageFromSinglePointAsByteString:
+    get:
+      tags: [Visualize]
+      operationId: generate_image_from_single_point_as_byte_string
+      summary: generates the reconstructed image from a single point and returns the byte string of it
+      parameters:
+        - name: single_point
+          in: query
+          type: array
+          items:
+            type: "number"
+      responses:
+        200:
+          description: "success"
+          schema:
+            type: string
+        400:
+          description: "Invalid dimensions"
+        404:
+          description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
         412:
           description: "Wrong Autoencoder"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
@@ -453,6 +548,38 @@ paths:
           description: "Invalid input"
         404:
           description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+        412:
+          description: "Wrong Autoencoder"
+      x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
+
+  /Visualize/GenerateImageFromSinglePointAndSingleLabelAsByteString:
+    get:
+      tags: [Visualize]
+      operationId: generate_image_from_single_point_and_single_label_as_byte_string
+      summary: generates the reconstructed image from a single point and returns the byte string of it
+      parameters:
+        - name: single_point
+          in: query
+          type: array
+          items:
+            type: "number"
+        - name: class_label
+          in: query
+          type: integer
+          minimum: 1
+      responses:
+        200:
+          description: "success"
+          schema:
+            type: "string"
+        400:
+          description: "Invalid input"
+        404:
+          description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
         412:
           description: "Wrong Autoencoder"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
@@ -461,7 +588,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_grid
-      summary: generates the reconstructed image from a single point
+      summary: generates the image grid and returns the array of images
       responses:
         200:
           description: "success"
@@ -472,6 +599,88 @@ paths:
               format: "double"
         404:
           description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+      x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
+
+  /Visualize/GenerateImageGridAsByteString:
+    get:
+      tags: [Visualize]
+      operationId: generate_image_grid_as_byte_string
+      summary: generates the image grid and returns the array of images as array of byte strings
+      responses:
+        200:
+          description: "success"
+          schema:
+            type: "array"
+            items:
+              type: "string"
+        404:
+          description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+      x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
+
+  /Visualize/ClassfifySingleImage:
+    get:
+      tags: [Visualize]
+      operationId: classify_single_image
+      summary: classify the provided image
+      parameters:
+        - name: single_image
+          in: query
+          type: array
+          items:
+            type: "number"
+      responses:
+        200:
+          description: "success"
+          schema:
+            type: integer
+        400:
+          description: "Invalid input"
+        404:
+          description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+        412:
+          description: "Wrong Autoencoder"
+      x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
+
+  /Visualize/GetBiasesOrWeightsForLayer:
+    get:
+      tags: [Visualize]
+      operationId: get_biases_or_weights_for_layer
+      summary: classify the provided image
+      parameters:
+        - name: bias_or_weights
+          in: query
+          type: string
+          enum: [bias, weights]
+          description: whether to return the biases or the weights for the layer
+          required: True
+        - name: layer_name
+          in: query
+          type: string
+          format: string
+          description: name of the layer to visualize
+          required: True
+      responses:
+        200:
+          description: "success"
+          schema:
+            type: "array"
+            items:
+              type: "number"
+              format: "double"
+        400:
+          description: "Invalid input"
+        404:
+          description: "Autoencoder not found"
+        408:
+          description: "Request timed out"
+        412:
+          description: "Wrong Autoencoder"
       x-swagger-router-controller: "swagger_server.controllers.visualize_controller"
 
   /Tune/runRandomSearch:
@@ -606,7 +815,7 @@ definitions:
         example: True
       save_final_model:
         type: "boolean"
-        example: True # TODO
+        example: False
       write_tensorboard:
         type: "boolean"
         example: False
@@ -693,20 +902,50 @@ definitions:
           type: "number"
           format: "double"
       activation_function_encoder:
-        type: "string"
-        example: "relu"
+        type: "array"
+        example:
+        - "relu"
+        - "relu"
+        - "relu"
+        - "relu"
+        - "linear"
+        items:
+          type: "string"
       activation_function_decoder:
-        type: "string"
-        example: "relu"
+        type: "array"
+        example:
+        - "sigmoid"
+        - "relu"
+        - "relu"
+        - "relu"
+        - "linear"
+        items:
+          type: "string"
       activation_function_discriminator:
-        type: "string"
-        example: "relu"
+        type: "array"
+        example:
+        - "relu"
+        - "relu"
+        - "relu"
+        - "linear"
+        items:
+          type: "string"
       activation_function_discriminator_c:
-        type: "string"
-        example: "relu"
+        type: "array"
+        example:
+        - "relu"
+        - "relu"
+        - "linear"
+        items:
+          type: "string"
       activation_function_discriminator_g:
-        type: "string"
-        example: "relu"
+        type: "array"
+        example:
+        - "relu"
+        - "relu"
+        - "linear"
+        items:
+          type: "string"
       learning_rate_autoencoder:
         type: "number"
         format: "double"
@@ -719,6 +958,18 @@ definitions:
         type: "number"
         format: "double"
         example: 0.0001
+      learning_rate_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0001
+      learning_rate_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0001
+      learning_rate_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0001
       decaying_learning_rate_name_autoencoder:
         type: "string"
         example: "static"
@@ -726,6 +977,15 @@ definitions:
         type: "string"
         example: "static"
       decaying_learning_rate_name_generator:
+        type: "string"
+        example: "static"
+      decaying_learning_rate_name_discriminator_gaussian:
+        type: "string"
+        example: "static"
+      decaying_learning_rate_name_discriminator_categorical:
+        type: "string"
+        example: "static"
+      decaying_learning_rate_name_supervised_encoder:
         type: "string"
         example: "static"
       optimizer_autoencoder:
@@ -737,6 +997,15 @@ definitions:
       optimizer_generator:
         type: "string"
         example: "AdamOptimizer"
+      optimizer_discriminator_gaussian:
+        type: "string"
+        example: "AdamOptimizer"
+      optimizer_discriminator_categorical:
+        type: "string"
+        example: "AdamOptimizer"
+      optimizer_supervised_encoder:
+        type: "string"
+        example: "AdamOptimizer"
       AdadeltaOptimizer_rho_autoencoder:
         type: "number"
         format: "double"
@@ -744,7 +1013,7 @@ definitions:
       AdadeltaOptimizer_epsilon_autoencoder:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
       AdadeltaOptimizer_rho_discriminator:
         type: "number"
         format: "double"
@@ -752,7 +1021,31 @@ definitions:
       AdadeltaOptimizer_epsilon_discriminator:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
+      AdadeltaOptimizer_rho_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.95
+      AdadeltaOptimizer_epsilon_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.00000001
+      AdadeltaOptimizer_rho_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.95
+      AdadeltaOptimizer_epsilon_categorical:
+        type: "number"
+        format: "double"
+        example: 0.00000001
+      AdadeltaOptimizer_rho_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.95
+      AdadeltaOptimizer_epsilon_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.00000001
       AdadeltaOptimizer_rho_generator:
         type: "number"
         format: "double"
@@ -760,12 +1053,24 @@ definitions:
       AdadeltaOptimizer_epsilon_generator:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
       AdagradOptimizer_initial_accumulator_value_autoencoder:
         type: "number"
         format: "double"
         example: 0.1
       AdagradOptimizer_initial_accumulator_value_discriminator:
+        type: "number"
+        format: "double"
+        example: 0.1
+      AdagradOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.1
+      AdagradOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.1
+      AdagradOptimizer_initial_accumulator_value_supervised_encoder:
         type: "number"
         format: "double"
         example: 0.1
@@ -787,6 +1092,27 @@ definitions:
       MomentumOptimizer_use_nesterov_discriminator:
         type: "boolean"
         example: False
+      MomentumOptimizer_momentum_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.9
+      MomentumOptimizer_use_nesterov_discriminator_gaussian:
+        type: "boolean"
+        example: False
+      MomentumOptimizer_momentum_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.9
+      MomentumOptimizer_use_nesterov_discriminator_categorical:
+        type: "boolean"
+        example: False
+      MomentumOptimizer_momentum_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.9
+      MomentumOptimizer_use_nesterov_supervised_encoder:
+        type: "boolean"
+        example: False
       MomentumOptimizer_momentum_generator:
         type: "number"
         format: "double"
@@ -805,7 +1131,7 @@ definitions:
       AdamOptimizer_epsilon_autoencoder:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
       AdamOptimizer_beta1_discriminator:
         type: "number"
         format: "double"
@@ -817,7 +1143,43 @@ definitions:
       AdamOptimizer_epsilon_discriminator:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
+      AdamOptimizer_beta1_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.9
+      AdamOptimizer_beta2_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.999
+      AdamOptimizer_epsilon_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.00000001
+      AdamOptimizer_beta1_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.9
+      AdamOptimizer_beta2_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.999
+      AdamOptimizer_epsilon_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.00000001
+      AdamOptimizer_beta1_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.9
+      AdamOptimizer_beta2_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.999
+      AdamOptimizer_epsilon_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.00000001
       AdamOptimizer_beta1_generator:
         type: "number"
         format: "double"
@@ -829,7 +1191,7 @@ definitions:
       AdamOptimizer_epsilon_generator:
         type: "number"
         format: "double"
-        example: 0.0000001
+        example: 0.00000001
       FtrlOptimizer_learning_rate_power_autoencoder:
         type: "number"
         format: "double"
@@ -870,6 +1232,66 @@ definitions:
         type: "number"
         format: "double"
         example: 0.0
+      FtrlOptimizer_learning_rate_power_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: -0.5
+      FtrlOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.1
+      FtrlOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_learning_rate_power_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: -0.5
+      FtrlOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.1
+      FtrlOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_learning_rate_power_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: -0.5
+      FtrlOptimizer_initial_accumulator_value_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.1
+      FtrlOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
       FtrlOptimizer_learning_rate_power_generator:
         type: "number"
         format: "double"
@@ -906,6 +1328,30 @@ definitions:
         type: "number"
         format: "double"
         example: 0.0
+      ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
       ProximalGradientDescentOptimizer_l1_regularization_strength_generator:
         type: "number"
         format: "double"
@@ -923,6 +1369,42 @@ definitions:
         format: "double"
         example: 0.0
       ProximalAdagradOptimizer_l2_regularization_strength_autoencoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.1
+      ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.1
+      ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.1
+      ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical:
         type: "number"
         format: "double"
         example: 0.0
@@ -961,7 +1443,7 @@ definitions:
       RMSPropOptimizer_epsilon_autoencoder:
         type: "number"
         format: "double"
-        example: 0.000000001
+        example: 0.0000000001
       RMSPropOptimizer_centered_autoencoder:
         type: "boolean"
         example: False
@@ -976,8 +1458,53 @@ definitions:
       RMSPropOptimizer_epsilon_discriminator:
         type: "number"
         format: "double"
-        example: 0.000000001
+        example: 0.0000000001
       RMSPropOptimizer_centered_discriminator:
+        type: "boolean"
+        example: False
+      RMSPropOptimizer_decay_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.9
+      RMSPropOptimizer_momentum_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0
+      RMSPropOptimizer_epsilon_discriminator_gaussian:
+        type: "number"
+        format: "double"
+        example: 0.0000000001
+      RMSPropOptimizer_centered_discriminator_gaussian:
+        type: "boolean"
+        example: False
+      RMSPropOptimizer_decay_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.9
+      RMSPropOptimizer_momentum_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0
+      RMSPropOptimizer_epsilon_discriminator_categorical:
+        type: "number"
+        format: "double"
+        example: 0.0000000001
+      RMSPropOptimizer_centered_discriminator_categorical:
+        type: "boolean"
+        example: False
+      RMSPropOptimizer_decay_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.9
+      RMSPropOptimizer_momentum_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0
+      RMSPropOptimizer_epsilon_supervised_encoder:
+        type: "number"
+        format: "double"
+        example: 0.0000000001
+      RMSPropOptimizer_centered_supervised_encoder:
         type: "boolean"
         example: False
       RMSPropOptimizer_decay_generator:
@@ -991,11 +1518,17 @@ definitions:
       RMSPropOptimizer_epsilon_generator:
         type: "number"
         format: "double"
-        example: 0.000000001
+        example: 0.0000000001
       RMSPropOptimizer_centered_generator:
         type: "boolean"
         example: False
       loss_function_discriminator:
+        type: "string"
+        example: "sigmoid_cross_entropy"
+      loss_function_discriminator_gaussian:
+        type: "string"
+        example: "sigmoid_cross_entropy"
+      loss_function_discriminator_categorical:
         type: "string"
         example: "sigmoid_cross_entropy"
       loss_function_generator:
@@ -1176,34 +1709,59 @@ definitions:
             format: "double"
       activation_function_encoder:
         type: "array"
-        example:
-        - relu
         items:
-          type: "string"
+          type: "array"
+          example:
+          - relu
+          - relu
+          - relu
+          - relu
+          - linear
+          items:
+            type: "string"
       activation_function_decoder:
         type: "array"
-        example:
-        - relu
         items:
-          type: "string"
+          type: "array"
+          example:
+          - sigmoid
+          - relu
+          - relu
+          - relu
+          - linear
+          items:
+            type: "string"
       activation_function_discriminator:
         type: "array"
-        example:
-        - relu
         items:
-          type: "string"
+          type: "array"
+          example:
+          - relu
+          - relu
+          - relu
+          - linear
+          items:
+            type: "string"
       activation_function_discriminator_c:
         type: "array"
-        example:
-        - relu
         items:
-          type: "string"
+          type: "array"
+          example:
+          - relu
+          - relu
+          - linear
+          items:
+            type: "string"
       activation_function_discriminator_g:
         type: "array"
-        example:
-        - relu
         items:
-          type: "string"
+          type: "array"
+          example:
+          - relu
+          - relu
+          - linear
+          items:
+            type: "string"
       learning_rate_autoencoder:
         type: "array"
         example:
@@ -1217,6 +1775,24 @@ definitions:
         items:
           format: "double"
       learning_rate_generator:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      learning_rate_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      learning_rate_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0001
+        items:
+          format: "double"
+      learning_rate_supervised_encoder:
         type: "array"
         example:
         - 0.0001
@@ -1240,6 +1816,24 @@ definitions:
         - static
         items:
           type: "string"
+      decaying_learning_rate_name_discriminator_gaussian:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
+      decaying_learning_rate_name_discriminator_categorical:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
+      decaying_learning_rate_name_supervised_encoder:
+        type: "array"
+        example:
+        - static
+        items:
+          type: "string"
       optimizer_autoencoder:
         type: "array"
         example:
@@ -1258,6 +1852,24 @@ definitions:
         - AdamOptimizer
         items:
           type: "string"
+      optimizer_discriminator_gaussian:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
+      optimizer_discriminator_categorical:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
+      optimizer_supervised_encoder:
+        type: "array"
+        example:
+        - AdamOptimizer
+        items:
+          type: "string"
       AdadeltaOptimizer_rho_autoencoder:
         type: "array"
         example:
@@ -1267,7 +1879,7 @@ definitions:
       AdadeltaOptimizer_epsilon_autoencoder:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
         items:
           format: "double"
       AdadeltaOptimizer_rho_discriminator:
@@ -1279,7 +1891,43 @@ definitions:
       AdadeltaOptimizer_epsilon_discriminator:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
+        items:
+          format: "double"
+      AdadeltaOptimizer_rho_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.00000001
+        items:
+          format: "double"
+      AdadeltaOptimizer_rho_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_categorical:
+        type: "array"
+        example:
+        - 0.00000001
+        items:
+          format: "double"
+      AdadeltaOptimizer_rho_supervised_encoder:
+        type: "array"
+        example:
+        - 0.95
+        items:
+          format: "double"
+      AdadeltaOptimizer_epsilon_supervised_encoder:
+        type: "array"
+        example:
+        - 0.00000001
         items:
           format: "double"
       AdadeltaOptimizer_rho_generator:
@@ -1291,7 +1939,7 @@ definitions:
       AdadeltaOptimizer_epsilon_generator:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
         items:
           format: "double"
       AdagradOptimizer_initial_accumulator_value_autoencoder:
@@ -1301,6 +1949,24 @@ definitions:
         items:
           format: "double"
       AdagradOptimizer_initial_accumulator_value_discriminator:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      AdagradOptimizer_initial_accumulator_value_supervised_encoder:
         type: "array"
         example:
         - 0.1
@@ -1336,6 +2002,42 @@ definitions:
         - False
         items:
           type: "boolean"
+      MomentumOptimizer_momentum_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_discriminator_gaussian:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      MomentumOptimizer_momentum_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_discriminator_categorical:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      MomentumOptimizer_momentum_supervised_encoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      MomentumOptimizer_use_nesterov_supervised_encoder:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
       MomentumOptimizer_momentum_generator:
         type: "array"
         example:
@@ -1363,7 +2065,7 @@ definitions:
       AdamOptimizer_epsilon_autoencoder:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
         items:
           format: "double"
       AdamOptimizer_beta1_discriminator:
@@ -1381,7 +2083,61 @@ definitions:
       AdamOptimizer_epsilon_discriminator:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
+        items:
+          format: "double"
+      AdamOptimizer_beta1_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.00000001
+        items:
+          format: "double"
+      AdamOptimizer_beta1_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.00000001
+        items:
+          format: "double"
+      AdamOptimizer_beta1_supervised_encoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      AdamOptimizer_beta2_supervised_encoder:
+        type: "array"
+        example:
+        - 0.999
+        items:
+          format: "double"
+      AdamOptimizer_epsilon_supervised_encoder:
+        type: "array"
+        example:
+        - 0.00000001
         items:
           format: "double"
       AdamOptimizer_beta1_generator:
@@ -1399,7 +2155,7 @@ definitions:
       AdamOptimizer_epsilon_generator:
         type: "array"
         example:
-        - 0.0000001
+        - 0.00000001
         items:
           format: "double"
       FtrlOptimizer_learning_rate_power_autoencoder:
@@ -1462,6 +2218,96 @@ definitions:
         - 0.0
         items:
           format: "double"
+      FtrlOptimizer_learning_rate_power_discriminator_gaussian:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_learning_rate_power_discriminator_categorical:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_learning_rate_power_supervised_encoder:
+        type: "array"
+        example:
+        - -0.5
+        items:
+          format: "double"
+      FtrlOptimizer_initial_accumulator_value_supervised_encoder:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      FtrlOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
       FtrlOptimizer_learning_rate_power_generator:
         type: "array"
         example:
@@ -1516,6 +2362,42 @@ definitions:
         - 0.0
         items:
           format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
       ProximalGradientDescentOptimizer_l1_regularization_strength_generator:
         type: "array"
         example:
@@ -1541,6 +2423,60 @@ definitions:
         items:
           format: "double"
       ProximalAdagradOptimizer_l2_regularization_strength_autoencoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.1
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical:
         type: "array"
         example:
         - 0.0
@@ -1597,7 +2533,7 @@ definitions:
       RMSPropOptimizer_epsilon_autoencoder:
         type: "array"
         example:
-        - 0.000000001
+        - 0.0000000001
         items:
           format: "double"
       RMSPropOptimizer_centered_autoencoder:
@@ -1621,10 +2557,82 @@ definitions:
       RMSPropOptimizer_epsilon_discriminator:
         type: "array"
         example:
-        - 0.000000001
+        - 0.0000000001
         items:
           format: "double"
       RMSPropOptimizer_centered_discriminator:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      RMSPropOptimizer_decay_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_discriminator_gaussian:
+        type: "array"
+        example:
+        - 0.0000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_discriminator_gaussian:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      RMSPropOptimizer_decay_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_discriminator_categorical:
+        type: "array"
+        example:
+        - 0.0000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_discriminator_categorical:
+        type: "array"
+        example:
+        - False
+        items:
+          type: "boolean"
+      RMSPropOptimizer_decay_supervised_encoder:
+        type: "array"
+        example:
+        - 0.9
+        items:
+          format: "double"
+      RMSPropOptimizer_momentum_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0
+        items:
+          format: "double"
+      RMSPropOptimizer_epsilon_supervised_encoder:
+        type: "array"
+        example:
+        - 0.0000000001
+        items:
+          format: "double"
+      RMSPropOptimizer_centered_supervised_encoder:
         type: "array"
         example:
         - False
@@ -1645,7 +2653,7 @@ definitions:
       RMSPropOptimizer_epsilon_generator:
         type: "array"
         example:
-        - 0.000000001
+        - 0.0000000001
         items:
           format: "double"
       RMSPropOptimizer_centered_generator:
@@ -1655,6 +2663,18 @@ definitions:
         items:
           type: "boolean"
       loss_function_discriminator:
+        type: "array"
+        example:
+        - sigmoid_cross_entropy
+        items:
+          type: "string"
+      loss_function_discriminator_gaussian:
+        type: "array"
+        example:
+        - sigmoid_cross_entropy
+        items:
+          type: "string"
+      loss_function_discriminator_categorical:
         type: "array"
         example:
         - sigmoid_cross_entropy

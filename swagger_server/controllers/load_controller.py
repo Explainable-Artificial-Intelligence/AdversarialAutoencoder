@@ -1,7 +1,6 @@
-from tensorflow.contrib.learn.python.learn.datasets import base
-
 from src.util.DataLoading import get_input_data
 from swagger_server.utils.Storage import Storage
+from swagger_server.utils.SwaggerHelperFunctions import convert_image_array_to_byte_string
 
 
 def load_data_set(dataset_name):
@@ -45,6 +44,19 @@ def get_single_image(image_id, data_subset_name="train"):
     return list(image.astype("float64")), 200
 
 
+def get_single_image_as_byte_string(image_id, data_subset_name="train"):
+    """
+    returns a single image with the respective id as byte string
+    :param image_id: id of the image to return
+    :param data_subset_name: one of ["train", "test", "validation"]
+    :return:
+    """
+
+    img, response_code = get_single_image(image_id, data_subset_name)
+    byte_string = convert_image_array_to_byte_string(img, channels=Storage.get_n_channels())
+    return byte_string, response_code
+
+
 def get_single_label(label_id, data_subset_name="train"):
     """
     returns a single label with the respective id
@@ -86,8 +98,26 @@ def get_data_batch(batch_size=100, data_subset_name="train"):
     Storage.set_current_batch_data({"images": batch_images, "labels": batch_labels})
 
     # since swagger doesn't allow multiple return values, we have to pack them in a dictionary and return it
-    batch_dict = {"images:": batch_images.astype("float64").tolist(), "labels:": batch_labels.tolist()}
+    batch_dict = {"images": batch_images.astype("float64").tolist(), "labels": batch_labels.tolist()}
 
     return batch_dict, 200
 
+
+def get_data_batch_as_byte_string(batch_size=100, data_subset_name="train"):
+    """
+    returns the data (images and labels) for the current batch as byte string
+    :param batch_size: size of the batch
+    :param data_subset_name: one of ["train", "test", "validation"]
+    :return:
+    """
+
+    batch_dict, response_code = get_data_batch(batch_size, data_subset_name)
+
+    channels = Storage.get_n_channels()
+    images = batch_dict["images"]
+    images = [convert_image_array_to_byte_string(image, channels) for image in images]
+
+    batch_dict["images"] = images
+
+    return batch_dict, 200
 

@@ -35,32 +35,62 @@ def get_default_parameters_mnist():
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
-                'activation_function_encoder': 'relu',
-                'activation_function_decoder': 'relu',
-                'activation_function_discriminator': 'relu',
-                'activation_function_discriminator_c': 'relu',  # for semi-supervised
-                'activation_function_discriminator_g': 'relu',  # for semi-supervised
+                'activation_function_encoder': ['relu', 'relu', 'relu', 'relu', 'linear'],
+                'activation_function_decoder': ['sigmoid', 'relu', 'relu', 'relu', 'linear'],
+                'activation_function_discriminator': ['relu', 'relu', 'relu', 'linear'],
+                'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
+                'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
+                'learning_rate_discriminator_gaussian': 0.0001,
+                'learning_rate_discriminator_categorical': 0.0001,
+                'learning_rate_supervised_encoder': 0.0001,
                 'decaying_learning_rate_name_autoencoder': "static",
                 'decaying_learning_rate_name_discriminator': "static",
                 'decaying_learning_rate_name_generator': "static",
+                'decaying_learning_rate_name_discriminator_gaussian': "static",
+                'decaying_learning_rate_name_discriminator_categorical': "static",
+                'decaying_learning_rate_name_supervised_encoder': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer',
                 'optimizer_generator': 'AdamOptimizer',
+                'optimizer_discriminator_gaussian': 'AdamOptimizer',
+                'optimizer_discriminator_categorical': 'AdamOptimizer',
+                'optimizer_supervised_encoder': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_gaussian': 0.95,
+                'AdadeltaOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_categorical': 0.95, 'AdadeltaOptimizer_epsilon_categorical': 1e-08,
+                'AdadeltaOptimizer_rho_supervised_encoder': 0.95, 'AdadeltaOptimizer_epsilon_supervised_encoder': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
                 'AdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
                 'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
+                'MomentumOptimizer_momentum_discriminator_gaussian': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_gaussian': False,
+                'MomentumOptimizer_momentum_discriminator_categorical': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_categorical': False,
+                'MomentumOptimizer_momentum_supervised_encoder': 0.9,
+                'MomentumOptimizer_use_nesterov_supervised_encoder': False,
                 'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
                 'AdamOptimizer_beta1_autoencoder': 0.9, 'AdamOptimizer_beta2_autoencoder': 0.999,
                 'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.9,
                 'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
+                'AdamOptimizer_beta1_discriminator_gaussian': 0.9,
+                'AdamOptimizer_beta2_discriminator_gaussian': 0.999,
+                'AdamOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdamOptimizer_beta1_discriminator_categorical': 0.9,
+                'AdamOptimizer_beta2_discriminator_categorical': 0.999,
+                'AdamOptimizer_epsilon_discriminator_categorical': 1e-08,
+                'AdamOptimizer_beta1_supervised_encoder': 0.9,
+                'AdamOptimizer_beta2_supervised_encoder': 0.999, 'AdamOptimizer_epsilon_supervised_encoder': 1e-08,
                 'AdamOptimizer_beta1_generator': 0.9, 'AdamOptimizer_beta2_generator': 0.999,
                 'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
@@ -72,6 +102,21 @@ def get_default_parameters_mnist():
                 'FtrlOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_gaussian': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_categorical': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_learning_rate_power_supervised_encoder': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder': 0.0,
                 'FtrlOptimizer_learning_rate_power_generator': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_generator': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_generator': 0.0,
@@ -81,24 +126,55 @@ def get_default_parameters_mnist():
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_generator': 0.0,
-                'RMSPropOptimizer_decay_autoencoder': 0.9, 'RMSPropOptimizer_momentum_autoencoder': 0.0,
+                'RMSPropOptimizer_decay_autoencoder': 0.9,
+                'RMSPropOptimizer_momentum_autoencoder': 0.0,
                 'RMSPropOptimizer_epsilon_autoencoder': 1e-10, 'RMSPropOptimizer_centered_autoencoder': False,
                 'RMSPropOptimizer_decay_discriminator': 0.9, 'RMSPropOptimizer_momentum_discriminator': 0.0,
-                'RMSPropOptimizer_epsilon_discriminator': 1e-10, 'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_epsilon_discriminator': 1e-10,
+                'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_decay_discriminator_gaussian': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_gaussian': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_gaussian': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_gaussian': False,
+                'RMSPropOptimizer_decay_discriminator_categorical': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_categorical': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_categorical': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_categorical': False,
+                'RMSPropOptimizer_decay_supervised_encoder': 0.9, 'RMSPropOptimizer_momentum_supervised_encoder': 0.0,
+                'RMSPropOptimizer_epsilon_supervised_encoder': 1e-10,
+                'RMSPropOptimizer_centered_supervised_encoder': False,
                 'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
                 'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
-                'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss'}
+                'loss_function_discriminator': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
+                'loss_function_generator': 'hinge_loss'}
 
 
 def get_default_parameters_svhn():
@@ -110,40 +186,71 @@ def get_default_parameters_svhn():
                 'color_scale': "rgb_scale", 'verbose': False, 'save_final_model': False, 'write_tensorboard': False,
                 'n_labeled': 1000,  # for semi-supervised
                 'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
-                'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
-                'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
+                'n_neurons_of_hidden_layer_x_autoencoder': [3000, 1500, 750, 375],
+                'n_neurons_of_hidden_layer_x_discriminator': [3000, 1500, 750, 375],
                 'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
                 'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
-                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
-                'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
+                'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
-                'activation_function_encoder': 'relu',
-                'activation_function_decoder': 'relu',
-                'activation_function_discriminator': 'relu',
-                'activation_function_discriminator_c': 'relu',  # for semi-supervised
-                'activation_function_discriminator_g': 'relu',  # for semi-supervised
+                'activation_function_encoder': ['relu', 'relu', 'relu', 'relu', 'linear'],
+                'activation_function_decoder': ['sigmoid', 'relu', 'relu', 'relu', 'sigmoid'],
+                'activation_function_discriminator': ['relu', 'relu', 'relu', 'relu', 'linear'],
+                'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
+                'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
+                'learning_rate_discriminator_gaussian': 0.0001,
+                'learning_rate_discriminator_categorical': 0.0001,
+                'learning_rate_supervised_encoder': 0.0001,
                 'decaying_learning_rate_name_autoencoder': "static",
                 'decaying_learning_rate_name_discriminator': "static",
                 'decaying_learning_rate_name_generator': "static",
+                'decaying_learning_rate_name_gaussian': "static",
+                'decaying_learning_rate_name_categorical': "static",
+                'decaying_learning_rate_name_supervised_encoder': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
-                'optimizer_discriminator': 'AdamOptimizer', 'optimizer_generator': 'AdamOptimizer',
+                'optimizer_discriminator': 'AdamOptimizer',
+                'optimizer_generator': 'AdamOptimizer',
+                'optimizer_discriminator_gaussian': 'AdamOptimizer',
+                'optimizer_discriminator_categorical': 'AdamOptimizer',
+                'optimizer_supervised_encoder': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_gaussian': 0.95,
+                'AdadeltaOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_categorical': 0.95, 'AdadeltaOptimizer_epsilon_categorical': 1e-08,
+                'AdadeltaOptimizer_rho_supervised_encoder': 0.95, 'AdadeltaOptimizer_epsilon_supervised_encoder': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
                 'AdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
                 'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
+                'MomentumOptimizer_momentum_discriminator_gaussian': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_gaussian': False,
+                'MomentumOptimizer_momentum_discriminator_categorical': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_categorical': False,
+                'MomentumOptimizer_momentum_supervised_encoder': 0.9,
+                'MomentumOptimizer_use_nesterov_supervised_encoder': False,
                 'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
-                'AdamOptimizer_beta1_autoencoder': 0.5, 'AdamOptimizer_beta2_autoencoder': 0.999,
-                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.5,
+                'AdamOptimizer_beta1_autoencoder': 0.9, 'AdamOptimizer_beta2_autoencoder': 0.999,
+                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.9,
                 'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
-                'AdamOptimizer_beta1_generator': 0.5, 'AdamOptimizer_beta2_generator': 0.999,
+                'AdamOptimizer_beta1_discriminator_gaussian': 0.9,
+                'AdamOptimizer_beta2_discriminator_gaussian': 0.999,
+                'AdamOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdamOptimizer_beta1_discriminator_categorical': 0.9,
+                'AdamOptimizer_beta2_discriminator_categorical': 0.999,
+                'AdamOptimizer_epsilon_discriminator_categorical': 1e-08,
+                'AdamOptimizer_beta1_supervised_encoder': 0.9,
+                'AdamOptimizer_beta2_supervised_encoder': 0.999, 'AdamOptimizer_epsilon_supervised_encoder': 1e-08,
+                'AdamOptimizer_beta1_generator': 0.9, 'AdamOptimizer_beta2_generator': 0.999,
                 'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_autoencoder': 0.0,
@@ -154,6 +261,21 @@ def get_default_parameters_svhn():
                 'FtrlOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_gaussian': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_categorical': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_learning_rate_power_supervised_encoder': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder': 0.0,
                 'FtrlOptimizer_learning_rate_power_generator': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_generator': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_generator': 0.0,
@@ -163,24 +285,55 @@ def get_default_parameters_svhn():
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_generator': 0.0,
-                'RMSPropOptimizer_decay_autoencoder': 0.9, 'RMSPropOptimizer_momentum_autoencoder': 0.0,
+                'RMSPropOptimizer_decay_autoencoder': 0.9,
+                'RMSPropOptimizer_momentum_autoencoder': 0.0,
                 'RMSPropOptimizer_epsilon_autoencoder': 1e-10, 'RMSPropOptimizer_centered_autoencoder': False,
                 'RMSPropOptimizer_decay_discriminator': 0.9, 'RMSPropOptimizer_momentum_discriminator': 0.0,
-                'RMSPropOptimizer_epsilon_discriminator': 1e-10, 'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_epsilon_discriminator': 1e-10,
+                'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_decay_discriminator_gaussian': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_gaussian': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_gaussian': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_gaussian': False,
+                'RMSPropOptimizer_decay_discriminator_categorical': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_categorical': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_categorical': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_categorical': False,
+                'RMSPropOptimizer_decay_supervised_encoder': 0.9, 'RMSPropOptimizer_momentum_supervised_encoder': 0.0,
+                'RMSPropOptimizer_epsilon_supervised_encoder': 1e-10,
+                'RMSPropOptimizer_centered_supervised_encoder': False,
                 'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
                 'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
-                'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss'}
+                'loss_function_discriminator': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
+                'loss_function_generator': 'hinge_loss'}
 
 
 def get_default_parameters_cifar10():
@@ -200,33 +353,63 @@ def get_default_parameters_cifar10():
                 'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
                 'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
                 'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
-                'activation_function_encoder': 'relu',
-                'activation_function_decoder': 'relu',
-                'activation_function_discriminator': 'relu',
-                'activation_function_discriminator_c': 'relu',  # for semi-supervised
-                'activation_function_discriminator_g': 'relu',  # for semi-supervised
+                'activation_function_encoder': ['relu', 'relu', 'linear'],
+                'activation_function_decoder': ['sigmoid', 'relu', 'sigmoid'],
+                'activation_function_discriminator': ['relu', 'relu', 'linear'],
+                'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
+                'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
                 'learning_rate_autoencoder': 0.0001,
                 'learning_rate_discriminator': 0.0001,
                 'learning_rate_generator': 0.0001,
+                'learning_rate_discriminator_gaussian': 0.0001,
+                'learning_rate_discriminator_categorical': 0.0001,
+                'learning_rate_supervised_encoder': 0.0001,
                 'decaying_learning_rate_name_autoencoder': "static",
                 'decaying_learning_rate_name_discriminator': "static",
                 'decaying_learning_rate_name_generator': "static",
+                'decaying_learning_rate_name_gaussian': "static",
+                'decaying_learning_rate_name_categorical': "static",
+                'decaying_learning_rate_name_supervised_encoder': "static",
                 'optimizer_autoencoder': 'AdamOptimizer',
                 'optimizer_discriminator': 'AdamOptimizer',
                 'optimizer_generator': 'AdamOptimizer',
+                'optimizer_discriminator_gaussian': 'AdamOptimizer',
+                'optimizer_discriminator_categorical': 'AdamOptimizer',
+                'optimizer_supervised_encoder': 'AdamOptimizer',
                 'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
                 'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_gaussian': 0.95,
+                'AdadeltaOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdadeltaOptimizer_rho_discriminator_categorical': 0.95, 'AdadeltaOptimizer_epsilon_categorical': 1e-08,
+                'AdadeltaOptimizer_rho_supervised_encoder': 0.95, 'AdadeltaOptimizer_epsilon_supervised_encoder': 1e-08,
                 'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
                 'AdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'AdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
                 'AdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
                 'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
+                'MomentumOptimizer_momentum_discriminator_gaussian': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_gaussian': False,
+                'MomentumOptimizer_momentum_discriminator_categorical': 0.9,
+                'MomentumOptimizer_use_nesterov_discriminator_categorical': False,
+                'MomentumOptimizer_momentum_supervised_encoder': 0.9,
+                'MomentumOptimizer_use_nesterov_supervised_encoder': False,
                 'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
-                'AdamOptimizer_beta1_autoencoder': 0.5, 'AdamOptimizer_beta2_autoencoder': 0.999,
-                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.5,
+                'AdamOptimizer_beta1_autoencoder': 0.9, 'AdamOptimizer_beta2_autoencoder': 0.999,
+                'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.9,
                 'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
-                'AdamOptimizer_beta1_generator': 0.5, 'AdamOptimizer_beta2_generator': 0.999,
+                'AdamOptimizer_beta1_discriminator_gaussian': 0.9,
+                'AdamOptimizer_beta2_discriminator_gaussian': 0.999,
+                'AdamOptimizer_epsilon_discriminator_gaussian': 1e-08,
+                'AdamOptimizer_beta1_discriminator_categorical': 0.9,
+                'AdamOptimizer_beta2_discriminator_categorical': 0.999,
+                'AdamOptimizer_epsilon_discriminator_categorical': 1e-08,
+                'AdamOptimizer_beta1_supervised_encoder': 0.9,
+                'AdamOptimizer_beta2_supervised_encoder': 0.999, 'AdamOptimizer_epsilon_supervised_encoder': 1e-08,
+                'AdamOptimizer_beta1_generator': 0.9, 'AdamOptimizer_beta2_generator': 0.999,
                 'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_autoencoder': 0.0,
@@ -237,6 +420,21 @@ def get_default_parameters_cifar10():
                 'FtrlOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_gaussian': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian': 0.0,
+                'FtrlOptimizer_learning_rate_power_discriminator_categorical': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical': 0.0,
+                'FtrlOptimizer_learning_rate_power_supervised_encoder': -0.5,
+                'FtrlOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'FtrlOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder': 0.0,
                 'FtrlOptimizer_learning_rate_power_generator': -0.5,
                 'FtrlOptimizer_initial_accumulator_value_generator': 0.1,
                 'FtrlOptimizer_l1_regularization_strength_generator': 0.0,
@@ -246,24 +444,55 @@ def get_default_parameters_cifar10():
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
                 'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+                'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+                'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+                'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_discriminator': 0.0,
                 'ProximalAdagradOptimizer_initial_accumulator_value_generator': 0.1,
                 'ProximalAdagradOptimizer_l1_regularization_strength_generator': 0.0,
                 'ProximalAdagradOptimizer_l2_regularization_strength_generator': 0.0,
-                'RMSPropOptimizer_decay_autoencoder': 0.9, 'RMSPropOptimizer_momentum_autoencoder': 0.0,
+                'RMSPropOptimizer_decay_autoencoder': 0.9,
+                'RMSPropOptimizer_momentum_autoencoder': 0.0,
                 'RMSPropOptimizer_epsilon_autoencoder': 1e-10, 'RMSPropOptimizer_centered_autoencoder': False,
                 'RMSPropOptimizer_decay_discriminator': 0.9, 'RMSPropOptimizer_momentum_discriminator': 0.0,
-                'RMSPropOptimizer_epsilon_discriminator': 1e-10, 'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_epsilon_discriminator': 1e-10,
+                'RMSPropOptimizer_centered_discriminator': False,
+                'RMSPropOptimizer_decay_discriminator_gaussian': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_gaussian': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_gaussian': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_gaussian': False,
+                'RMSPropOptimizer_decay_discriminator_categorical': 0.9,
+                'RMSPropOptimizer_momentum_discriminator_categorical': 0.0,
+                'RMSPropOptimizer_epsilon_discriminator_categorical': 1e-10,
+                'RMSPropOptimizer_centered_discriminator_categorical': False,
+                'RMSPropOptimizer_decay_supervised_encoder': 0.9, 'RMSPropOptimizer_momentum_supervised_encoder': 0.0,
+                'RMSPropOptimizer_epsilon_supervised_encoder': 1e-10,
+                'RMSPropOptimizer_centered_supervised_encoder': False,
                 'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
                 'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
-                'loss_function_discriminator': 'sigmoid_cross_entropy', 'loss_function_generator': 'hinge_loss'}
+                'loss_function_discriminator': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
+                'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
+                'loss_function_generator': 'hinge_loss'}
 
 
 def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):
@@ -375,14 +604,21 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]
     # n_neurons_of_hidden_layer_x_autoencoder = [[500, 250, 125], [1000, 750, 25]]
     n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]
+    n_neurons_of_hidden_layer_x_discriminator_c = [500, 250, 125]
+    n_neurons_of_hidden_layer_x_discriminator_g = [500, 250, 125]
 
     # initial bias values for the hidden layers
     bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0, 0.0]
     bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0, 0.0]
+    bias_init_value_of_hidden_layer_x_discriminator_c = [0.0, 0.0, 0.0, 0.0]
+    bias_init_value_of_hidden_layer_x_discriminator_g = [0.0, 0.0, 0.0, 0.0]
 
     # individual learning rates
     learning_rate_autoencoder = [0.001, 0.01, 0.1]
     learning_rate_discriminator = 0.001
+    learning_rate_discriminator_gaussian = 0.001
+    learning_rate_discriminator_categorical = 0.001
+    learning_rate_supervised_encoder = 0.001
     learning_rate_generator = 0.001
 
     # available optimizers:
@@ -397,11 +633,14 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
                   "RMSPropOptimizer"]
     optimizer_autoencoder = "AdamOptimizer"
     optimizer_discriminator = "RMSPropOptimizer"
+    optimizer_discriminator_gaussian = "RMSPropOptimizer"
+    optimizer_discriminator_categorical = "RMSPropOptimizer"
+    optimizer_supervised_encoder = "RMSPropOptimizer"
     optimizer_generator = "RMSPropOptimizer"
     """
         https://www.tensorflow.org/api_guides/python/train#Optimizers
         parameters for optimizers:
-        """
+    """
 
     # GradientDescentOptimizer:
     #   - learning rate:
@@ -411,8 +650,19 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     #   - epsilon: A constant epsilon used to better conditioning the grad update; default: 1e-08
     AdadeltaOptimizer_rho_autoencoder = 0.95
     AdadeltaOptimizer_epsilon_autoencoder = 1e-08
+
     AdadeltaOptimizer_rho_discriminator = 0.95
     AdadeltaOptimizer_epsilon_discriminator = 1e-08
+
+    AdadeltaOptimizer_rho_discriminator_gaussian = 0.95
+    AdadeltaOptimizer_epsilon_discriminator_gaussian = 1e-08
+
+    AdadeltaOptimizer_rho_discriminator_categorical = 0.95
+    AdadeltaOptimizer_epsilon_discriminator_categorical = 1e-08
+
+    AdadeltaOptimizer_rho_supervised_encoder = 0.95
+    AdadeltaOptimizer_epsilon_supervised_encoder = 1e-08
+
     AdadeltaOptimizer_rho_generator = 0.95
     AdadeltaOptimizer_epsilon_generator = 1e-08
 
@@ -420,8 +670,11 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     #   - learning rate
     #   - initial_accumulator_value: A floating point value. Starting value for the accumulators, must be positive.
     #   default: 0.1
-    AdagradOptimizer_initial_accumulator_value_autoencoder = [0.1, 0.01, 0.001]
+    AdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
     AdagradOptimizer_initial_accumulator_value_discriminator = 0.1
+    AdagradOptimizer_initial_accumulator_value_discriminator_gaussian = 0.1
+    AdagradOptimizer_initial_accumulator_value_discriminator_categorical = 0.1
+    AdagradOptimizer_initial_accumulator_value_supervised_encoder = 0.1
     AdagradOptimizer_initial_accumulator_value_generator = 0.1
 
     # MomentumOptimizer
@@ -430,8 +683,19 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     #   - use_nesterov: If True use Nesterov Momentum; default: False http://proceedings.mlr.press/v28/sutskever13.pdf
     MomentumOptimizer_momentum_autoencoder = 0.9
     MomentumOptimizer_use_nesterov_autoencoder = False
+
     MomentumOptimizer_momentum_discriminator = 0.9
     MomentumOptimizer_use_nesterov_discriminator = False
+
+    MomentumOptimizer_momentum_discriminator_gaussian = 0.9
+    MomentumOptimizer_use_nesterov_discriminator_gaussian = False
+
+    MomentumOptimizer_momentum_discriminator_categorical = 0.9
+    MomentumOptimizer_use_nesterov_discriminator_categorical = False
+
+    MomentumOptimizer_momentum_supervised_encoder = 0.9
+    MomentumOptimizer_use_nesterov_supervised_encoder = False
+
     MomentumOptimizer_momentum_generator = 0.9
     MomentumOptimizer_use_nesterov_generator = False
 
@@ -445,9 +709,23 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     AdamOptimizer_beta1_autoencoder = 0.9
     AdamOptimizer_beta2_autoencoder = 0.999
     AdamOptimizer_epsilon_autoencoder = 1e-08
+
     AdamOptimizer_beta1_discriminator = 0.9
     AdamOptimizer_beta2_discriminator = 0.999
     AdamOptimizer_epsilon_discriminator = 1e-08
+
+    AdamOptimizer_beta1_discriminator_gaussian = 0.9
+    AdamOptimizer_beta2_discriminator_gaussian = 0.999
+    AdamOptimizer_epsilon_discriminator_gaussian = 1e-08
+
+    AdamOptimizer_beta1_discriminator_categorical = 0.9
+    AdamOptimizer_beta2_discriminator_categorical = 0.999
+    AdamOptimizer_epsilon_discriminator_categorical = 1e-08
+
+    AdamOptimizer_beta1_supervised_encoder = 0.9
+    AdamOptimizer_beta2_supervised_encoder = 0.999
+    AdamOptimizer_epsilon_supervised_encoder= 1e-08
+
     AdamOptimizer_beta1_generator = 0.9
     AdamOptimizer_beta2_generator = 0.999
     AdamOptimizer_epsilon_generator = 1e-08
@@ -466,11 +744,31 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     FtrlOptimizer_l1_regularization_strength_autoencoder = 0.0
     FtrlOptimizer_l2_regularization_strength_autoencoder = 0.0
     FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = 0.0
+
     FtrlOptimizer_learning_rate_power_discriminator = -0.5
     FtrlOptimizer_initial_accumulator_value_discriminator = 0.1
     FtrlOptimizer_l1_regularization_strength_discriminator = 0.0
     FtrlOptimizer_l2_regularization_strength_discriminator = 0.0
     FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = 0.0
+
+    FtrlOptimizer_learning_rate_power_discriminator_gaussian = -0.5
+    FtrlOptimizer_initial_accumulator_value_discriminator_gaussian = 0.1
+    FtrlOptimizer_l1_regularization_strength_discriminator_gaussian = 0.0
+    FtrlOptimizer_l2_regularization_strength_discriminator_gaussian = 0.0
+    FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian = 0.0
+
+    FtrlOptimizer_learning_rate_power_discriminator_categorical = -0.5
+    FtrlOptimizer_initial_accumulator_value_discriminator_categorical = 0.1
+    FtrlOptimizer_l1_regularization_strength_discriminator_categorical = 0.0
+    FtrlOptimizer_l2_regularization_strength_discriminator_categorical = 0.0
+    FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical = 0.0
+
+    FtrlOptimizer_learning_rate_power_supervised_encoder = -0.5
+    FtrlOptimizer_initial_accumulator_value_supervised_encoder = 0.1
+    FtrlOptimizer_l1_regularization_strength_supervised_encoder = 0.0
+    FtrlOptimizer_l2_regularization_strength_supervised_encoder = 0.0
+    FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder = 0.0
+
     FtrlOptimizer_learning_rate_power_generator = -0.5
     FtrlOptimizer_initial_accumulator_value_generator = 0.1
     FtrlOptimizer_l1_regularization_strength_generator = 0.0
@@ -483,8 +781,19 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     #   - l2_regularization_strength: A float value, must be greater than or equal to zero. default: 0.0
     ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder = 0.0
     ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = 0.0
+
     ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = 0.0
     ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = 0.0
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian = 0.0
+    ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian = 0.0
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical = 0.0
+    ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical = 0.0
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder= 0.0
+    ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder = 0.0
+
     ProximalGradientDescentOptimizer_l1_regularization_strength_generator = 0.0
     ProximalGradientDescentOptimizer_l2_regularization_strength_generator = 0.0
 
@@ -497,9 +806,23 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     ProximalAdagradOptimizer_initial_accumulator_value_autoencoder = 0.1
     ProximalAdagradOptimizer_l1_regularization_strength_autoencoder = 0.0
     ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = 0.0
+
     ProximalAdagradOptimizer_initial_accumulator_value_discriminator = 0.1
     ProximalAdagradOptimizer_l1_regularization_strength_discriminator = 0.0
     ProximalAdagradOptimizer_l2_regularization_strength_discriminator = 0.0
+
+    ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian = 0.1
+    ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian = 0.0
+    ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian = 0.0
+
+    ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical = 0.1
+    ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical = 0.0
+    ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical = 0.0
+
+    ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder = 0.1
+    ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder = 0.0
+    ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder = 0.0
+
     ProximalAdagradOptimizer_initial_accumulator_value_generator = 0.1
     ProximalAdagradOptimizer_l1_regularization_strength_generator = 0.0
     ProximalAdagradOptimizer_l2_regularization_strength_generator = 0.0
@@ -516,10 +839,27 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     RMSPropOptimizer_momentum_autoencoder = 0.0
     RMSPropOptimizer_epsilon_autoencoder = 1e-10
     RMSPropOptimizer_centered_autoencoder = False
+
     RMSPropOptimizer_decay_discriminator = 0.9
     RMSPropOptimizer_momentum_discriminator = 0.0
     RMSPropOptimizer_epsilon_discriminator = 1e-10
     RMSPropOptimizer_centered_discriminator = False
+
+    RMSPropOptimizer_decay_discriminator_gaussian = 0.9
+    RMSPropOptimizer_momentum_discriminator_gaussian = 0.0
+    RMSPropOptimizer_epsilon_discriminator_gaussian = 1e-10
+    RMSPropOptimizer_centered_discriminator_gaussian = False
+
+    RMSPropOptimizer_decay_discriminator_categorical = 0.9
+    RMSPropOptimizer_momentum_discriminator_categorical = 0.0
+    RMSPropOptimizer_epsilon_discriminator_categorical = 1e-10
+    RMSPropOptimizer_centered_discriminator_categorical = False
+
+    RMSPropOptimizer_decay_supervised_encoder = 0.9
+    RMSPropOptimizer_momentum_supervised_encoder = 0.0
+    RMSPropOptimizer_epsilon_supervised_encoder = 1e-10
+    RMSPropOptimizer_centered_supervised_encoder = False
+
     RMSPropOptimizer_decay_generator = 0.9
     RMSPropOptimizer_momentum_generator = 0.0
     RMSPropOptimizer_epsilon_generator = 1e-10
@@ -533,6 +873,8 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
 
     # loss function for discriminator
     loss_function_discriminator = "sigmoid_cross_entropy"
+    loss_function_discriminator_gaussian = "sigmoid_cross_entropy"
+    loss_function_discriminator_categorical = "sigmoid_cross_entropy"
 
     # loss function for generator
     loss_function_generator = "hinge_loss"
@@ -568,7 +910,7 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     # we don't have variable names provided, so we take all hard coded parameters for the grid search
     if not args and not kwargs:
         # those vars are always lists, so we need to ignore them
-        local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
+        local_vars_to_ignore = ["loss_functions", "param_dict_mnist", "optimizers", "autoencoder_optimizers",
                                 "local_vars_to_ignore", "args", "kwargs", "default_params_selected_for_gridsearch",
                                 "n_neurons_of_hidden_layer_x_autoencoder",
                                 "n_neurons_of_hidden_layer_x_discriminator",
@@ -622,7 +964,7 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     # iterate over the combinations ..
     for parameter_value_combination in parameter_value_combinations:
         for i, param_value in enumerate(parameter_value_combination):
-            # .. set the param_dict accordingly ..
+            # .. set the param_dict_mnist accordingly ..
             param_dict[params_selected_for_gridsearch[i]] = param_value
         # .. and add them to the list
         all_final_parameter_combinations_list.append(copy.deepcopy(param_dict))
@@ -651,17 +993,29 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     # network topology
     n_neurons_of_hidden_layer_x_autoencoder = [1000, 500, 250]  # TODO: function to create a random number of layers
     n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
+    n_neurons_of_hidden_layer_x_discriminator_c = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
+    n_neurons_of_hidden_layer_x_discriminator_g = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
 
     # initial bias values for the hidden layers
     bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0,
                                                      0.0]  # TODO: function to create a random number of layers
     bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0,
                                                        0.0]  # TODO: and neurons; should be smaller to the end
+    bias_init_value_of_hidden_layer_x_discriminator_c = [0.0, 0.0, 0.0,
+                                                       0.0]  # TODO: and neurons; should be smaller to the end
+    bias_init_value_of_hidden_layer_x_discriminator_g = [0.0, 0.0, 0.0,
+                                                       0.0]  # TODO: and neurons; should be smaller to the end
 
     # individual learning rates
     learning_rate_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
     learning_rate_discriminator = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+    learning_rate_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+    learning_rate_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
+    learning_rate_supervised_encoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
     learning_rate_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.0001, high=0.1, return_type="float")
@@ -682,6 +1036,9 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
 
     optimizer_autoencoder = random.choice(autoencoder_optimizers)
     optimizer_discriminator = random.choice(optimizers)
+    optimizer_discriminator_gaussian = random.choice(optimizers)
+    optimizer_discriminator_categorical = random.choice(optimizers)
+    optimizer_supervised_encoder = random.choice(optimizers)
     optimizer_generator = random.choice(optimizers)
 
     """
@@ -700,10 +1057,27 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
     AdadeltaOptimizer_epsilon_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+
     AdadeltaOptimizer_rho_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
     AdadeltaOptimizer_epsilon_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+
+    AdadeltaOptimizer_rho_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+    AdadeltaOptimizer_epsilon_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+
+    AdadeltaOptimizer_rho_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+    AdadeltaOptimizer_epsilon_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+
+    AdadeltaOptimizer_rho_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
+    AdadeltaOptimizer_epsilon_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-09, high=1e-07, return_type="float")
+
     AdadeltaOptimizer_rho_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.9, high=1.0, return_type="float")
     AdadeltaOptimizer_epsilon_generator = \
@@ -717,6 +1091,12 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
     AdagradOptimizer_initial_accumulator_value_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+    AdagradOptimizer_initial_accumulator_value_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+    AdagradOptimizer_initial_accumulator_value_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
+    AdagradOptimizer_initial_accumulator_value_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
     AdagradOptimizer_initial_accumulator_value_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.2, return_type="float")
 
@@ -727,9 +1107,23 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     MomentumOptimizer_momentum_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     MomentumOptimizer_use_nesterov_autoencoder = random.choice([True, False])
+
     MomentumOptimizer_momentum_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     MomentumOptimizer_use_nesterov_discriminator = random.choice([True, False])
+
+    MomentumOptimizer_momentum_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    MomentumOptimizer_use_nesterov_discriminator_gaussian = random.choice([True, False])
+
+    MomentumOptimizer_momentum_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    MomentumOptimizer_use_nesterov_discriminator_categorical = random.choice([True, False])
+
+    MomentumOptimizer_momentum_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    MomentumOptimizer_use_nesterov_supervised_encoder = random.choice([True, False])
+
     MomentumOptimizer_momentum_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     MomentumOptimizer_use_nesterov_generator = random.choice([True, False])
@@ -747,12 +1141,35 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
     AdamOptimizer_epsilon_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+
     AdamOptimizer_beta1_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     AdamOptimizer_beta2_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
     AdamOptimizer_epsilon_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+
+    AdamOptimizer_beta1_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    AdamOptimizer_beta2_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+    AdamOptimizer_epsilon_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+
+    AdamOptimizer_beta1_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    AdamOptimizer_beta2_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+    AdamOptimizer_epsilon_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+
+    AdamOptimizer_beta1_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    AdamOptimizer_beta2_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.99, high=1.0, return_type="float")
+    AdamOptimizer_epsilon_supervised_encoder= \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-07, high=1e-09, return_type="float")
+
     AdamOptimizer_beta1_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     AdamOptimizer_beta2_generator = \
@@ -779,6 +1196,7 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     FtrlOptimizer_learning_rate_power_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
     FtrlOptimizer_initial_accumulator_value_discriminator = \
@@ -789,6 +1207,40 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    FtrlOptimizer_learning_rate_power_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+    FtrlOptimizer_initial_accumulator_value_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    FtrlOptimizer_l1_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    FtrlOptimizer_learning_rate_power_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+    FtrlOptimizer_initial_accumulator_value_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    FtrlOptimizer_l1_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    FtrlOptimizer_learning_rate_power_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
+    FtrlOptimizer_initial_accumulator_value_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    FtrlOptimizer_l1_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     FtrlOptimizer_learning_rate_power_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=-1, high=0, return_type="float")
     FtrlOptimizer_initial_accumulator_value_generator = \
@@ -808,10 +1260,27 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder= \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     ProximalGradientDescentOptimizer_l1_regularization_strength_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     ProximalGradientDescentOptimizer_l2_regularization_strength_generator = \
@@ -829,12 +1298,35 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     ProximalAdagradOptimizer_l2_regularization_strength_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     ProximalAdagradOptimizer_initial_accumulator_value_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
     ProximalAdagradOptimizer_l1_regularization_strength_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
     ProximalAdagradOptimizer_l2_regularization_strength_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+    ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+    ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
+    ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
+    ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+    ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.1, return_type="float")
+
     ProximalAdagradOptimizer_initial_accumulator_value_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.01, high=0.3, return_type="float")
     ProximalAdagradOptimizer_l1_regularization_strength_generator = \
@@ -857,6 +1349,7 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     RMSPropOptimizer_epsilon_autoencoder = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
     RMSPropOptimizer_centered_autoencoder = random.choice([True, False])
+
     RMSPropOptimizer_decay_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     RMSPropOptimizer_momentum_discriminator = \
@@ -864,6 +1357,31 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     RMSPropOptimizer_epsilon_discriminator = \
         draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
     RMSPropOptimizer_centered_discriminator = random.choice([True, False])
+
+    RMSPropOptimizer_decay_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    RMSPropOptimizer_momentum_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    RMSPropOptimizer_epsilon_discriminator_gaussian = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+    RMSPropOptimizer_centered_discriminator_gaussian = random.choice([True, False])
+
+    RMSPropOptimizer_decay_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    RMSPropOptimizer_momentum_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    RMSPropOptimizer_epsilon_discriminator_categorical = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+    RMSPropOptimizer_centered_discriminator_categorical = random.choice([True, False])
+
+    RMSPropOptimizer_decay_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
+    RMSPropOptimizer_momentum_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=0, high=0.2, return_type="float")
+    RMSPropOptimizer_epsilon_supervised_encoder = \
+        draw_from_np_distribution(distribution_name="uniform", low=1e-9, high=1e-11, return_type="float")
+    RMSPropOptimizer_centered_supervised_encoder = random.choice([True, False])
+
     RMSPropOptimizer_decay_generator = \
         draw_from_np_distribution(distribution_name="uniform", low=0.8, high=1.0, return_type="float")
     RMSPropOptimizer_momentum_generator = \
@@ -880,6 +1398,8 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
 
     # loss function for discriminator
     loss_function_discriminator = random.choice(loss_functions)
+    loss_function_discriminator_gaussian = random.choice(loss_functions)
+    loss_function_discriminator_categorical = random.choice(loss_functions)
     # loss function for generator
     loss_function_generator = random.choice(loss_functions)
 
@@ -901,7 +1421,7 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
                 param_dict[var_name] = kwargs[var_name]
 
     if not kwargs and not args:
-        local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
+        local_vars_to_ignore = ["loss_functions", "param_dict_mnist", "optimizers", "autoencoder_optimizers",
                                 "local_vars_to_ignore", "args", "kwargs"]
         for var_name in list(
                 locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
