@@ -273,7 +273,7 @@ def get_minibatch_summary_vars():
 
         batch_x = minibatch_summary_vars["batch_x"]  # (batch_size, input_dim_x*input_dim_x*color_scale) array of floats
         batch_x = batch_x.astype("float64").tolist()
-        decoder_output = minibatch_summary_vars["decoder_output"]   # (batch_size, input_dim_x*input_dim_x*color_scale)
+        decoder_output = minibatch_summary_vars["x_reconstructed"]   # (batch_size, input_dim_x*input_dim_x*color_scale)
         decoder_output = decoder_output.astype("float64").tolist()  # array of floats
 
         batch_labels = minibatch_summary_vars["batch_labels"]  # (batch_size, n_classes) array of ints
@@ -284,7 +284,7 @@ def get_minibatch_summary_vars():
 
     minibatch_summary_vars_dict = {"real_dist": real_dist, "latent_representation": latent_representation,
                                    "discriminator_neg": discriminator_neg, "discriminator_pos": discriminator_pos,
-                                   "batch_x": batch_x, "decoder_output": decoder_output, "epoch": epoch, "b": b,
+                                   "batch_x": batch_x, "x_reconstructed": decoder_output, "epoch": epoch, "b": b,
                                    "batch_labels": batch_labels, "batch_X_unlabeled": batch_X_unlabeled,
                                    "reconstructed_image": reconstructed_image, "real_cat_dist": real_cat_dist,
                                    "encoder_cat_dist": encoder_cat_dist,

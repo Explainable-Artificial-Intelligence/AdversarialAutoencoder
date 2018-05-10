@@ -14,7 +14,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 import util.AdversarialAutoencoderUtils as aae_helper
 from swagger_server.utils.Storage import Storage
-from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
+from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll, \
+    draw_from_dim_reduced_dataset
 
 
 class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
@@ -61,11 +62,47 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.n_neurons_of_hidden_layer_x_discriminator = \
             parameter_dictionary["n_neurons_of_hidden_layer_x_discriminator"]
 
-        # initial bias values of the hidden layers
-        self.bias_init_value_of_hidden_layer_x_autoencoder = parameter_dictionary[
-            "bias_init_value_of_hidden_layer_x_autoencoder"]
-        self.bias_init_value_of_hidden_layer_x_discriminator = parameter_dictionary[
-            "bias_init_value_of_hidden_layer_x_discriminator"]
+        # dropout for the layers
+        self.dropout_encoder = tf.placeholder_with_default([0.0]*len(parameter_dictionary["dropout_encoder"]),
+                                                           shape=(len(parameter_dictionary["dropout_encoder"]),))
+        self.dropout_decoder = tf.placeholder_with_default([0.0]*len(parameter_dictionary["dropout_decoder"]),
+                                                           shape=(len(parameter_dictionary["dropout_decoder"]),))
+        self.dropout_discriminator = \
+            tf.placeholder_with_default([0.0]*len(parameter_dictionary["dropout_discriminator"]),
+                                        shape=(len(parameter_dictionary["dropout_discriminator"]),))
+
+        # what batch normalization to use for the different layers (no BN, post-activation, pre-activation)
+        self.batch_normalization_encoder = parameter_dictionary["batch_normalization_encoder"]
+        self.batch_normalization_decoder = parameter_dictionary["batch_normalization_decoder"]
+        self.batch_normalization_discriminator = parameter_dictionary["batch_normalization_discriminator"]
+
+        # convert "None" to None
+        self.batch_normalization_encoder = [x if x is not "None" else None for x in self.batch_normalization_encoder]
+        self.batch_normalization_decoder = [x if x is not "None" else None for x in self.batch_normalization_decoder]
+        self.batch_normalization_discriminator = [x if x is not "None" else None for x in
+                                                  self.batch_normalization_discriminator]
+
+        # how the biases of the different layers should be initialized
+        self.bias_initializer_encoder = parameter_dictionary["bias_initializer_encoder"]
+        self.bias_initializer_decoder = parameter_dictionary["bias_initializer_decoder"]
+        self.bias_initializer_discriminator = parameter_dictionary["bias_initializer_discriminator"]
+
+        # parameters for the initialization of the different layers, e.g. mean and stddev for the
+        # random_normal_initializer
+        self.bias_initializer_params_encoder = parameter_dictionary["bias_initializer_params_encoder"]
+        self.bias_initializer_params_decoder = parameter_dictionary["bias_initializer_params_decoder"]
+        self.bias_initializer_params_discriminator = parameter_dictionary["bias_initializer_params_discriminator"]
+
+        # how the weights of the different layers should be initialized
+        self.weights_initializer_encoder = parameter_dictionary["weights_initializer_encoder"]
+        self.weights_initializer_decoder = parameter_dictionary["weights_initializer_decoder"]
+        self.weights_initializer_discriminator = parameter_dictionary["weights_initializer_discriminator"]
+
+        # parameters for the initialization of the different layers, e.g. mean and stddev for the
+        # random_normal_initializer
+        self.weights_initializer_params_encoder = parameter_dictionary["weights_initializer_params_encoder"]
+        self.weights_initializer_params_decoder = parameter_dictionary["weights_initializer_params_decoder"]
+        self.weights_initializer_params_discriminator = parameter_dictionary["weights_initializer_params_discriminator"]
 
         # activation functions for the different parts of the network
         if type(parameter_dictionary["activation_function_encoder"]) is list:
@@ -90,7 +127,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         params for learning
         """
-
         # number of epochs for training
         self.n_epochs = parameter_dictionary["n_epochs"]
 
@@ -141,6 +177,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.decoder_input_multiple = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
                                                      name='Decoder_input_multiple')
 
+        # for proper batch normalization
+        self.is_training = tf.placeholder(tf.bool, name='is_training')
+
         """
         Init the network; generator doesn't need to be initiated, since the generator is the encoder of the autoencoder
         """
@@ -148,34 +187,28 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # init autoencoder
         with tf.variable_scope(tf.get_variable_scope()):
             # encoder part of the autoencoder and also the generator
-            self.encoder_output = self.encoder(self.X,
-                                               bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+            self.encoder_output = self.encoder(self.X)
             # decoder part of the autoencoder
-            self.decoder_output = self.decoder(self.encoder_output,
-                                               bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+            self.decoder_output = self.decoder(self.encoder_output)
 
         # init discriminator
         with tf.variable_scope(tf.get_variable_scope()):
             # discriminator for the positive samples p(z) (from a real data distribution)
             self.discriminator_pos_samples = \
-                self.discriminator(self.real_distribution,
-                                   bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
+                self.discriminator(self.real_distribution)
             # discriminator for the negative samples q(z) (generated by the generator)
             self.discriminator_neg_samples = \
-                self.discriminator(self.encoder_output, reuse=True,
-                                   bias_init_values=self.bias_init_value_of_hidden_layer_x_discriminator)
+                self.discriminator(self.encoder_output, reuse=True)
 
         # output of the decoder
         with tf.variable_scope(tf.get_variable_scope()):
             # used for "manually" passing single values drawn from a real distribution through the decoder for the
             # tensorboard
-            self.decoder_output_real_dist = self.decoder(self.decoder_input, reuse=True,
-                                                         bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+            self.decoder_output_real_dist = self.decoder(self.decoder_input, reuse=True)
             # used for "manually" passing multiple values drawn from a real distribution through the decoder for the
             # tensorboard
             self.decoder_output_multiple = \
-                self.decoder(self.decoder_input_multiple, reuse=True,
-                             bias_init_values=self.bias_init_value_of_hidden_layer_x_autoencoder)
+                self.decoder(self.decoder_input_multiple, reuse=True)
 
         """
         Init the loss functions
@@ -258,7 +291,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # variables for the minibatch summary image
         self.minibatch_summary_vars = {"real_dist": None, "latent_representation": None, "discriminator_neg": None,
-                                       "discriminator_pos": None, "batch_x": None, "decoder_output": None,
+                                       "discriminator_pos": None, "batch_x": None, "x_reconstructed": None,
                                        "epoch": None, "b": None, "batch_labels": None}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
@@ -267,6 +300,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # holds the names for all layers
         self.all_layer_names = aae_helper.get_layer_names(self)
+
+        self.latent_space_min_max_per_dim = []
 
         """
         Init all variables         
@@ -313,22 +348,22 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def get_final_performance(self):
         return self.final_performance
 
+    def set_result_folder_name(self, result_folder_name):
+        self.result_folder_name = result_folder_name
+
     def get_result_folder_name(self):
         return self.result_folder_name
 
-    def encoder(self, X, bias_init_values, reuse=False):
+    def encoder(self, X, reuse=False):
         """
         Encoder of the autoencoder.
         :param X: input to the autoencoder
-        :param bias_init_values: the initial value for the bias
         :param reuse: True -> Reuse the encoder variables, False -> Create or search of variables before creating
         :return: tensor which is the hidden latent variable of the autoencoder.
         """
 
         # number of hidden layers
         n_hidden_layers = len(self.n_neurons_of_hidden_layer_x_autoencoder)
-
-        assert n_hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -338,52 +373,106 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Encoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0], aae_helper. \
-                    create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
-                                       bias_init_value=bias_init_values[0]))
-                return latent_variable
+
+                last_layer = \
+                    aae_helper.create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
+                                                  weight_initializer=self.weights_initializer_encoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_encoder[0],
+                                                  bias_initializer=self.bias_initializer_encoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_encoder[0],
+                                                  activation_function=self.activation_function_encoder[0],
+                                                  batch_normalization=self.batch_normalization_encoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_encoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_encoder[1],
+                                                  is_training=self.is_training)
+                return last_layer
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0], aae_helper.
-                                           create_dense_layer(X, self.input_dim,
-                                                              self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                                              'encoder_dense_layer_1',
-                                                              bias_init_value=bias_init_values[0]))
-                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[-1], aae_helper. \
-                    create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0], self.z_dim,
-                                       'encoder_output', bias_init_value=bias_init_values[1]))
-                return latent_variable
+
+                dense_layer_1 = \
+                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  'encoder_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_encoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_encoder[0],
+                                                  bias_initializer=self.bias_initializer_encoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_encoder[0],
+                                                  activation_function=self.activation_function_encoder[0],
+                                                  batch_normalization=self.batch_normalization_encoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_encoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_encoder[1],
+                                                  is_training=self.is_training)
+
+                last_layer =\
+                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  self.z_dim, 'encoder_output',
+                                                  weight_initializer=self.weights_initializer_encoder[1],
+                                                  weight_initializer_params=self.weights_initializer_params_encoder[1],
+                                                  bias_initializer=self.bias_initializer_encoder[1],
+                                                  bias_initializer_params=self.bias_initializer_params_encoder[1],
+                                                  activation_function=self.activation_function_encoder[1],
+                                                  batch_normalization=self.batch_normalization_encoder[1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_encoder[2],
+                                                  is_training=self.is_training)
+
+                return last_layer
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[0],
-                    aae_helper.
-                        create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                           'encoder_dense_layer_1', bias_init_value=bias_init_values[0]))
+
+                dense_layer_i = \
+                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  'encoder_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_encoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_encoder[0],
+                                                  bias_initializer=self.bias_initializer_encoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_encoder[0],
+                                                  activation_function=self.activation_function_encoder[0],
+                                                  batch_normalization=self.batch_normalization_encoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_encoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_encoder[1],
+                                                  is_training=self.is_training)
+
                 for i in range(1, n_hidden_layers):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[i], aae_helper.
-                                                                                 create_dense_layer(dense_layer_i,
+                    dense_layer_i = \
+                        aae_helper.create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                       'encoder_dense_layer_' + str(i + 1),
-                                                      bias_init_value=bias_init_values[i]))
-                latent_variable = aae_helper.use_activation_function_for_layer(self.activation_function_encoder[-1], aae_helper. \
-                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                       self.z_dim, 'encoder_output', bias_init_value=bias_init_values[-1]))
-                return latent_variable
+                                                      weight_initializer=self.weights_initializer_encoder[i],
+                                                      weight_initializer_params=self.weights_initializer_params_encoder[
+                                                          i],
+                                                      bias_initializer=self.bias_initializer_encoder[i],
+                                                      bias_initializer_params=self.bias_initializer_params_encoder[i],
+                                                      activation_function=self.activation_function_encoder[i],
+                                                      batch_normalization=self.batch_normalization_encoder[i],
+                                                      drop_out_rate_input_layer=0.0,
+                                                      drop_out_rate_output_layer=self.dropout_encoder[i+1],
+                                                      is_training=self.is_training)
 
-    def decoder(self, X, bias_init_values, reuse=False):
+                last_layer =\
+                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                                                  self.z_dim, 'encoder_output',
+                                                  weight_initializer=self.weights_initializer_encoder[-1],
+                                                  weight_initializer_params=self.weights_initializer_params_encoder[-1],
+                                                  bias_initializer=self.bias_initializer_encoder[-1],
+                                                  bias_initializer_params=self.bias_initializer_params_encoder[-1],
+                                                  activation_function=self.activation_function_encoder[-1],
+                                                  batch_normalization=self.batch_normalization_encoder[-1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_encoder[-1],
+                                                  is_training=self.is_training)
+                return last_layer
+
+    def decoder(self, X, reuse=False):
         """
         Decoder of the autoencoder.
         :param X: input to the decoder
-        :param bias_init_values: the initial values for the bias
         :param reuse: True -> Reuse the decoder variables, False -> Create or search of variables before creating
         :return: tensor which should ideally be the input given to the encoder.
         """
 
         # number of hidden layers
         n_hidden_layers = len(self.n_neurons_of_hidden_layer_x_autoencoder)
-
-        assert n_hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -393,47 +482,96 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Decoder'):
             # there is no hidden layer
             if n_hidden_layers == 0:
-                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0],
-                    aae_helper.create_dense_layer(X, self.z_dim, self.input_dim,
-                                                                             'decoder_output',
-                                                                             bias_init_value=bias_init_values[0]))
+
+                decoder_output = \
+                    aae_helper.create_dense_layer(X, self.z_dim, self.input_dim, 'x_reconstructed',
+                                                  weight_initializer=self.weights_initializer_decoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_decoder[0],
+                                                  bias_initializer=self.bias_initializer_decoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_decoder[0],
+                                                  activation_function=self.activation_function_decoder[0],
+                                                  batch_normalization=self.batch_normalization_decoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_decoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_decoder[1],
+                                                  is_training=self.is_training)
                 return decoder_output
             # there is only one hidden layer
             elif n_hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0], aae_helper.
-                                           create_dense_layer(X, self.z_dim,
-                                                              self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                                              'decoder_dense_layer_1',
-                                                              bias_init_value=bias_init_values[0]))
-                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[-1],
-                    aae_helper.
-                        create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                           self.input_dim, 'decoder_output', bias_init_value=bias_init_values[1]))
+
+                dense_layer_1 = \
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  'decoder_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_decoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_decoder[0],
+                                                  bias_initializer=self.bias_initializer_decoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_decoder[0],
+                                                  activation_function=self.activation_function_decoder[0],
+                                                  batch_normalization=self.batch_normalization_decoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_decoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_decoder[1],
+                                                  is_training=self.is_training)
+
+                decoder_output = \
+                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  self.input_dim, 'x_reconstructed',
+                                                  weight_initializer=self.weights_initializer_decoder[1],
+                                                  weight_initializer_params=self.weights_initializer_params_decoder[1],
+                                                  bias_initializer=self.bias_initializer_decoder[-1],
+                                                  bias_initializer_params=self.bias_initializer_params_decoder[1],
+                                                  activation_function=self.activation_function_decoder[1],
+                                                  batch_normalization=self.batch_normalization_decoder[1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_decoder[2],
+                                                  is_training=self.is_training)
+
                 return decoder_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[0],
-                    aae_helper.
-                        create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                           'decoder_dense_layer_1', bias_init_value=bias_init_values[0]))
+                dense_layer_i = \
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                                                  'decoder_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_decoder[0],
+                                                  weight_initializer_params=self.weights_initializer_params_decoder[0],
+                                                  bias_initializer=self.bias_initializer_decoder[0],
+                                                  bias_initializer_params=self.bias_initializer_params_decoder[0],
+                                                  activation_function=self.activation_function_decoder[0],
+                                                  batch_normalization=self.batch_normalization_decoder[0],
+                                                  drop_out_rate_input_layer=self.dropout_decoder[0],
+                                                  drop_out_rate_output_layer=self.dropout_decoder[1],
+                                                  is_training=self.is_training)
                 for i in range(n_hidden_layers - 1, 0, -1):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[i],
-                        aae_helper.
-                            create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
-                                               self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
-                                               'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
-                                               bias_init_value=bias_init_values[i]))
-                decoder_output = aae_helper.use_activation_function_for_layer(self.activation_function_decoder[-1],
-                    aae_helper.
-                        create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
-                                           self.input_dim, 'decoder_output', bias_init_value=bias_init_values[-1]))
+                    dense_layer_i = \
+                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
+                                                      self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
+                                                      'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
+                                                      weight_initializer=self.weights_initializer_decoder[i],
+                                                      weight_initializer_params=self.weights_initializer_params_decoder[
+                                                          i],
+                                                      bias_initializer=self.bias_initializer_decoder[i],
+                                                      bias_initializer_params=self.bias_initializer_params_decoder[i],
+                                                      activation_function=self.activation_function_decoder[i],
+                                                      batch_normalization=self.batch_normalization_decoder[i],
+                                                      drop_out_rate_input_layer=0.0,
+                                                      drop_out_rate_output_layer=self.dropout_decoder[n_hidden_layers-i+1],
+                                                      is_training=self.is_training)
+                decoder_output = \
+                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                                                  self.input_dim, 'x_reconstructed',
+                                                  weight_initializer=self.weights_initializer_decoder[-1],
+                                                  weight_initializer_params=self.weights_initializer_params_decoder[-1],
+                                                  bias_initializer=self.bias_initializer_decoder[-1],
+                                                  bias_initializer_params=self.bias_initializer_params_decoder[-1],
+                                                  activation_function=self.activation_function_decoder[-1],
+                                                  batch_normalization=self.batch_normalization_decoder[-1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_decoder[-1],
+                                                  is_training=self.is_training)
                 return decoder_output
 
-    def discriminator(self, X, bias_init_values, reuse=False):
+    def discriminator(self, X, reuse=False):
         """
         Discriminator that is used to match the posterior distribution with a given prior distribution.
         :param X: tensor of shape [batch_size, z_dim]
-        :param bias_init_values: the initial value for the bias
         :param reuse: True -> Reuse the discriminator variables,
                       False -> Create or search of variables before creating
         :return: tensor of shape [batch_size, 1]
@@ -441,8 +579,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # number of hidden layers
         n__hidden_layers = len(self.n_neurons_of_hidden_layer_x_discriminator)
-
-        assert n__hidden_layers == len(bias_init_values) - 1
 
         # allows tensorflow to reuse the variables defined in the current variable scope
         if reuse:
@@ -452,35 +588,93 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         with tf.name_scope('Discriminator'):
             # there is no hidden layer
             if n__hidden_layers == 0:
-                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0], aae_helper.\
-                    create_dense_layer(X, self.z_dim, 1, 'discriminator_output', bias_init_value=bias_init_values[0]))
+                discriminator_output = \
+                    aae_helper.create_dense_layer(X, self.z_dim, 1, 'discriminator_output',
+                                                  weight_initializer=self.weights_initializer_discriminator[0],
+                                                  weight_initializer_params=self.weights_initializer_params_discriminator[0],
+                                                  bias_initializer=self.bias_initializer_discriminator[0],
+                                                  bias_initializer_params=self.bias_initializer_params_discriminator[0],
+                                                  activation_function=self.activation_function_discriminator[0],
+                                                  batch_normalization=self.batch_normalization_discriminator[0],
+                                                  drop_out_rate_input_layer=self.dropout_discriminator[0],
+                                                  drop_out_rate_output_layer=self.dropout_discriminator[1],
+                                                  is_training=self.is_training)
                 return discriminator_output
             # there is only one hidden layer
             elif n__hidden_layers == 1:
-                dense_layer_1 = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0],
-                                                                 aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
-                                           'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
-                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[-1], aae_helper\
-                    .create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
-                                        'discriminator_output', bias_init_value=bias_init_values[1]))
+                dense_layer_1 = \
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                                                 'discriminator_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_discriminator[0],
+                                                  weight_initializer_params=
+                                                  self.weights_initializer_params_discriminator[0],
+                                                  bias_initializer=self.bias_initializer_discriminator[0],
+                                                  bias_initializer_params=self.bias_initializer_params_discriminator[0],
+                                                  activation_function=self.activation_function_discriminator[0],
+                                                  batch_normalization=self.batch_normalization_discriminator[0],
+                                                  drop_out_rate_input_layer=self.dropout_discriminator[0],
+                                                  drop_out_rate_output_layer=self.dropout_discriminator[1],
+                                                  is_training=self.is_training)
+                discriminator_output = \
+                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator[0], 1,
+                                                  'discriminator_output',
+                                                  weight_initializer=self.weights_initializer_discriminator[-1],
+                                                  weight_initializer_params=
+                                                  self.weights_initializer_params_discriminator[-1],
+                                                  bias_initializer=self.bias_initializer_discriminator[-1],
+                                                  bias_initializer_params=self.bias_initializer_params_discriminator[-1],
+                                                  activation_function=self.activation_function_discriminator[-1],
+                                                  batch_normalization=self.batch_normalization_discriminator[-1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_discriminator[-1],
+                                                  is_training=self.is_training)
                 return discriminator_output
             # there is an arbitrary number of hidden layers
             else:
-                dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[0],
-                    aae_helper
-                        .create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
-                                           'discriminator_dense_layer_1', bias_init_value=bias_init_values[0]))
+                dense_layer_i = \
+                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                                                  'discriminator_dense_layer_1',
+                                                  weight_initializer=self.weights_initializer_discriminator[0],
+                                                  weight_initializer_params=
+                                                  self.weights_initializer_params_discriminator[0],
+                                                  bias_initializer=self.bias_initializer_discriminator[0],
+                                                  bias_initializer_params=self.bias_initializer_params_discriminator[0],
+                                                  activation_function=self.activation_function_discriminator[0],
+                                                  batch_normalization=self.batch_normalization_discriminator[0],
+                                                  drop_out_rate_input_layer=self.dropout_discriminator[0],
+                                                  drop_out_rate_output_layer=self.dropout_discriminator[1],
+                                                  is_training=self.is_training)
                 for i in range(1, n__hidden_layers):
-                    dense_layer_i = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[i],
-                        aae_helper.
-                            create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
-                                               self.n_neurons_of_hidden_layer_x_discriminator[i],
-                                               'discriminator_dense_layer_' + str(i + 1),
-                                               bias_init_value=bias_init_values[i]))
+                    dense_layer_i = \
+                        aae_helper.create_dense_layer(dense_layer_i,
+                                                      self.n_neurons_of_hidden_layer_x_discriminator[i - 1],
+                                                      self.n_neurons_of_hidden_layer_x_discriminator[i],
+                                                      'discriminator_dense_layer_' + str(i + 1),
+                                                      weight_initializer=self.weights_initializer_discriminator[i],
+                                                      weight_initializer_params=
+                                                      self.weights_initializer_params_discriminator[i],
+                                                      bias_initializer=self.bias_initializer_discriminator[i],
+                                                      bias_initializer_params=
+                                                      self.bias_initializer_params_discriminator[i],
+                                                      activation_function=self.activation_function_discriminator[i],
+                                                      batch_normalization=self.batch_normalization_discriminator[i],
+                                                      drop_out_rate_input_layer=0.0,
+                                                      drop_out_rate_output_layer=self.dropout_discriminator[i+1],
+                                                      is_training=self.is_training)
 
-                discriminator_output = aae_helper.use_activation_function_for_layer(self.activation_function_discriminator[-1], aae_helper.\
-                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
-                                       'discriminator_output',  bias_init_value=bias_init_values[-1]))
+                discriminator_output = \
+                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator[-1], 1,
+                                                  'discriminator_output',
+                                                  weight_initializer=self.weights_initializer_discriminator[-1],
+                                                  weight_initializer_params=
+                                                  self.weights_initializer_params_discriminator[-1],
+                                                  bias_initializer=self.bias_initializer_discriminator[-1],
+                                                  bias_initializer_params=self.bias_initializer_params_discriminator[-1],
+                                                  activation_function=self.activation_function_discriminator[-1],
+                                                  batch_normalization=self.batch_normalization_discriminator[-1],
+                                                  drop_out_rate_input_layer=0.0,
+                                                  drop_out_rate_output_layer=self.dropout_discriminator[-1],
+                                                  is_training=self.is_training)
                 return discriminator_output
 
     def create_tensorboard_summary(self, decoder_output, encoder_output, autoencoder_loss, discriminator_loss,
@@ -522,7 +716,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         summary_op = tf.summary.merge_all()
         return summary_op
 
-    def generate_image_grid(self, sess, op, epoch, left_cell=None, save_image_grid=True):
+    def generate_image_grid(self, sess, op, epoch, points, left_cell=None, save_image_grid=True):
         """
         Generates and saves a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
@@ -535,11 +729,27 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        # creates evenly spaced values within [-10, 10] with a spacing of 1.5
-        x_points = np.arange(10, -10, -1.5).astype(np.float32)
-        y_points = np.arange(-10, 10, 1.5).astype(np.float32)
+        random_points = None
 
-        nx, ny = len(x_points), len(y_points)
+        if self.z_dim > 2:
+            # TODO: parameter for number of points to sample
+            # randomly sample some points from the z dim space
+            image_grid_x_length = 10
+            image_grid_y_length = 10
+            n_points_to_sample = image_grid_x_length * image_grid_y_length
+
+            # randomly sample some points from the z dim space
+            random_points = np.random.uniform(-10, 10, [n_points_to_sample, self.z_dim])
+
+        else:
+            # creates evenly spaced values within [-10, 10] with a spacing of 1.5
+            # x_points = np.arange(10, -10, -1.5).astype(np.float32)
+            # y_points = np.arange(-10, 10, 1.5).astype(np.float32)
+            x_points = np.arange(60, -60, -12).astype(np.float32)
+            y_points = np.arange(-60, 60, 12).astype(np.float32)
+
+        # TODO: parameter
+        nx, ny = 10, 10
         # create the image grid
         if left_cell:
             gs = gridspec.GridSpecFromSubplotSpec(nx, ny, left_cell)
@@ -552,13 +762,24 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # iterate over the image grid
         for i, g in enumerate(gs):
 
-            # create a data point from the x_points and y_points array as input for the decoder
-            z = np.concatenate(([y_points[int(i % nx)]], [x_points[int(i / ny)]]))
-            z = np.reshape(z, (1, 2))
+            # # create a data point from the random_points array
+            if self.z_dim > 2:
+                z = points[i]
+                # z = random_points[i]
+                # print(z)
+            else:
+                # create a data point from the x_points and y_points array as input for the decoder
+                z = np.concatenate(([y_points[int(i % nx)]], [x_points[int(i / ny)]]))
+
+            z = np.reshape(z, (1, self.z_dim))
 
             # run the decoder
-            x = sess.run(op, feed_dict={self.decoder_input: z})
+            x = sess.run(op, feed_dict={self.decoder_input: z, self.is_training: False})
             x = np.array(x).reshape(self.input_dim)
+
+            # TODO: check when normalize is necessary
+            # x = (x - np.min(x)) / (np.max(x) - np.min(x))
+
             ax = plt.subplot(g)
 
             # reshape the image array and display it
@@ -573,72 +794,20 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             ax.set_yticks([])
             ax.set_aspect('auto')
 
-            # create the label for the y axis
-            if ax.is_first_col():
-                ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
+            if self.z_dim == 2:
+                # create the label for the y axis
+                if ax.is_first_col():
+                    ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
 
-            # create the label x for the x axis
-            if ax.is_last_row():
-                ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
+                # create the label x for the x axis
+                if ax.is_last_row():
+                    ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
 
         if not left_cell and save_image_grid:
             # save the created image grid
             plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
         return list_of_images_for_swagger
-
-    def generate_image_grid_z_dim(self, sess, op, epoch, image_grid_shape=(10, 10), left_cell=None,
-                                  save_image_grid=True):
-        """
-        Generates a grid of images by passing a set of numbers to the decoder and getting its output.
-        :param sess: Tensorflow Session required to get the decoder output
-        :param op: Operation that needs to be called inorder to get the decoder output
-        :param epoch: current epoch of the training; image grid is saved as <epoch>.png
-        :param image_grid_shape: shape of the resulting image grid
-        :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
-        and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
-        to be plotted and not the "combinated" image (image grid + class distr. on latent space).
-        :param save_image_grid: whether to save the image grid
-        :return: None, displays a matplotlib window with all the merged images.
-        """
-
-        image_grid_x_length = image_grid_shape[0]
-        image_grid_y_length = image_grid_shape[1]
-        n_points_to_sample = image_grid_x_length * image_grid_y_length
-
-        # randomly sample some points from the z dim space
-        random_points = np.random.uniform(-10, 10, [n_points_to_sample, self.z_dim])
-
-        # create the image grid
-        if left_cell:
-            gs = gridspec.GridSpecFromSubplotSpec(image_grid_x_length, image_grid_y_length, left_cell)
-        else:
-            plt.subplot()
-            gs = gridspec.GridSpec(image_grid_x_length, image_grid_y_length, hspace=0.05, wspace=0.05)
-
-        for i, g in enumerate(gs):
-            # create a data point from the x_points and y_points array as input for the decoder
-            z = random_points[i]
-            z = np.reshape(z, (1, self.z_dim))
-
-            # run the decoder
-            x = sess.run(op, feed_dict={self.decoder_input: z})
-            ax = plt.subplot(g)
-
-            # reshape the image array and display it
-            img = aae_helper.reshape_image_array(self, x)
-            if self.color_scale == "gray_scale":
-                plt.imshow(img, cmap="gray")
-            else:
-                plt.imshow(img)
-
-            # we don't want ticks for the x or the y axis
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_aspect('auto')
-
-        if not left_cell and save_image_grid:
-            plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
 
     def generate_image_from_single_point(self, sess, single_point):
         """
@@ -652,7 +821,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         single_point = np.reshape(single_point, (1, self.z_dim))
 
         # run the point through the decoder to generate the image
-        generated_image = sess.run(self.decoder_output_real_dist, feed_dict={self.decoder_input: single_point})
+        generated_image = sess.run(self.decoder_output_real_dist, feed_dict={self.decoder_input: single_point,
+                                                                             self.is_training: False})
 
         # reshape the image array and display it
         generated_image = np.array(generated_image).reshape(self.input_dim)
@@ -663,7 +833,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         else:
             plt.imshow(img)
 
-        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "testing" + '.png')
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "test_algorithm" + '.png')
 
         return img
 
@@ -675,11 +845,12 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        # we need a new session, since training has been completed and the old session is closed
+        # we need a new session, if training has been completed and the old session has been closed
         if not is_train_mode_active:
             self.session = tf.Session()
 
         saved_model_path = None
+        writer = None
 
         latent_representations_current_epoch = []
         labels_current_epoch = []
@@ -688,7 +859,11 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         if Storage.get_all_input_data():
             data = Storage.get_all_input_data()
         else:
-            data = aae_helper.get_input_data(self.selected_dataset, color_scale=self.color_scale)
+            data = aae_helper.get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False)
+
+        # get the minimum and maximum values for each dimension on the latent space
+        # TODO: probably not needed
+        self.latent_space_min_max_per_dim = aae_helper.get_min_and_max_per_dim_on_latent_space(self.z_dim)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
         epochs_completed = 0
@@ -738,7 +913,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         # draw a sample from p(z) and use it as real distribution for the discriminator
                         # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
                         z_real_dist = \
-                            draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
+                             draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
+                        # TODO:
+                        # z_real_dist = draw_from_dim_reduced_dataset(self.batch_size, self.selected_dataset, self.z_dim)
 
                         # get the batch from the training data
                         # TODO:
@@ -754,7 +931,13 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         """
                         # train the autoencoder by minimizing the reconstruction error between X and X_target
                         # sess.run(self.autoencoder_optimizer, feed_dict={self.X: batch_x, self.X_target: batch_x})
-                        sess.run(self.autoencoder_trainer, feed_dict={self.X: batch_x, self.X_target: batch_x})
+                        sess.run(self.autoencoder_trainer,
+                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                            self.is_training: True,
+                                            self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
+                                            self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
+                                            self.dropout_discriminator:
+                                                self.parameter_dictionary["dropout_discriminator"]})
 
                         """
                         Regularization phase: the adversarial network first updates its discriminative network
@@ -766,11 +949,22 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         # generator
                         sess.run(self.discriminator_trainer,
                                  feed_dict={self.X: batch_x, self.X_target: batch_x,
-                                            self.real_distribution: z_real_dist})
+                                            self.real_distribution: z_real_dist,
+                                            self.is_training: True,
+                                            self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
+                                            self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
+                                            self.dropout_discriminator:
+                                                self.parameter_dictionary["dropout_discriminator"]})
                         # train the generator to fool the discriminator with its generated samples.
-                        sess.run(self.generator_trainer, feed_dict={self.X: batch_x, self.X_target: batch_x})
+                        sess.run(self.generator_trainer,
+                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                            self.is_training: True,
+                                            self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
+                                            self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
+                                            self.dropout_discriminator:
+                                                self.parameter_dictionary["dropout_discriminator"]})
 
-                        # every 5 epochs: write a summary for every 50th minibatch
+                        # every x epochs: write a summary for every 50th minibatch
                         if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
@@ -781,6 +975,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                  self.discriminator_neg_samples, self.discriminator_pos_samples,
                                  self.decoder_output],
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                           self.is_training: False,
                                            self.real_distribution: z_real_dist,
                                            self.decoder_input_multiple: z_real_dist})
                             if self.write_tensorboard:
@@ -810,7 +1005,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             self.minibatch_summary_vars["discriminator_neg"] = discriminator_neg
                             self.minibatch_summary_vars["discriminator_pos"] = discriminator_pos
                             self.minibatch_summary_vars["batch_x"] =  batch_x
-                            self.minibatch_summary_vars["decoder_output"] = decoder_output
+                            self.minibatch_summary_vars["x_reconstructed"] = decoder_output
                             self.minibatch_summary_vars["epoch"] = epoch
                             self.minibatch_summary_vars["b"] = b
                             self.minibatch_summary_vars["batch_labels"] = batch_labels
@@ -821,6 +1016,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                       decoder_output, epoch, b, batch_labels,
                                                                       include_tuning_performance=
                                                                       self.include_tuning_performance)
+
+                            aae_helper.create_reconstruction_grid(self, real_images=batch_x,
+                                                                  reconstructed_images=decoder_output, epoch=epoch,
+                                                                  batch_number=b)
 
                             if self.verbose:
                                 print("Epoch: {}, iteration: {}".format(epoch, b))
@@ -851,20 +1050,15 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # every x epochs ..
                     if epoch % self.summary_image_frequency == 0:
+
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
                         outer_grid = gridspec.GridSpec(1, 2)
                         left_cell = outer_grid[0, 0]  # the left SubplotSpec within outer_grid
 
                         # generate the image grid for the latent space
-                        # TODO: maybe two separate functions are not needed..
-                        if self.z_dim > 2:
-                            self.generate_image_grid_z_dim(sess, op=self.decoder_output_real_dist, epoch=epoch,
-                                                           left_cell=left_cell)
-                        else:
-                            self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
-                                                     left_cell=left_cell)
-                        # plt.close('all')
+                        self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
+                                                 left_cell=left_cell, points=latent_representations_current_epoch)
 
                         # draw the class distribution on the latent space
                         result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
@@ -904,7 +1098,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         processes the operations requested by swagger
         :param sess: tensorflow session
-        :param image_title: title of the image
         :return:
         """
 
@@ -931,7 +1124,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         result = self.generate_image_from_single_point(sess, function_params)
                         self.set_requested_operations_by_swagger_results(result)
                     elif function_name == "get_biases_or_weights_for_layer":
-                        result = aae_helper.get_biases_or_weights_for_layer(self, sess, function_params)
+                        result = aae_helper.get_biases_or_weights_for_layer(self, function_params)
                         self.set_requested_operations_by_swagger_results(result)
 
                     plt.close('all')

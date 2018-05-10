@@ -33,7 +33,7 @@ class DataSet(object):
         """Construct a DataSet.
         one_hot arg is used only if fake_data is true.    `dtype` can be either
         `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
-        `[0, 1]`.    Seed arg provides for convenient deterministic testing.
+        `[0, 1]`.    Seed arg provides for convenient deterministic test_algorithm.
         """
         seed1, seed2 = random_seed.get_seed(seed)
         # If op level seed is not set, use whatever graph level seed is returned
@@ -80,6 +80,9 @@ class DataSet(object):
     @property
     def epochs_completed(self):
         return self._epochs_completed
+
+    def set_images(self, images):
+        self._images = images
 
     def next_batch(self, batch_size, fake_data=False, shuffle=True):
         """Return the next `batch_size` examples from this data set."""
@@ -188,27 +191,83 @@ https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/py
 """
 
 
-def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale"):
+def normalize_np_array(np_array):
+    """
+    normalizes the given numpy array using z score normalization (subtracting the mean of each element and dividing
+    by the std deviation)
+    :param np_array:
+    :return:
+    """
+    # get the shape of the data points
+    data_point_shape = np_array.shape[1]
+
+    # calculate the mean for each element and create a vector out of it
+    mean_per_element = np.mean(np_array, axis=0)
+    means_col_vec = mean_per_element.reshape((1, data_point_shape))
+
+    # calculate the std dev for each element and create a vector out of it
+    std_dev_per_element = np.std(np_array, axis=0)
+    std_dev_col_vec = std_dev_per_element.reshape((1, data_point_shape))
+
+    # apply z score normalization
+    return (np_array - means_col_vec) / std_dev_col_vec
+
+
+def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale", data_normalized=False):
     """
     returns the input data set based on self.selected_dataset
     :return: object holding the train data, the test data and the validation data
     """
 
+    data = None
+
     # hand written digits
     if selected_dataset == "MNIST":
-        return read_mnist_data_from_ubyte(filepath, one_hot=True)
+        data = read_mnist_data_from_ubyte(filepath, one_hot=True)
     # Street View House Numbers
     elif selected_dataset == "SVHN":
         if color_scale == "gray_scale":
-            return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000, grey_scale=True)
+            data = read_svhn_from_mat(filepath, one_hot=True, validation_size=5000, grey_scale=True)
         else:
-            return read_svhn_from_mat(filepath, one_hot=True, validation_size=5000)
+            data = read_svhn_from_mat(filepath, one_hot=True, validation_size=5000)
     elif selected_dataset == "cifar10":
-        return read_cifar10(filepath, one_hot=True, validation_size=5000)
+        if color_scale == "gray_scale":
+            data = read_cifar10(filepath, one_hot=True, validation_size=5000, grey_scale=True)
+        else:
+            data = read_cifar10(filepath, one_hot=True, validation_size=5000)
     elif selected_dataset == "custom":
         # TODO:
         print("not yet implemented")
         raise NotImplementedError
+
+    if data_normalized:
+
+        # get the image data
+        train_images= data.train.images
+        test_images = data.test.images
+        validation_images = data.validation.images
+
+        # normalize it
+        normalized_train_images = normalize_np_array(train_images)
+        normalized_test_images = normalize_np_array(test_images)
+        normalized_validation_images = normalize_np_array(validation_images)
+
+        # store the normalized data in the data set
+        data.train.set_images(normalized_train_images)
+        data.test.set_images(normalized_test_images)
+        data.validation.set_images(normalized_validation_images)
+
+        # create the dataset holding the test, train and validation data
+        # test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
+        #                                          train_images, train_labels, 5000)
+        #
+        # return Datasets(train=train, validation=validation, test=test)
+        #
+        #
+        # data.train.images = data.train.images._replace(v=node.v)
+
+    return data
+
 
 """
 Read .tfrecords
@@ -282,7 +341,6 @@ def read_cifar10(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, 
     :param grey_scale: load the images as gray scale
     :return:
     """
-    # TODO: implement gray scale
 
     # names of the cifar10 dataset
     cifar10_train_file_names = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4"]
@@ -313,6 +371,11 @@ def read_cifar10(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32, 
     # convert the lists to numpy array
     train_images = np.array(train_images)
     train_labels = np.array(train_labels)
+
+    if grey_scale:
+        # grey scale luminosity conversion formula is 0.21 R + 0.72 G + 0.07 B
+        test_images = test_images[:, :1024] * 0.21 + test_images[:, 1024:1024*2] * 0.72 + test_images[:, 1024*2:] * 0.07
+        train_images = train_images[:, :1024] * 0.21 + train_images[:, 1024:1024*2] * 0.72 + train_images[:, 1024*2:] * 0.07
 
     # create the dataset holding the test, train and validation data
     test, train, validation = create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels,
@@ -370,13 +433,12 @@ def reshape_image_array(img_array, grey_scale=False):
     return reshaped_img_array
 
 
-def read_mat_file(filename, one_hot=False, num_classes=10, grey_scale=False):
+def read_mat_file(filename, one_hot=False, num_classes=10):
     """
     reads the mat file and returns the array holding the images
     :param filename: filename to read
     :param one_hot: whether labels should be returned as one hot vector
     :param num_classes: number of classes we have
-    :param grey_scale: whether we want to have grey scale images
     :return: array holding the image data with shape [num_of_images, rows * cols * channels], array holding the labels
     with shape [num_of_images, num_classes] if one_hot is true and shape [num_of_images] otherwise
     """
@@ -389,7 +451,7 @@ def read_mat_file(filename, one_hot=False, num_classes=10, grey_scale=False):
     else:
         labels_one_hot = labels
     # labels_one_hot = labels
-    img_array = reshape_image_array(img_array=imgs, grey_scale=grey_scale)
+    img_array = reshape_image_array(img_array=imgs)
     return img_array, labels_one_hot
 
 
@@ -414,15 +476,20 @@ def read_svhn_from_mat(data_dir, one_hot=False, num_classes=10, dtype=dtypes.flo
 
     # read the train file
     train_file = open(train_filename, 'rb')
-    train_images, train_labels = read_mat_file(filename=train_file, one_hot=one_hot, num_classes=num_classes,
-                                               grey_scale=grey_scale)
+    train_images, train_labels = read_mat_file(filename=train_file, one_hot=one_hot, num_classes=num_classes)
     train_file.close()
 
     # read the test file
     test_file = open(test_filename, 'rb')
-    test_images, test_labels = read_mat_file(filename=test_file, one_hot=one_hot, num_classes=num_classes,
-                                             grey_scale=grey_scale)
+    test_images, test_labels = read_mat_file(filename=test_file, one_hot=one_hot, num_classes=num_classes)
     test_file.close()
+
+    if grey_scale:
+        print("grey scale")
+
+        # grey scale luminosity conversion formula is 0.21 R + 0.72 G + 0.07 B
+        test_images = test_images[:, :1024] * 0.21 + test_images[:, 1024:1024*2] * 0.72 + test_images[:, 1024*2:] * 0.07
+        train_images = train_images[:, :1024] * 0.21 + train_images[:, 1024:1024*2] * 0.72 + train_images[:, 1024*2:] * 0.07
 
     # create the dataset holding the test, train and validation data
     test, train, validation = create_dataset(dtype, num_classes, False, reshape, seed, test_images, test_labels,
@@ -613,7 +680,7 @@ read image data (png)
 def read_images_from_dir(data_dir, n_classes=10, image_fileformat='.png', dim_x=28, dim_y=28, color_channels=1):
     """
     reads the images from the data directory
-    :param data_dir: ../data/mnist_png/testing/
+    :param data_dir: ../data/mnist_png/test_algorithm/
     :param n_classes: number of classes we have
     :param image_fileformat: fileformat of the image
     :param dim_x: x resolution of the image
@@ -656,7 +723,7 @@ def read_mnist_from_png(data_dir, one_hot=False, num_classes=10, dtype=dtypes.fl
     :return:
     """
     print("reading test data")
-    test_images, test_labels = read_images_from_dir(data_dir + "/mnist_png/testing/", image_fileformat="png")
+    test_images, test_labels = read_images_from_dir(data_dir + "/mnist_png/test_algorithm/", image_fileformat="png")
 
     print("reading train data")
     train_images, train_labels = read_images_from_dir(data_dir + "/mnist_png/training/", image_fileformat="png")
@@ -711,7 +778,7 @@ def testing():
     """
 
     if False:
-        cifar10 = read_cifar10('../data', one_hot=True)
+        cifar10 = read_cifar10('../../data', one_hot=True)
         first_img, _ = cifar10.train.next_batch(1)
 
         print(_)
@@ -732,7 +799,7 @@ def testing():
             start = timeit.default_timer()
             print("read .mat")
 
-            svhn = read_svhn_from_mat('../data', grey_scale=True, one_hot=True)
+            svhn = read_svhn_from_mat('../../data', grey_scale=True, one_hot=True)
             first_img, _ = svhn.train.next_batch(1)
 
             print(_)
@@ -748,7 +815,7 @@ def testing():
             start = timeit.default_timer()
             print("read .mat")
 
-            svhn = read_svhn_from_mat('../data', grey_scale=False, one_hot=True)
+            svhn = read_svhn_from_mat('../../data', grey_scale=False, one_hot=True)
             first_img, _ = svhn.train.next_batch(1)
 
             print(_)
@@ -774,7 +841,7 @@ def testing():
         start = timeit.default_timer()
         print("read ubyte")
 
-        mnist = read_mnist_data_from_ubyte('../data', one_hot=True)
+        mnist = read_mnist_data_from_ubyte('../../data', one_hot=True)
         ubyte_first_img, _ = mnist.train.next_batch(1)
 
         print(_)
@@ -797,7 +864,7 @@ def testing():
         print("read csv")
 
         # test reading csv files
-        train_images = read_csv_data_set('../data', one_hot=True)
+        train_images = read_csv_data_set('../../data', one_hot=True)
         csv_first_img, _ = train_images.train.next_batch(1)
 
         print(_)
@@ -819,7 +886,7 @@ def testing():
         start = timeit.default_timer()
         print("read png")
 
-        mnist = read_mnist_from_png('../data', one_hot=True)
+        mnist = read_mnist_from_png('../../data', one_hot=True)
         png_first_img, _ = mnist.train.next_batch(1)
 
         print(_)

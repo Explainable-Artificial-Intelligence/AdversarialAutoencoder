@@ -151,7 +151,7 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
     sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])
 
     # save the tuning results for the swagger server
-    Storage.set_tuning_results(performance_for_parameter_combination)
+    Storage.set_tuning_results(sorted_list)
 
     print("#" * 20)
 

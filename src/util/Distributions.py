@@ -6,7 +6,7 @@ import math
 def draw_from_np_distribution(n_samples=1, **distribution_parameters):
     """
     wrapper function to draw from the distributions implemented in numpy.random.
-    :param n_samples: number of samples to return
+    :param n_samples: int or tuple of ints, Output shape.
     :param distribution_parameters: dictionary holding
         required:
             - distribution_name: the distribution to draw from
@@ -185,6 +185,90 @@ def draw_from_np_distribution(n_samples=1, **distribution_parameters):
         pass
 
     return return_value
+
+
+def draw_from_dim_reduced_dataset(n_samples, dataset, z_dim):
+    """
+    draws from the dataset which has gotten their dimension reduced
+    :param n_samples: number of samples to draw
+    :param dataset: ["MNIST", "SVHN", "cifar10"]
+    :param z_dim: dimensionality
+    :return:
+    """
+
+    # restore np array from numpy file
+    # TODO: no more hard coded file names
+    data = np.load('../data/dimension_reduced_data/' + dataset + '/pca/SVHN_pca_z_dim_8' + '.npy')
+
+    # restore labels
+    # data_labels = np.load('../data/dimension_reduced_data/mnist_z_dim_equals_2_labels.npy')
+
+    noise_distribution = {"distribution_name": "normal", "loc": 0, "scale": 0.1}
+
+    # try it with some noise
+    random_data = select_randomly_from_np_array(data, n_samples, noise_distribution)
+
+    return random_data
+
+
+def select_randomly_from_np_array_with_label(np_array, np_array_labels, n_samples, int_label, noise_distribution_params):
+    """
+    returns n_samples samples with label=int_label randomly selected from the numpy array
+    :param np_array: numpy array to select from
+    :param np_array_labels: numpy array of the labels
+    :param n_samples: how many samples to return
+    :param int_label: desired label of the samples
+    :param noise_distribution_params: dictionary holding
+        required:
+            - distribution_name: the distribution to draw from
+        optionally:
+            - distribution specific parameters: e.g. the lower and upper boundary for the uniform distribution.
+            Note: necessary if it's required to draw from the distribution!
+            - is_positive: returned value should be >= 0
+            - is_greater_than_zero: returned value should be > 0
+            - is_negative: returned value should be <= 0
+            - is_smaller_than_zero: returned value should be < 0
+    :return:
+    """
+    samples_for_label = np_array[np.where(np_array_labels == int_label)]
+    random_indices = np.random.choice(samples_for_label.shape[0], n_samples, replace=False)
+
+    random_samples = samples_for_label[random_indices]
+
+    if noise_distribution_params:
+        noise_array = draw_from_np_distribution(n_samples=random_samples.shape, **noise_distribution_params)
+        # apply noise
+        random_samples += noise_array
+
+    return random_samples
+
+
+def select_randomly_from_np_array(np_array, n_samples, noise_distribution_params):
+    """
+    returns n_samples samples randomly selected from the numpy array
+    :param np_array: numpy array to select from
+    :param n_samples: how many samples to return
+    :param noise_distribution_params: dictionary holding
+        required:
+            - distribution_name: the distribution to draw from
+        optionally:
+            - distribution specific parameters: e.g. the lower and upper boundary for the uniform distribution.
+            Note: necessary if it's required to draw from the distribution!
+            - is_positive: returned value should be >= 0
+            - is_greater_than_zero: returned value should be > 0
+            - is_negative: returned value should be <= 0
+            - is_smaller_than_zero: returned value should be < 0
+    :return:
+    """
+    random_indices = np.random.choice(np_array.shape[0], n_samples, replace=False)
+    random_samples = np_array[random_indices]
+
+    if noise_distribution_params:
+        noise_array = draw_from_np_distribution(n_samples=random_samples.shape, **noise_distribution_params)
+        # apply noise
+        random_samples += noise_array
+
+    return random_samples
 
 
 def create_class_specific_samples_swiss_roll(class_i: int, n_classes: int, spread: float, noise: float,

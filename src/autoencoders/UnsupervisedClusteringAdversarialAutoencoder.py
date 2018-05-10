@@ -17,8 +17,10 @@ from swagger_server.utils.Storage import Storage
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
 
 
-class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
+class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
+
+        self.n_clusters = 16
 
         # vars for the swagger server
         self.requested_operations_by_swagger = []
@@ -186,8 +188,8 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
 
         # loss function
-        self.loss_function_discriminator_categorical = parameter_dictionary["loss_function_discriminator_categorical"]
-        self.loss_function_discriminator_gaussian = parameter_dictionary["loss_function_discriminator_gaussian"]
+        self.loss_function_discriminator_c = parameter_dictionary["loss_function_discriminator_categorical"]
+        self.loss_function_discriminator_g = parameter_dictionary["loss_function_discriminator_gaussian"]
         self.loss_function_generator = parameter_dictionary["loss_function_generator"]
 
         # path for the results
@@ -221,14 +223,14 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                 name='Real_distribution')
 
         # holds the input samples for the decoder (only for generating the images; NOT used for training)
-        self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, self.z_dim + self.n_classes],
+        self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, self.z_dim + self.n_clusters],
                                             name='Decoder_input')
         self.decoder_input_multiple = \
-            tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim + self.n_classes],
+            tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim + self.n_clusters],
                            name='Decoder_input_multiple')
 
         # holds the categorical distribution
-        self.categorial_distribution = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.n_classes],
+        self.categorial_distribution = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.n_clusters],
                                                       name='Categorical_distribution')
 
         # for proper batch normalization
@@ -251,7 +253,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # Concat class label and the encoder output
             decoder_input = tf.concat([self.encoder_class_label, self.encoder_latent_space], 1)
             # decoder part of the autoencoder; takes z and y as input
-            self.decoder_output = self.decoder(decoder_input)
+            decoder_output = self.decoder(decoder_input)
 
         # init discriminator for the samples drawn from some gaussian distribution (holds style information)
         with tf.variable_scope(tf.get_variable_scope()):
@@ -292,26 +294,20 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.decoder_output_multiple = \
                 self.decoder(self.decoder_input_multiple, reuse=True)
 
-        # Classification accuracy of encoder
-        # compare the predicted labels with the actual labels
-        correct_pred = tf.equal(tf.argmax(predicted_labels, 1), tf.argmax(self.y, 1))
-        # calculate the accuracy
-        self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-
         """
         Init the loss functions
         """
 
         # Autoencoder loss
-        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
+        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - decoder_output))
 
         # Gaussian Discriminator Loss
         discriminator_gaussian_loss_pos_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_gaussian,
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_g,
                                          labels=tf.ones_like(self.discriminator_gaussian_pos_samples),
                                          logits=self.discriminator_gaussian_pos_samples))
         discriminator_gaussian_loss_neg_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_gaussian,
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_g,
                                          labels=tf.zeros_like(self.discriminator_gaussian_neg_samples),
                                          logits=self.discriminator_gaussian_neg_samples))
         self.discriminator_gaussian_loss = discriminator_gaussian_loss_neg_samples + \
@@ -319,11 +315,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Categorical Discrimminator Loss
         discriminator_categorical_loss_pos_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_categorical,
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_c,
                                          labels=tf.ones_like(self.discriminator_categorical_pos_samples),
                                          logits=self.discriminator_categorical_pos_samples))
         discriminator_categorical_loss_neg_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_categorical,
+            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_c,
                                          labels=tf.zeros_like(self.discriminator_categorical_neg_samples),
                                          logits=self.discriminator_categorical_neg_samples))
         self.discriminator_categorical_loss = discriminator_categorical_loss_pos_samples + \
@@ -340,10 +336,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                          logits=self.discriminator_categorical_neg_samples))
         self.generator_loss = generator_gaussian_loss + generator_categorical_loss
 
-        # Supervised Encoder Loss
-        self.supervised_encoder_loss = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(labels=self.y, logits=predicted_labels))
-
         """
         Init the optimizers
         """
@@ -352,12 +344,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         optimizer_discriminator_gaussian = parameter_dictionary["optimizer_discriminator_gaussian"]
         optimizer_discriminator_categorical = parameter_dictionary["optimizer_discriminator_categorical"]
         optimizer_generator = parameter_dictionary["optimizer_generator"]
-        optimizer_supervised_encoder = parameter_dictionary["optimizer_supervised_encoder"]
 
         # get the discriminator and encoder variables
         all_variables = tf.trainable_variables()
-        discriminator_gaussian_vars = [var for var in all_variables if 'discriminator_gaussian_' in var.name]
-        discriminator_categorical_vars = [var for var in all_variables if 'discriminator_categorical_' in var.name]
+        discriminator_gaussian_vars = [var for var in all_variables if 'discriminator_gaussian' in var.name]
+        discriminator_categorical_vars = [var for var in all_variables if 'discriminator_categorical' in var.name]
         encoder_vars = [var for var in all_variables if 'encoder_' in var.name]
 
         # Optimizers
@@ -388,23 +379,15 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.generator_trainer = \
             self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars, global_step=self.global_step)
 
-        self.supervised_encoder_optimizer = aae_helper.\
-            get_optimizer(self.parameter_dictionary, optimizer_supervised_encoder, "autoencoder",
-                          global_step=self.global_step,
-                          decaying_learning_rate_name=self.decaying_learning_rate_name_supervised_encoder)
-        self.supervised_encoder_trainer = self.supervised_encoder_optimizer.minimize(self.supervised_encoder_loss,
-                                                                                     var_list=encoder_vars)
-
         """
         Create the tensorboard summary and the tf.saver and tf.session vars
         """
         self.tensorboard_summary = \
-            self.create_tensorboard_summary(decoder_output=self.decoder_output, encoder_output=self.encoder_latent_space,
+            self.create_tensorboard_summary(decoder_output=decoder_output, encoder_output=self.encoder_latent_space,
                                             autoencoder_loss=self.autoencoder_loss,
                                             discriminator_gaussian_loss=self.discriminator_gaussian_loss,
                                             discriminator_categorical_loss=self.discriminator_categorical_loss,
                                             generator_loss=self.generator_loss,
-                                            supervised_encoder_loss=self.supervised_encoder_loss,
                                             real_distribution=self.real_distribution,
                                             encoder_output_label=self.encoder_class_label,
                                             categorical_distribution=self.categorial_distribution,
@@ -423,8 +406,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.final_performance = None
         self.performance_over_time = {"autoencoder_losses": [], "discriminator_gaussian_losses": [],
                                       "discriminator_categorical_losses": [], "generator_losses": [],
-                                      "supervised_encoder_loss": [], "accuracy": [], "accuracy_epochs": [],
-                                      "list_of_epochs": []}
+                                      "supervised_encoder_loss": [], "list_of_epochs": []}
         self.learning_rates = {"autoencoder_lr": [], "discriminator_g_lr": [], "discriminator_c_lr": [],
                                "generator_lr": [], "supervised_encoder_lr": [], "list_of_epochs": []}
 
@@ -637,7 +619,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 # label prediction of the encoder
                 categorical_encoder_label = \
                     aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
-                                                  self.n_classes, 'encoder_label', activation_function="linear",
+                                                  self.n_clusters, 'encoder_label', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[-1],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[-1],
                                                   bias_initializer=self.bias_initializer_encoder[-1],
@@ -674,7 +656,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is no hidden layer
             if n_hidden_layers == 0:
                 decoder_output = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes, self.input_dim, 'x_reconstructed',
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters, self.input_dim, 'x_reconstructed',
                                                   weight_initializer=self.weights_initializer_decoder[0],
                                                   weight_initializer_params=self.weights_initializer_params_decoder[0],
                                                   bias_initializer=self.bias_initializer_decoder[0],
@@ -688,7 +670,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes,
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   'decoder_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_decoder[0],
@@ -717,7 +699,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_classes,
+                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   'decoder_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_decoder[0],
@@ -881,7 +863,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is no hidden layer
             if n__hidden_layers == 0:
                 discriminator_output = \
-                    aae_helper.create_dense_layer(X, self.n_classes, 1, 'discriminator_categorical_output',
+                    aae_helper.create_dense_layer(X, self.n_clusters, 1, 'discriminator_categorical_output',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_c[0],
                                                   bias_initializer=self.bias_initializer_discriminator_c[0],
@@ -895,7 +877,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.n_classes,
+                    aae_helper.create_dense_layer(X, self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_discriminator_c[0],
                                                   'discriminator_categorical_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
@@ -923,7 +905,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.n_classes,
+                    aae_helper.create_dense_layer(X, self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_discriminator_c[0],
                                                   'discriminator_categorical_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
@@ -977,7 +959,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         return x[random_index], y[random_index]
 
     def create_tensorboard_summary(self, decoder_output, encoder_output, autoencoder_loss, discriminator_gaussian_loss,
-                                   discriminator_categorical_loss, generator_loss, supervised_encoder_loss,
+                                   discriminator_categorical_loss, generator_loss,
                                    real_distribution, encoder_output_label, categorical_distribution,
                                    decoder_output_multiple):
         """
@@ -1008,7 +990,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         tf.summary.scalar(name='Discriminator Gaussian Loss', tensor=discriminator_gaussian_loss)
         tf.summary.scalar(name='Discriminator Categorical Loss', tensor=discriminator_categorical_loss)
         tf.summary.scalar(name='Generator Loss', tensor=generator_loss)
-        tf.summary.scalar(name='Supervised Encoder Loss', tensor=supervised_encoder_loss)
         tf.summary.histogram(name='Encoder Gaussian Distribution', values=encoder_output)
         tf.summary.histogram(name='Real Gaussian Distribution', values=real_distribution)
         tf.summary.histogram(name='Encoder Categorical Distribution', values=encoder_output_label)
@@ -1050,12 +1031,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :param save_image_grid: whether to save the image grid
         :return: None, displays a matplotlib window with all the merged images.
         """
-        nx, ny = self.n_classes, self.n_classes
+        nx, ny = self.n_clusters, self.n_clusters
+        self.random_points_for_image_grid = np.random.randn(self.n_clusters, self.z_dim) * 5.
 
-        if self.random_points_for_image_grid is None:
-            self.random_points_for_image_grid = np.random.randn(self.n_classes, self.z_dim) * 5.
-
-        class_labels = np.identity(self.n_classes)
+        cluster_labels = np.identity(self.n_clusters)
 
         # create the image grid
         if left_cell:
@@ -1065,16 +1044,18 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
 
         # unicode equivalent for the used matplotlib markers
-        unicode_markers = [u"\u25b2", u"\u25bc", u"\u25b6", u"\u25c0", u"\u25a0", u"\u2605", "-", "+", "x", "|"]
+        # TODO: more than 10
+        unicode_markers = [u"\u25b2", u"\u25bc", u"\u25b6", u"\u25c0", u"\u25a0", u"\u2605", "-", "+", "x", "|",
+                           "a", "b", "c", "d", "e", "f"]
 
         list_of_images_for_swagger = []
 
         i = 0
-        for class_label_one_hot in class_labels:
+        for cluster_label_one_hot in cluster_labels:
             for j, r in enumerate(self.random_points_for_image_grid):
-                r, class_label_one_hot = np.reshape(r, (1, self.z_dim)), np.reshape(class_label_one_hot,
-                                                                                    (1, self.n_classes))
-                dec_input = np.concatenate((class_label_one_hot, r), 1)
+                r, cluster_label_one_hot = np.reshape(r, (1, self.z_dim)), np.reshape(cluster_label_one_hot,
+                                                                                    (1, self.n_clusters))
+                dec_input = np.concatenate((cluster_label_one_hot, r), 1)
                 x = sess.run(op, feed_dict={self.decoder_input: dec_input, self.is_training: False})
                 ax = plt.subplot(gs[i])
                 i += 1
@@ -1095,7 +1076,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 # create the label for the y axis
                 if ax.is_first_col():
-                    class_label = int(i / self.n_classes)
+                    class_label = int(i / self.n_clusters)
                     ax.set_ylabel(class_label, fontsize=9)
 
                 # create the label x for the x axis
@@ -1172,7 +1153,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         discriminator_loss_g_final = 0
         discriminator_loss_c_final = 0
         generator_loss_final = 0
-        accuracy = 0
         supervised_encoder_loss_final = 0
         epochs_completed = 0
 
@@ -1222,7 +1202,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # create some onehot vectors and use it as input for the categorical discriminator
                         real_cat_dist = np.random.randint(low=0, high=10, size=self.batch_size)
-                        real_cat_dist = np.eye(self.n_classes)[real_cat_dist]
+                        real_cat_dist = np.eye(self.n_clusters)[real_cat_dist]
 
                         # get the unlabeled batch from the training data
                         batch_X_unlabeled, batch_X_unlabeled_labels = data.train.next_batch(self.batch_size)
@@ -1286,42 +1266,37 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                 self.parameter_dictionary["dropout_discriminator_g"],
                                             self.is_training: True})
 
-                        """
-                        Semi-supervised classification phase: autoencoder updates q(y|x) to minimize the cross-entropy 
-                        cost on a labeled mini-batch.
-                        """
-                        # update encoder
-                        sess.run(self.supervised_encoder_trainer,
-                                 feed_dict={self.X_labeled: mini_batch_X_labeled, self.y: mini_batch_labels,
-                                            self.is_training: True})
-
                         # every 5 epochs: write a summary for every 10th minibatch
-                        if epoch % self.summary_image_frequency == 0 and b % 10 == 0:
+                        if epoch % self.summary_image_frequency == 0 and b % 100 == 0:
 
                             # prepare the decoder inputs
-                            n_images_per_class = int(self.batch_size / self.n_classes)
-                            class_labels_one_hot = np.identity(self.n_classes)
+                            n_images_per_class = int(np.ceil(self.batch_size / self.n_clusters))
+                            cluster_labels_one_hot = np.identity(self.n_clusters)
                             dec_inputs = []
                             for k in range(n_images_per_class):
-                                for class_label in class_labels_one_hot:
+                                for cluster_label in cluster_labels_one_hot:
                                     random_inputs = np.random.randn(1, self.z_dim) * 5.
                                     random_inputs = np.reshape(random_inputs, (1, self.z_dim))
-                                    class_label = np.reshape(class_label, (1, self.n_classes))
-                                    dec_inputs.append(np.concatenate((random_inputs, class_label), 1))
-                            dec_inputs = np.array(dec_inputs).reshape(self.batch_size, self.z_dim + self.n_classes)
+                                    cluster_label = np.reshape(cluster_label, (1, self.n_clusters))
+                                    dec_inputs.append(np.concatenate((random_inputs, cluster_label), 1))
+                            dec_inputs = np.array(dec_inputs)
+                            # select batch size entries from the array, so reshape works properly in case batch_size is
+                            # not divisible by the number of clusters without remainder
+                            random_indices = np.random.choice(dec_inputs.shape[0], self.batch_size, replace=False)
+                            random_samples = dec_inputs[random_indices]
+                            dec_inputs = random_samples.reshape(self.batch_size, self.z_dim + self.n_clusters)
 
                             # get the network output for the summary images
                             autoencoder_loss, discriminator_gaussian_loss, discriminator_categorical_loss, \
-                            generator_loss, supervised_encoder_loss, summary, real_dist, \
+                            generator_loss, summary, real_dist, \
                             latent_representation, encoder_cat_dist, discriminator_gaussian_pos, \
-                            discriminator_gaussian_neg, discriminator_cat_pos, discriminator_cat_neg, \
-                            decoder_output = sess.run(
+                            discriminator_gaussian_neg, discriminator_cat_pos, discriminator_cat_neg = sess.run(
                                 [self.autoencoder_loss, self.discriminator_gaussian_loss,
-                                 self.discriminator_categorical_loss, self.generator_loss, self.supervised_encoder_loss,
+                                 self.discriminator_categorical_loss, self.generator_loss,
                                  self.tensorboard_summary, self.real_distribution, self.encoder_latent_space,
                                  self.encoder_class_label, self.discriminator_gaussian_pos_samples,
                                  self.discriminator_gaussian_neg_samples, self.discriminator_categorical_pos_samples,
-                                 self.discriminator_categorical_neg_samples, self.decoder_output],
+                                 self.discriminator_categorical_neg_samples],
                                 feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                            self.real_distribution: z_real_dist, self.y: mini_batch_labels,
                                            self.X_labeled: mini_batch_X_labeled,
@@ -1332,20 +1307,36 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                             # prepare the decoder input for a single input image
                             r = np.reshape(latent_representation[0, :], (1, self.z_dim))
-                            class_label_one_hot = np.reshape(batch_X_unlabeled_labels[0, :], (1, self.n_classes))
+                            int_label = np.argmax(batch_X_unlabeled_labels[0, :], axis=0)
+                            class_label_one_hot = np.reshape(np.identity(self.n_clusters)[int_label, :], (1, self.n_clusters))
+                            # class_label_one_hot = np.reshape(batch_X_unlabeled_labels[0, :], (1, self.n_classes))
                             dec_input = np.concatenate((class_label_one_hot, r), 1)
 
-                            # reconstruct the image
+                            # # reconstruct the image
                             reconstructed_image = sess.run(self.decoder_output_real_dist,
                                                            feed_dict={self.decoder_input: dec_input,
                                                                       self.is_training: False})
+
+                            #  digits generated by fixing the style variable to zero and setting the label variable to
+                            # one of the 16 one-hot vectors.
+                            cluster_head_one_hot_vectors = np.identity(self.n_clusters)
+                            cluster_heads = []
+                            for cluster_head_one_hot_vector in cluster_head_one_hot_vectors:
+                                style_variable = np.reshape(np.array([0]*self.z_dim), (1, self.z_dim))
+                                cluster_head_one_hot_vector = cluster_head_one_hot_vector.reshape(1, self.n_clusters)
+                                dec_input = np.concatenate((cluster_head_one_hot_vector, style_variable), 1)
+
+                                cluster_head = sess.run(self.decoder_output_real_dist,
+                                                        feed_dict={self.decoder_input: dec_input,
+                                                                   self.is_training: False})
+                                cluster_heads.append(cluster_head)
+                            aae_helper.visualize_cluster_heads(self, cluster_heads, epoch, b)
 
                             # update the dictionary holding the losses
                             self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
                             self.performance_over_time["discriminator_gaussian_losses"].append(discriminator_gaussian_loss)
                             self.performance_over_time["discriminator_categorical_losses"].append(discriminator_categorical_loss)
                             self.performance_over_time["generator_losses"].append(generator_loss)
-                            self.performance_over_time["supervised_encoder_loss"].append(supervised_encoder_loss)
                             self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
 
                             # update the dictionary holding the learning rates
@@ -1357,8 +1348,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 aae_helper.get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer, sess))
                             self.learning_rates["generator_lr"].append(
                                 aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess))
-                            self.learning_rates["supervised_encoder_lr"].append(
-                                aae_helper.get_learning_rate_for_optimizer(self.supervised_encoder_optimizer, sess))
                             self.learning_rates["list_of_epochs"].append(epoch + (b / n_batches))
 
                             # update the lists holding the latent representation + labels for the current minibatch
@@ -1381,7 +1370,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             self.minibatch_summary_vars["discriminator_cat_pos"] = discriminator_cat_pos
 
                             # create the summary image for the current minibatch
-                            aae_helper.create_minibatch_summary_image_semi_supervised(self, real_dist,
+                            aae_helper.create_minibatch_summary_image_unsupervised_clustering(self, real_dist,
                                                                                       latent_representation,
                                                                                       batch_X_unlabeled,
                                                                                       reconstructed_image, epoch, b,
@@ -1396,17 +1385,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                                       self.include_tuning_performance
                                                                                       )
 
-                            # TODO: reconstructed image is only one image
-                            aae_helper.create_reconstruction_grid(self, real_images=batch_X_unlabeled,
-                                                                  reconstructed_images=decoder_output, epoch=epoch,
-                                                                  batch_number=b)
-
                             # set the latest loss as final loss
                             autoencoder_loss_final = autoencoder_loss
                             discriminator_loss_g_final = discriminator_gaussian_loss
                             discriminator_loss_c_final = discriminator_categorical_loss
                             generator_loss_final = generator_loss
-                            supervised_encoder_loss_final = supervised_encoder_loss
 
                             if self.verbose:
                                 print("Epoch: {}, iteration: {}".format(epoch, b))
@@ -1414,7 +1397,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 print("Discriminator Gauss Loss: {}".format(discriminator_gaussian_loss))
                                 print("Discriminator Categorical Loss: {}".format(discriminator_categorical_loss))
                                 print("Generator Loss: {}".format(generator_loss))
-                                print("Supervised Loss: {}\n".format(supervised_encoder_loss))
                                 print('Learning rate autoencoder: {}'.format(
                                     aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess)))
                                 print('Learning rate categorical discriminator: {}'.format(
@@ -1425,43 +1407,13 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                                sess)))
                                 print('Learning rate generator: {}'.format(
                                     aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess)))
-                                print('Learning rate supervised encoder: {}'.format(
-                                    aae_helper.get_learning_rate_for_optimizer(self.supervised_encoder_optimizer,
-                                                                               sess)))
 
                         step += 1
-
-                    # evaluate the classification performance
-                    accuracy = 0
-                    num_batches = int(data.validation.num_examples / self.batch_size)
-                    for j in range(num_batches):
-                        # Classify unseen validation data instead of test data or train data
-                        mini_batch_X_labeled, mini_batch_labels = data.validation.next_batch(batch_size=self.batch_size)
-                        encoder_acc = sess.run(self.accuracy, feed_dict={self.X_labeled: mini_batch_X_labeled,
-                                                                         self.y: mini_batch_labels,
-                                                                         self.is_training: False})
-                        accuracy += encoder_acc
-                    accuracy /= num_batches
-                    self.performance_over_time["accuracy"].append(accuracy)
-                    self.performance_over_time["accuracy_epochs"].append(epoch)
-
-                    if self.verbose:
-                        print("Encoder Classification Accuracy: {}".format(accuracy))
-                    with open(log_path + '/log.txt', 'a') as log:
-                        log.write("Encoder Classification Accuracy: {}\n".format(accuracy))
 
                     epochs_completed += 1
 
                     # every x epochs..
                     if epoch % self.summary_image_frequency == 0:
-
-                        # draw randomly from the latent representation; those points will be then be used to create the
-                        # images on the image grid
-                        random_indices = np.random.choice(np.array(latent_representations_current_epoch).shape[0],
-                                                          self.n_classes, replace=False)
-                        self.random_points_for_image_grid = \
-                            np.array(latent_representations_current_epoch)[random_indices]
-
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
                         outer_grid = gridspec.GridSpec(1, 2)
@@ -1476,7 +1428,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                                                labels_current_epoch, result_path, epoch,
                                                                                self.random_points_for_image_grid,
                                                                                combined_plot=True)
-
                             # reset random points
                             self.random_points_for_image_grid = None
 
@@ -1504,8 +1455,8 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             if epochs_completed > 0:
                 # end the training
                 self.end_training(autoencoder_loss_final, discriminator_loss_g_final, discriminator_loss_c_final,
-                                  generator_loss_final, supervised_encoder_loss_final, accuracy,
-                                  saved_model_path, self.saver, sess, step)
+                                  generator_loss_final, supervised_encoder_loss_final, saved_model_path, self.saver,
+                                  sess, step)
 
     def process_requested_swagger_operations(self, sess):
         """
@@ -1549,7 +1500,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.requested_operations_by_swagger = []
 
     def end_training(self, autoencoder_loss_final, discriminator_loss_g_final, discriminator_loss_c_final,
-                     generator_loss_final, supervised_encoder_loss_final, accuracy, saved_model_path, saver, sess,
+                     generator_loss_final, supervised_encoder_loss_final, saved_model_path, saver, sess,
                      step):
         """
         ends the training by saving the model if a model path is provided, saving the final losses and closing the
@@ -1583,8 +1534,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                   "discriminator_loss_final": discriminator_loss_g_final,
                                   "generator_loss_final": generator_loss_final,
                                   "summed_loss_final": autoencoder_loss_final + discriminator_loss_g_final +
-                                                       generator_loss_final,
-                                  "accuracy": accuracy}
+                                                       generator_loss_final}
 
         # create the gif for the learning progress
         aae_helper.create_gif(self)
