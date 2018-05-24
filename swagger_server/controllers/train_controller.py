@@ -1,5 +1,6 @@
 import threading
 import connexion
+import numpy as np
 from swagger_server.utils.Storage import Storage
 
 
@@ -189,7 +190,7 @@ def get_learning_rates():
     return lr_dict, 200
 
 
-def get_minibatch_summary_vars():
+def get_epoch_summary_vars():
 
     # get the autoencoder
     aae = Storage.get_aae()
@@ -199,7 +200,7 @@ def get_minibatch_summary_vars():
         return "Error: no autoencoder found", 404
 
     # get the vars for the minibatch summary
-    minibatch_summary_vars = aae.get_minibatch_summary_vars()
+    minibatch_summary_vars = aae.get_epoch_summary_vars()
 
     # since swagger doesn't allow different return values for the same function, we return all of them
     discriminator_neg = []       # only (un)-supervised
@@ -212,89 +213,87 @@ def get_minibatch_summary_vars():
     reconstructed_image = []     # only semi-supervised
     real_cat_dist = []     # only semi-supervised
     encoder_cat_dist = []     # only semi-supervised
-    batch_X_unlabeled_labels = []     # only semi-supervised
+    batch_labels = []     # only semi-supervised
     discriminator_gaussian_neg = []     # only semi-supervised
     discriminator_gaussian_pos = []     # only semi-supervised
     discriminator_cat_neg = []     # only semi-supervised
     discriminator_cat_pos = []     # only semi-supervised
 
+    # TODO: fix this
+
     # distinguish between semi-supervised or (un-)supervised autoencoder
     if Storage.get_selected_autoencoder() == "SemiSupervised":
 
-        real_dist = minibatch_summary_vars["real_dist"]  # (batch_size, z_dim) array of floats
+        real_dist = np.array(minibatch_summary_vars["real_dist"])  # (batch_size, z_dim) array of floats
         real_dist = real_dist.astype("float64").tolist()
 
-        latent_representation = minibatch_summary_vars["latent_representation"]  # (batch_size, z_dim) array of floats
+        latent_representation = np.array(minibatch_summary_vars["latent_representation"])  # (batch_size, z_dim) array of floats
         latent_representation = latent_representation.astype("float64").tolist()
 
-        batch_X_unlabeled = minibatch_summary_vars["batch_X_unlabeled"]  # (batch_size, z_dim) array of floats
+        batch_X_unlabeled = np.array(minibatch_summary_vars["batch_X_unlabeled"])  # (batch_size, z_dim) array of floats
         batch_X_unlabeled = batch_X_unlabeled.astype("float64").tolist()
 
-        reconstructed_image = minibatch_summary_vars["latent_representation"]  # (batch_size, z_dim) array of floats
-        reconstructed_image = reconstructed_image.astype("float64").tolist()
+        reconstructed_images = np.array(minibatch_summary_vars["reconstructed_images"])  # (batch_size, z_dim) array of floats
+        reconstructed_images = reconstructed_images.astype("float64").tolist()
 
-        real_cat_dist = minibatch_summary_vars["real_cat_dist"]  # (batch_size, z_dim) array of floats
+        real_cat_dist = np.array(minibatch_summary_vars["real_cat_dist"])  # (batch_size, z_dim) array of floats
         real_cat_dist = real_cat_dist.astype("float64").tolist()
 
-        encoder_cat_dist = minibatch_summary_vars["encoder_cat_dist"]  # (batch_size, z_dim) array of floats
+        encoder_cat_dist = np.array(minibatch_summary_vars["encoder_cat_dist"])  # (batch_size, z_dim) array of floats
         encoder_cat_dist = encoder_cat_dist.astype("float64").tolist()
 
-        batch_X_unlabeled_labels = minibatch_summary_vars["batch_X_unlabeled_labels"]  # (batch_size, z_dim) array of floats
-        batch_X_unlabeled_labels = batch_X_unlabeled_labels.astype("float64").tolist()
+        batch_labels = np.array(minibatch_summary_vars["batch_labels"] ) # (batch_size, z_dim) array of floats
+        batch_labels = batch_labels.astype("float64").tolist()
 
-        discriminator_gaussian_neg = minibatch_summary_vars["discriminator_gaussian_neg"]  # (batch_size) array of floats
+        discriminator_gaussian_neg = np.array(minibatch_summary_vars["discriminator_gaussian_neg"])  # (batch_size) array of floats
         discriminator_gaussian_neg = discriminator_gaussian_neg.astype("float64").tolist()
 
-        discriminator_gaussian_pos = minibatch_summary_vars["discriminator_gaussian_pos"]  # (batch_size) array of floats
+        discriminator_gaussian_pos = np.array(minibatch_summary_vars["discriminator_gaussian_pos"])  # (batch_size) array of floats
         discriminator_gaussian_pos = discriminator_gaussian_pos.astype("float64").tolist()
 
-        discriminator_cat_neg = minibatch_summary_vars["discriminator_cat_neg"]  # (batch_size) array of floats
+        discriminator_cat_neg = np.array(minibatch_summary_vars["discriminator_cat_neg"])  # (batch_size) array of floats
         discriminator_cat_neg = discriminator_cat_neg.astype("float64").tolist()
 
-        discriminator_cat_pos = minibatch_summary_vars["discriminator_cat_pos"]  # (batch_size, z_dim) array of floats
+        discriminator_cat_pos = np.array(minibatch_summary_vars["discriminator_cat_pos"])  # (batch_size, z_dim) array of floats
         discriminator_cat_pos = discriminator_cat_pos.astype("float64").tolist()
 
         epoch = minibatch_summary_vars["epoch"]  # single integer
-        b = minibatch_summary_vars["b"]  # single integer
 
     # we have an unsupervised or a supervised autoencoder
     else:
-        real_dist = minibatch_summary_vars["real_dist"]  # (batch_size, z_dim) array of floats
+        real_dist = np.array(minibatch_summary_vars["real_dist"])  # (batch_size, z_dim) array of floats
         real_dist = real_dist.astype("float64").tolist()
 
-        latent_representation = minibatch_summary_vars["latent_representation"]  # (batch_size, z_dim) array of floats
+        latent_representation = np.array(minibatch_summary_vars["latent_representation"])  # (batch_size, z_dim) array of floats
         latent_representation = latent_representation.astype("float64").tolist()
 
-        discriminator_neg = minibatch_summary_vars["discriminator_neg"]  # (batch_size) array of floats
+        discriminator_neg = np.array(minibatch_summary_vars["discriminator_neg"]) # (batch_size) array of floats
         discriminator_neg = discriminator_neg.astype("float64").tolist()
 
-        discriminator_pos = minibatch_summary_vars["discriminator_pos"]  # (batch_size, z_dim) array of floats
+        discriminator_pos = np.array(minibatch_summary_vars["discriminator_pos"]) # (batch_size, z_dim) array of floats
         discriminator_pos = discriminator_pos.astype("float64").tolist()
 
-        batch_x = minibatch_summary_vars["batch_x"]  # (batch_size, input_dim_x*input_dim_x*color_scale) array of floats
+        batch_x = np.array(minibatch_summary_vars["batch_x"])  # (batch_size, input_dim_x*input_dim_x*color_scale) array of floats
         batch_x = batch_x.astype("float64").tolist()
-        decoder_output = minibatch_summary_vars["x_reconstructed"]   # (batch_size, input_dim_x*input_dim_x*color_scale)
-        decoder_output = decoder_output.astype("float64").tolist()  # array of floats
 
-        batch_labels = minibatch_summary_vars["batch_labels"]  # (batch_size, n_classes) array of ints
+        reconstructed_images = np.array(minibatch_summary_vars["reconstructed_images"])   # (batch_size, input_dim_x*input_dim_x*color_scale)
+        reconstructed_images = reconstructed_images.astype("float64").tolist()  # array of floats
+
+        batch_labels = np.array(minibatch_summary_vars["batch_labels"])  # (batch_size, n_classes) array of ints
         batch_labels = batch_labels.astype("float64").tolist()
 
         epoch = minibatch_summary_vars["epoch"]  # single integer
-        b = minibatch_summary_vars["b"]  # single integer
 
     minibatch_summary_vars_dict = {"real_dist": real_dist, "latent_representation": latent_representation,
                                    "discriminator_neg": discriminator_neg, "discriminator_pos": discriminator_pos,
-                                   "batch_x": batch_x, "x_reconstructed": decoder_output, "epoch": epoch, "b": b,
+                                   "batch_x": batch_x, "reconstructed_images": reconstructed_images, "epoch": epoch,
                                    "batch_labels": batch_labels, "batch_X_unlabeled": batch_X_unlabeled,
-                                   "reconstructed_image": reconstructed_image, "real_cat_dist": real_cat_dist,
+                                   "real_cat_dist": real_cat_dist,
                                    "encoder_cat_dist": encoder_cat_dist,
-                                   "batch_X_unlabeled_labels": batch_X_unlabeled_labels,
                                    "discriminator_gaussian_neg": discriminator_gaussian_neg,
                                    "discriminator_gaussian_pos": discriminator_gaussian_pos,
                                    "discriminator_cat_neg": discriminator_cat_neg,
                                    "discriminator_cat_pos": discriminator_cat_pos}
-
-
 
     # TODO
     return minibatch_summary_vars_dict, 200

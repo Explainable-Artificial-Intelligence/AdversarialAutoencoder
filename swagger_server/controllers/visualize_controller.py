@@ -2,7 +2,7 @@ import time
 
 
 from swagger_server.utils.Storage import Storage
-from swagger_server.utils.SwaggerHelperFunctions import convert_image_array_to_byte_string
+from swagger_server.utils.SwaggerUtils import convert_image_array_to_byte_string
 
 
 def generate_image_from_single_point(single_point):

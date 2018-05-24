@@ -12,9 +12,14 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
-import util.AdversarialAutoencoderUtils as aae_helper
 from swagger_server.utils.Storage import Storage
+from util.DataLoading import get_input_data
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
+from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, form_results, \
+    get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
+from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
+    create_reconstruction_grid, draw_class_distribution_on_latent_space, visualize_autoencoder_weights_and_biases, \
+    create_gif, visualize_cluster_heads, create_minibatch_summary_image_unsupervised_clustering
 
 
 class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMixin):
@@ -303,11 +308,11 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # Gaussian Discriminator Loss
         discriminator_gaussian_loss_pos_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_g,
+            get_loss_function(loss_function=self.loss_function_discriminator_g,
                                          labels=tf.ones_like(self.discriminator_gaussian_pos_samples),
                                          logits=self.discriminator_gaussian_pos_samples))
         discriminator_gaussian_loss_neg_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_g,
+            get_loss_function(loss_function=self.loss_function_discriminator_g,
                                          labels=tf.zeros_like(self.discriminator_gaussian_neg_samples),
                                          logits=self.discriminator_gaussian_neg_samples))
         self.discriminator_gaussian_loss = discriminator_gaussian_loss_neg_samples + \
@@ -315,11 +320,11 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # Categorical Discrimminator Loss
         discriminator_categorical_loss_pos_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_c,
+            get_loss_function(loss_function=self.loss_function_discriminator_c,
                                          labels=tf.ones_like(self.discriminator_categorical_pos_samples),
                                          logits=self.discriminator_categorical_pos_samples))
         discriminator_categorical_loss_neg_samples = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_discriminator_c,
+            get_loss_function(loss_function=self.loss_function_discriminator_c,
                                          labels=tf.zeros_like(self.discriminator_categorical_neg_samples),
                                          logits=self.discriminator_categorical_neg_samples))
         self.discriminator_categorical_loss = discriminator_categorical_loss_pos_samples + \
@@ -327,11 +332,11 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # Generator loss
         generator_gaussian_loss = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_generator,
+            get_loss_function(loss_function=self.loss_function_generator,
                                          labels=tf.ones_like(self.discriminator_gaussian_neg_samples),
                                          logits=self.discriminator_gaussian_neg_samples))
         generator_categorical_loss = tf.reduce_mean(
-            aae_helper.get_loss_function(loss_function=self.loss_function_generator,
+            get_loss_function(loss_function=self.loss_function_generator,
                                          labels=tf.ones_like(self.discriminator_categorical_neg_samples),
                                          logits=self.discriminator_categorical_neg_samples))
         self.generator_loss = generator_gaussian_loss + generator_categorical_loss
@@ -352,12 +357,12 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         encoder_vars = [var for var in all_variables if 'encoder_' in var.name]
 
         # Optimizers
-        self.autoencoder_optimizer = aae_helper.\
+        self.autoencoder_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_autoencoder, "autoencoder", global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_autoencoder)
         self.autoencoder_trainer = self.autoencoder_optimizer.minimize(self.autoencoder_loss)
 
-        self.discriminator_gaussian_optimizer = aae_helper.\
+        self.discriminator_gaussian_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_discriminator_gaussian, "discriminator_gaussian",
                           global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_discriminator_gaussian)
@@ -365,7 +370,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             self.discriminator_gaussian_optimizer.minimize(self.discriminator_gaussian_loss,
                                                            var_list=discriminator_gaussian_vars)
 
-        self.discriminator_categorical_optimizer = aae_helper.\
+        self.discriminator_categorical_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_discriminator_categorical, "discriminator_categorical",
                           global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_discriminator_categorical)
@@ -373,7 +378,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             self.discriminator_categorical_optimizer.minimize(self.discriminator_categorical_loss,
                                                               var_list=discriminator_categorical_vars)
 
-        self.generator_optimizer = aae_helper.\
+        self.generator_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_generator, "generator", global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_generator)
         self.generator_trainer = \
@@ -425,7 +430,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         self.random_points_for_image_grid = None
 
         # holds the names for all layers
-        self.all_layer_names = aae_helper.get_layer_names(self)
+        self.all_layer_names = get_layer_names(self)
 
         """
         Init all variables         
@@ -501,7 +506,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is no hidden layer
             if n_hidden_layers == 0:
                 latent_variable_z = \
-                    aae_helper.create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
+                    create_dense_layer(X, self.input_dim, self.z_dim, 'encoder_output',
                                                   activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[0],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[0],
@@ -513,7 +518,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
 
                 categorical_encoder_label = \
-                    aae_helper.create_dense_layer(latent_variable_z, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                    create_dense_layer(latent_variable_z, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   self.n_classes, 'encoder_label', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[1],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[1],
@@ -534,7 +539,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   'encoder_dense_layer_1',
                                                   activation_function=self.activation_function_encoder[0],
                                                   weight_initializer=self.weights_initializer_encoder[0],
@@ -546,7 +551,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=0.0,
                                                   is_training=self.is_training)
                 latent_variable_z = \
-                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   self.z_dim, 'encoder_output', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[0],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[0],
@@ -558,7 +563,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
 
                 categorical_encoder_label = \
-                    aae_helper.create_dense_layer(latent_variable_z, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                    create_dense_layer(latent_variable_z, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   self.n_classes, 'encoder_label', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[-1],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[-1],
@@ -578,7 +583,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    create_dense_layer(X, self.input_dim, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   'encoder_dense_layer_1',
                                                   activation_function=self.activation_function_encoder[0],
                                                   weight_initializer=self.weights_initializer_encoder[0],
@@ -591,7 +596,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
                 for i in range(1, n_hidden_layers):
                     dense_layer_i = \
-                        aae_helper.create_dense_layer(dense_layer_i,
+                        create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                       'encoder_dense_layer_' + str(i + 1),
@@ -605,7 +610,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                       drop_out_rate_output_layer=0.0,
                                                       is_training=self.is_training)
                 latent_variable_z = \
-                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   self.z_dim, 'encoder_output', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[-1],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[-1],
@@ -618,7 +623,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
                 # label prediction of the encoder
                 categorical_encoder_label = \
-                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
+                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   self.n_clusters, 'encoder_label', activation_function="linear",
                                                   weight_initializer=self.weights_initializer_encoder[-1],
                                                   weight_initializer_params=self.weights_initializer_params_encoder[-1],
@@ -656,7 +661,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is no hidden layer
             if n_hidden_layers == 0:
                 decoder_output = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters, self.input_dim, 'x_reconstructed',
+                    create_dense_layer(X, self.z_dim + self.n_clusters, self.input_dim, 'x_reconstructed',
                                                   weight_initializer=self.weights_initializer_decoder[0],
                                                   weight_initializer_params=self.weights_initializer_params_decoder[0],
                                                   bias_initializer=self.bias_initializer_decoder[0],
@@ -670,7 +675,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is only one hidden layer
             elif n_hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters,
+                    create_dense_layer(X, self.z_dim + self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   'decoder_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_decoder[0],
@@ -683,7 +688,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=self.dropout_decoder[1],
                                                   is_training=self.is_training)
                 decoder_output = \
-                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   self.input_dim,
                                                   'x_reconstructed',
                                                   weight_initializer=self.weights_initializer_decoder[-1],
@@ -699,7 +704,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.z_dim + self.n_clusters,
+                    create_dense_layer(X, self.z_dim + self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_autoencoder[-1],
                                                   'decoder_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_decoder[0],
@@ -713,7 +718,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
                 for i in range(n_hidden_layers - 1, 0, -1):
                     dense_layer_i = \
-                        aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
+                        create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[i],
                                                       self.n_neurons_of_hidden_layer_x_autoencoder[i - 1],
                                                       'decoder_dense_layer_' + str(n_hidden_layers - i + 1),
                                                       weight_initializer=self.weights_initializer_decoder[i],
@@ -727,7 +732,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                       drop_out_rate_output_layer=self.dropout_decoder[i+1],
                                                       is_training=self.is_training)
                 decoder_output = \
-                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
+                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_autoencoder[0],
                                                   self.input_dim, 'x_reconstructed',
                                                   weight_initializer=self.weights_initializer_decoder[-1],
                                                   weight_initializer_params=self.weights_initializer_params_decoder[-1],
@@ -761,7 +766,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is no hidden layer
             if n__hidden_layers == 0:
                 discriminator_output = \
-                    aae_helper.create_dense_layer(X, self.z_dim, 1, 'discriminator_gaussian_output',
+                    create_dense_layer(X, self.z_dim, 1, 'discriminator_gaussian_output',
                                                   weight_initializer=self.weights_initializer_discriminator_g[0],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_g[0],
                                                   bias_initializer=self.bias_initializer_discriminator_g[0],
@@ -775,7 +780,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator_g[0],
+                    create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator_g[0],
                                                   'discriminator_gaussian_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_g[0],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_g[0],
@@ -787,7 +792,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=self.dropout_discriminator_g[1],
                                                   is_training=self.is_training)
                 discriminator_output = \
-                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator_g[-1], 1,
+                    create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator_g[-1], 1,
                                                   'discriminator_gaussian_output',
                                                   weight_initializer=self.weights_initializer_discriminator_g[-1],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_g[-1],
@@ -802,7 +807,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator_g[0],
+                    create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator_g[0],
                                                   'discriminator_gaussian_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_g[0],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_g[0],
@@ -815,7 +820,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
                 for i in range(1, n__hidden_layers):
                     dense_layer_i = \
-                        aae_helper.create_dense_layer(dense_layer_i,
+                        create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_discriminator_g[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_discriminator_g[i],
                                                       'discriminator_gaussian_dense_layer_' + str(i + 1),
@@ -829,7 +834,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=self.dropout_discriminator_g[i+1],
                                                   is_training=self.is_training)
                 discriminator_output = \
-                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator_g[-1],
+                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator_g[-1],
                                                   1, 'discriminator_gaussian_output',
                                                   weight_initializer=self.weights_initializer_discriminator_g[-1],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_g[-1],
@@ -863,7 +868,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is no hidden layer
             if n__hidden_layers == 0:
                 discriminator_output = \
-                    aae_helper.create_dense_layer(X, self.n_clusters, 1, 'discriminator_categorical_output',
+                    create_dense_layer(X, self.n_clusters, 1, 'discriminator_categorical_output',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_c[0],
                                                   bias_initializer=self.bias_initializer_discriminator_c[0],
@@ -877,7 +882,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = \
-                    aae_helper.create_dense_layer(X, self.n_clusters,
+                    create_dense_layer(X, self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_discriminator_c[0],
                                                   'discriminator_categorical_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
@@ -890,7 +895,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=self.dropout_discriminator_c[1],
                                                   is_training=self.is_training)
                 discriminator_output = \
-                    aae_helper.create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator_c[-1], 1,
+                    create_dense_layer(dense_layer_1, self.n_neurons_of_hidden_layer_x_discriminator_c[-1], 1,
                                                   'discriminator_categorical_output',
                                                   weight_initializer=self.weights_initializer_discriminator_c[-1],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_c[-1],
@@ -905,7 +910,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    aae_helper.create_dense_layer(X, self.n_clusters,
+                    create_dense_layer(X, self.n_clusters,
                                                   self.n_neurons_of_hidden_layer_x_discriminator_c[0],
                                                   'discriminator_categorical_dense_layer_1',
                                                   weight_initializer=self.weights_initializer_discriminator_c[0],
@@ -919,7 +924,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   is_training=self.is_training)
                 for i in range(1, n__hidden_layers):
                     dense_layer_i = \
-                        aae_helper.create_dense_layer(dense_layer_i,
+                        create_dense_layer(dense_layer_i,
                                                       self.n_neurons_of_hidden_layer_x_discriminator_c[i - 1],
                                                       self.n_neurons_of_hidden_layer_x_discriminator_c[i],
                                                       'discriminator_categorical_dense_layer_' + str(i + 1),
@@ -933,7 +938,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                   drop_out_rate_output_layer=self.dropout_discriminator_c[i+1],
                                                   is_training=self.is_training)
                 discriminator_output = \
-                    aae_helper.create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator_c[-1],
+                    create_dense_layer(dense_layer_i, self.n_neurons_of_hidden_layer_x_discriminator_c[-1],
                                                   1, 'discriminator_categorical_output',
                                                   weight_initializer=self.weights_initializer_discriminator_c[-1],
                                                   weight_initializer_params=self.weights_initializer_params_discriminator_c[-1],
@@ -977,9 +982,9 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # Reshape images accordingly to the color scale to display them
         if self.color_scale == "rgb_scale":
-            input_images = aae_helper.reshape_tensor_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
-            generated_images = aae_helper.reshape_tensor_to_rgb_image(decoder_output, self.input_dim_x, self.input_dim_y)
-            generated_images_z_dist = aae_helper.reshape_tensor_to_rgb_image(decoder_output_multiple, self.input_dim_x,
+            input_images = reshape_tensor_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
+            generated_images = reshape_tensor_to_rgb_image(decoder_output, self.input_dim_x, self.input_dim_y)
+            generated_images_z_dist = reshape_tensor_to_rgb_image(decoder_output_multiple, self.input_dim_x,
                                                                                                         self.input_dim_y)
         else:
             input_images = tf.reshape(self.X, [-1, self.input_dim_x, self.input_dim_y, 1])
@@ -1061,7 +1066,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                 i += 1
 
                 # reshape the images according to the color scale
-                img = aae_helper.reshape_image_array(self, x, is_array_of_arrays=True)
+                img = reshape_image_array(self, x, is_array_of_arrays=True)
                 list_of_images_for_swagger.append(img)
 
                 # show the image
@@ -1114,7 +1119,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # reshape the image array and display it
         generated_image = np.array(generated_image).reshape(self.input_dim)
-        img = aae_helper.reshape_image_array(self, generated_image, is_array_of_arrays=True)
+        img = reshape_image_array(self, generated_image, is_array_of_arrays=True)
 
         # show the image
         if self.color_scale == "gray_scale":
@@ -1147,7 +1152,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         if Storage.get_all_input_data():
             data = Storage.get_all_input_data()
         else:
-            data = aae_helper.get_input_data(self.selected_dataset, self.color_scale)
+            data = get_input_data(self.selected_dataset, self.color_scale)
 
         autoencoder_loss_final = 0
         discriminator_loss_g_final = 0
@@ -1165,7 +1170,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
             # train the autoencoder
             if is_train_mode_active:
                 # creates folders for each run to store the tensorboard files, saved models and the log files.
-                tensorboard_path, saved_model_path, log_path = aae_helper.form_results(self)
+                tensorboard_path, saved_model_path, log_path = form_results(self)
                 if self.write_tensorboard:
                     writer = tf.summary.FileWriter(logdir=tensorboard_path, graph=sess.graph)
 
@@ -1330,7 +1335,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                         feed_dict={self.decoder_input: dec_input,
                                                                    self.is_training: False})
                                 cluster_heads.append(cluster_head)
-                            aae_helper.visualize_cluster_heads(self, cluster_heads, epoch, b)
+                            visualize_cluster_heads(self, cluster_heads, epoch, b)
 
                             # update the dictionary holding the losses
                             self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
@@ -1341,13 +1346,13 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
-                                aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess))
+                                get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess))
                             self.learning_rates["discriminator_g_lr"].append(
-                                aae_helper.get_learning_rate_for_optimizer(self.discriminator_gaussian_optimizer, sess))
+                                get_learning_rate_for_optimizer(self.discriminator_gaussian_optimizer, sess))
                             self.learning_rates["discriminator_c_lr"].append(
-                                aae_helper.get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer, sess))
+                                get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer, sess))
                             self.learning_rates["generator_lr"].append(
-                                aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess))
+                                get_learning_rate_for_optimizer(self.generator_optimizer, sess))
                             self.learning_rates["list_of_epochs"].append(epoch + (b / n_batches))
 
                             # update the lists holding the latent representation + labels for the current minibatch
@@ -1370,7 +1375,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                             self.minibatch_summary_vars["discriminator_cat_pos"] = discriminator_cat_pos
 
                             # create the summary image for the current minibatch
-                            aae_helper.create_minibatch_summary_image_unsupervised_clustering(self, real_dist,
+                            create_minibatch_summary_image_unsupervised_clustering(self, real_dist,
                                                                                       latent_representation,
                                                                                       batch_X_unlabeled,
                                                                                       reconstructed_image, epoch, b,
@@ -1398,15 +1403,15 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                 print("Discriminator Categorical Loss: {}".format(discriminator_categorical_loss))
                                 print("Generator Loss: {}".format(generator_loss))
                                 print('Learning rate autoencoder: {}'.format(
-                                    aae_helper.get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess)))
+                                    get_learning_rate_for_optimizer(self.autoencoder_optimizer, sess)))
                                 print('Learning rate categorical discriminator: {}'.format(
-                                    aae_helper.get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer,
+                                    get_learning_rate_for_optimizer(self.discriminator_categorical_optimizer,
                                                                                sess)))
                                 print('Learning rate gaussian discriminator: {}'.format(
-                                    aae_helper.get_learning_rate_for_optimizer(self.discriminator_gaussian_optimizer,
+                                    get_learning_rate_for_optimizer(self.discriminator_gaussian_optimizer,
                                                                                sess)))
                                 print('Learning rate generator: {}'.format(
-                                    aae_helper.get_learning_rate_for_optimizer(self.generator_optimizer, sess)))
+                                    get_learning_rate_for_optimizer(self.generator_optimizer, sess)))
 
                         step += 1
 
@@ -1424,7 +1429,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
                         if len(labels_current_epoch) > 0:
                             result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
-                            aae_helper.draw_class_distribution_on_latent_space(latent_representations_current_epoch,
+                            draw_class_distribution_on_latent_space(latent_representations_current_epoch,
                                                                                labels_current_epoch, result_path, epoch,
                                                                                self.random_points_for_image_grid,
                                                                                combined_plot=True)
@@ -1434,7 +1439,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                         """
                         Weights + biases visualization
                         """
-                        aae_helper.visualize_autoencoder_weights_and_biases(self, epoch=epoch)
+                        visualize_autoencoder_weights_and_biases(self, epoch=epoch)
 
                     # reset the list holding the latent representations for the current epoch
                     latent_representations_current_epoch = []
@@ -1491,7 +1496,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                         result = self.classify_single_image(sess, function_params)
                         self.set_requested_operations_by_swagger_results(result)
                     elif function_name == "get_biases_or_weights_for_layer":
-                        result = aae_helper.get_biases_or_weights_for_layer(self, function_params)
+                        result = get_biases_or_weights_for_layer(self, function_params)
                         self.set_requested_operations_by_swagger_results(result)
 
                     plt.close('all')
@@ -1537,7 +1542,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                                        generator_loss_final}
 
         # create the gif for the learning progress
-        aae_helper.create_gif(self)
+        create_gif(self)
 
         # training has stopped
         self.train_status = "stop"

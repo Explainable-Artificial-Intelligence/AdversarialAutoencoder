@@ -1,6 +1,6 @@
 from src.util.DataLoading import get_input_data
 from swagger_server.utils.Storage import Storage
-from swagger_server.utils.SwaggerHelperFunctions import convert_image_array_to_byte_string
+from swagger_server.utils.SwaggerUtils import convert_image_array_to_byte_string
 
 
 def load_data_set(dataset_name):

@@ -16,6 +16,13 @@ def get_result_path_for_selected_autoencoder(selected_autoencoder):
         return '../results/Supervised'
     elif selected_autoencoder == "SemiSupervised":
         return '../results/SemiSupervised'
+    elif selected_autoencoder == "UnsupervisedClustering":
+        return '../results/UnsupervisedClustering'
+    elif selected_autoencoder == "DimensionalityReduction":
+        return '../results/DimensionalityReduction'
+    else:
+        print(selected_autoencoder + " has no result path associated with it!")
+        raise NotImplementedError
 
 
 def get_default_parameters_mnist():

@@ -385,7 +385,7 @@ paths:
       tags: [Train]
       summary: returns the variables for the minibatch summary
       description: returns the variables for the minibatch summary
-      operationId: get_minibatch_summary_vars
+      operationId: get_epoch_summary_vars
       responses:
         200:
           description: "vars successfully returned"
