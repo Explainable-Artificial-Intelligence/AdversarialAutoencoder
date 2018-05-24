@@ -37,6 +37,77 @@ def testing():
     #   uniform_unit_scaling_initializer: factor: Float. A multiplicative factor by which the values will be scaled.
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
 
+    if True:
+        # code for the cluster
+        for i in range(2, 21):
+
+            params = get_default_parameters_svhn()
+            params["selected_dataset"] = "SVHN"
+
+            params["z_dim"] = i
+
+            params["verbose"] = True
+            params["selected_autoencoder"] = "Supervised"
+            params["results_path"] = get_result_path_for_selected_autoencoder("Supervised")
+            params["summary_image_frequency"] = 20
+            params["n_epochs"] = 1
+            params["batch_normalization_encoder"] = [None, None, None, None, None, None, None]
+            params["batch_normalization_decoder"] = [None, None, None, None, None, None, None]
+            params["batch_normalization_discriminator"] = [None, None, None, None, None, None, None]
+
+            params["n_neurons_of_hidden_layer_x_autoencoder"] = [3000, 2000, 1000, 500, 250, 125]
+            params["n_neurons_of_hidden_layer_x_discriminator"] = [3000, 2000, 1000, 500, 250, 125]
+
+            params["activation_function_encoder"] = ['relu', 'relu', 'relu', 'relu', 'relu', 'relu', 'linear']
+            params["activation_function_decoder"] = ['relu', 'relu', 'relu', 'relu', 'relu', 'relu', 'sigmoid']
+            params["activation_function_discriminator"] = ['relu', 'relu', 'relu', 'relu', 'relu', 'relu', 'linear']
+
+            params["dropout_encoder"] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            params["dropout_decoder"] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            params["dropout_discriminator"] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+            params["decaying_learning_rate_params_autoencoder"] = {"learning_rate": 0.0001}
+            params["decaying_learning_rate_params_generator"] = {"learning_rate": 0.0001}
+            params["decaying_learning_rate_params_discriminator"] = {"learning_rate": 0.0001}
+
+            params['decaying_learning_rate_name_autoencoder'] = "static"
+            params['decaying_learning_rate_name_discriminator'] = "static"
+            params['decaying_learning_rate_name_generator'] = "static"
+
+            params['bias_initializer_encoder'] = ["zeros_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['bias_initializer_decoder'] = ["zeros_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['bias_initializer_discriminator'] = ["zeros_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_discriminator"])
+
+            params['bias_initializer_params_encoder'] = [{}] * len(params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['bias_initializer_params_decoder'] = [{}] * len(params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['bias_initializer_params_discriminator'] = [{}] * len(
+                params["n_neurons_of_hidden_layer_x_discriminator"])
+
+            params['weights_initializer_encoder'] = ["truncated_normal_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['weights_initializer_decoder'] = ["truncated_normal_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['weights_initializer_discriminator'] = ["truncated_normal_initializer"] * len(
+                params["n_neurons_of_hidden_layer_x_discriminator"])
+
+            params['weights_initializer_params_encoder'] = [{"mean": 0, "stddev": 0.1}] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['weights_initializer_params_decoder'] = [{"mean": 0, "stddev": 0.1}] * len(
+                params["n_neurons_of_hidden_layer_x_autoencoder"])
+            params['weights_initializer_params_discriminator'] = [{"mean": 0, "stddev": 0.1}] * len(
+                params["n_neurons_of_hidden_layer_x_discriminator"])
+
+            aae = SupervisedAdversarialAutoencoder(params)
+            # aae = UnsupervisedAdversarialAutoencoder(params)
+            # aae = SemiSupervisedAdversarialAutoencoder(params)
+
+            aae.train(True)
+            aae.reset_graph()
+        return
+
     if False:
 
         params = get_default_parameters_mnist()
