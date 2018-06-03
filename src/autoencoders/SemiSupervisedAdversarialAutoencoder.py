@@ -1241,7 +1241,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         Reconstruction phase: autoencoder updates the encoder q(z, y|x) and the decoder to
                         minimize the reconstruction error of the inputs on an unlabeled mini-batch
                         """
-                        # train the autoencoder by minimizing the reconstruction error between X and X_target
+                        # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
                         sess.run(self.autoencoder_trainer,
                                  feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                             self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],

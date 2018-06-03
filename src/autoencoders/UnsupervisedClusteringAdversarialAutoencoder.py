@@ -415,12 +415,12 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         self.learning_rates = {"autoencoder_lr": [], "discriminator_g_lr": [], "discriminator_c_lr": [],
                                "generator_lr": [], "supervised_encoder_lr": [], "list_of_epochs": []}
 
-        self.minibatch_summary_vars = {"real_dist": None, "latent_representation": None, "batch_X_unlabeled": None,
+        self.epoch_summary_vars = {"real_dist": None, "latent_representation": None, "batch_X_unlabeled": None,
                                        "reconstructed_image": None, "epoch": None, "b": None,
                                        "real_cat_dist": None, "encoder_cat_dist": None,
                                        "batch_X_unlabeled_labels": None, "discriminator_gaussian_neg": None,
                                        "discriminator_gaussian_pos": None, "discriminator_cat_neg": None,
-                                       "discriminator_cat_pos": None}
+                                   "discriminator_cat_pos": None}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
         # minibatch summary plots
@@ -459,8 +459,8 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
     def add_to_requested_operations_by_swagger(self, requested_operation):
         self.requested_operations_by_swagger.append(requested_operation)
 
-    def get_minibatch_summary_vars(self):
-        return self.minibatch_summary_vars
+    def get_epoch_summary_vars(self):
+        return self.epoch_summary_vars
 
     def get_performance_over_time(self):
         return self.performance_over_time
@@ -1221,7 +1221,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                         Reconstruction phase: autoencoder updates the encoder q(z, y|x) and the decoder to
                         minimize the reconstruction error of the inputs on an unlabeled mini-batch
                         """
-                        # train the autoencoder by minimizing the reconstruction error between X and X_target
+                        # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
                         sess.run(self.autoencoder_trainer,
                                  feed_dict={self.X: batch_X_unlabeled, self.X_target: batch_X_unlabeled,
                                             self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
@@ -1360,19 +1360,19 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                             labels_current_epoch.extend(batch_X_unlabeled_labels)
 
                             # updates vars for the swagger server
-                            self.minibatch_summary_vars["real_dist"] = real_dist
-                            self.minibatch_summary_vars["latent_representation"] = latent_representation
-                            self.minibatch_summary_vars["batch_X_unlabeled"] = batch_X_unlabeled
-                            self.minibatch_summary_vars["reconstructed_image"] = reconstructed_image
-                            self.minibatch_summary_vars["epoch"] = epoch
-                            self.minibatch_summary_vars["b"] = b
-                            self.minibatch_summary_vars["real_cat_dist"] = real_cat_dist
-                            self.minibatch_summary_vars["encoder_cat_dist"] = encoder_cat_dist
-                            self.minibatch_summary_vars["batch_X_unlabeled_labels"] = batch_X_unlabeled_labels
-                            self.minibatch_summary_vars["discriminator_gaussian_neg"] = discriminator_gaussian_neg
-                            self.minibatch_summary_vars["discriminator_gaussian_pos"] = discriminator_gaussian_pos
-                            self.minibatch_summary_vars["discriminator_cat_neg"] = discriminator_cat_neg
-                            self.minibatch_summary_vars["discriminator_cat_pos"] = discriminator_cat_pos
+                            self.epoch_summary_vars["real_dist"] = real_dist
+                            self.epoch_summary_vars["latent_representation"] = latent_representation
+                            self.epoch_summary_vars["batch_X_unlabeled"] = batch_X_unlabeled
+                            self.epoch_summary_vars["reconstructed_image"] = reconstructed_image
+                            self.epoch_summary_vars["epoch"] = epoch
+                            self.epoch_summary_vars["b"] = b
+                            self.epoch_summary_vars["real_cat_dist"] = real_cat_dist
+                            self.epoch_summary_vars["encoder_cat_dist"] = encoder_cat_dist
+                            self.epoch_summary_vars["batch_X_unlabeled_labels"] = batch_X_unlabeled_labels
+                            self.epoch_summary_vars["discriminator_gaussian_neg"] = discriminator_gaussian_neg
+                            self.epoch_summary_vars["discriminator_gaussian_pos"] = discriminator_gaussian_pos
+                            self.epoch_summary_vars["discriminator_cat_neg"] = discriminator_cat_neg
+                            self.epoch_summary_vars["discriminator_cat_pos"] = discriminator_cat_pos
 
                             # create the summary image for the current minibatch
                             create_minibatch_summary_image_unsupervised_clustering(self, real_dist,

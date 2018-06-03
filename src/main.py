@@ -4,6 +4,8 @@ from autoencoders.AAE_LearningPriorSupervised import LearningPriorsAdversarialAu
 from autoencoders.AAE_LearningPriorUnsupervised import LearningPriorsAdversarialAutoencoderUnsupervised
 from autoencoders.AAE_LearningPriorSameTopology import LearningPriorsAdversarialAutoencoderSameTopology
 from autoencoders.DimensionalityReductionAdversarialAutoencoder import DimensionalityReductionAdversarialAutoencoder
+from autoencoders.IncorporatingLabelInformationAdversarialAutoencoder import \
+    IncorporatingLabelInformationAdversarialAutoencoder
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
 from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
@@ -37,20 +39,20 @@ def testing():
     #   uniform_unit_scaling_initializer: factor: Float. A multiplicative factor by which the values will be scaled.
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
 
-    if True:
+    if False:
         # code for the cluster
         for i in range(2, 21):
 
-            params = get_default_parameters_svhn()
-            params["selected_dataset"] = "SVHN"
+            params = get_default_parameters_mnist()
+            params["selected_dataset"] = "MNIST"
 
             params["z_dim"] = i
 
             params["verbose"] = True
             params["selected_autoencoder"] = "Supervised"
             params["results_path"] = get_result_path_for_selected_autoencoder("Supervised")
-            params["summary_image_frequency"] = 20
-            params["n_epochs"] = 1
+            params["summary_image_frequency"] = 5
+            params["n_epochs"] = 16
             params["batch_normalization_encoder"] = [None, None, None, None, None, None, None]
             params["batch_normalization_decoder"] = [None, None, None, None, None, None, None]
             params["batch_normalization_discriminator"] = [None, None, None, None, None, None, None]
@@ -179,17 +181,15 @@ def testing():
         return
 
     if False:
-
-        # semi-supervised parameters
         params = get_default_parameters_mnist()
         params["selected_dataset"] = "MNIST"
 
+        params["z_dim"] = 4
         params["verbose"] = True
-        params["selected_autoencoder"] = "SemiSupervised"
-        params["results_path"] = get_result_path_for_selected_autoencoder("SemiSupervised")
-        params["n_labeled"] = 20000
-        params["summary_image_frequency"] = 25
-        params["n_epochs"] = 1
+        params["selected_autoencoder"] = "Unsupervised"
+        params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
+        params["summary_image_frequency"] = 10
+        params["n_epochs"] = 101
         params["batch_normalization_encoder"] = [None, None, None, None, None]
         params["batch_normalization_decoder"] = [None, None, None, None, None]
         params["batch_normalization_discriminator"] = [None, None, None, None, None]
@@ -214,18 +214,62 @@ def testing():
         params["decaying_learning_rate_params_discriminator_categorical"] = {"learning_rate": 0.001}
         params["decaying_learning_rate_params_supervised_encoder"] = {"learning_rate": 0.001}
 
-
         # learning_priors_aae = LearningPriorsAdversarialAutoencoderUnsupervised(params)
         # learning_priors_aae = LearningPriorsAdversarialAutoencoderSupervised(params)
-        unsupervised_clustering_aae = UnsupervisedClusteringAdversarialAutoencoder(params)
+        # unsupervised_clustering_aae = UnsupervisedClusteringAdversarialAutoencoder(params)
         # unsupervised_clustering_aae = SemiSupervisedAdversarialAutoencoder(params)
+        aae = UnsupervisedAdversarialAutoencoder(params)
 
-        unsupervised_clustering_aae.train(True)
+        aae.train(True)
 
-        # return
+        return
 
     if True:
-        # semi-supervised parameters
+
+        params = get_default_parameters_mnist()
+        params["selected_dataset"] = "MNIST"
+
+        params["verbose"] = True
+        params["selected_autoencoder"] = "IncorporatingLabelInformation"
+        params["results_path"] = get_result_path_for_selected_autoencoder("IncorporatingLabelInformation")
+        params["n_labeled"] = 20000
+        params["summary_image_frequency"] = 5
+        params["n_epochs"] = 101
+        params["batch_normalization_encoder"] = [None, None, None, None, None]
+        params["batch_normalization_decoder"] = [None, None, None, None, None]
+        params["batch_normalization_discriminator"] = [None, None, None, None, None]
+
+        params["save_final_model"] = True
+
+        params["n_neurons_of_hidden_layer_x_autoencoder"] = [1000, 1000]
+        params["n_neurons_of_hidden_layer_x_discriminator_c"] = [1000, 1000]
+        params["n_neurons_of_hidden_layer_x_discriminator_g"] = [1000, 1000]
+
+        params["activation_function_encoder"] = ['relu', 'relu', 'linear']
+        params["activation_function_decoder"] = ['relu', 'relu', 'sigmoid']
+        params["activation_function_discriminator"] = ['relu', 'relu', 'linear']
+
+        params["loss_function_generator"] = "softmax_cross_entropy"
+        params["loss_function_discriminator"] = "softmax_cross_entropy"
+
+        params["dropout_encoder"] = [0.0, 0.0, 0.0]
+        params["dropout_decoder"] = [0.0, 0.0, 0.0]
+
+        params["decaying_learning_rate_params_autoencoder"] = {"learning_rate": 0.0001}
+        params["decaying_learning_rate_params_generator"] = {"learning_rate": 0.0001}
+        params["decaying_learning_rate_params_discriminator"] = {"learning_rate": 0.0001}
+
+        # aae = LearningPriorsAdversarialAutoencoderUnsupervised(params)
+        # aae = LearningPriorsAdversarialAutoencoderSupervised(params)
+        # aae = UnsupervisedClusteringAdversarialAutoencoder(params)
+        # aae = SemiSupervisedAdversarialAutoencoder(params)
+        aae = IncorporatingLabelInformationAdversarialAutoencoder(params)
+
+        aae.train(True)
+
+        return
+
+    if True:
         params = get_default_parameters_svhn()
         params["selected_dataset"] = "SVHN"
 

@@ -15,7 +15,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from swagger_server.utils.Storage import Storage
 from util.DataLoading import get_input_data
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll, \
-    draw_from_dim_reduced_dataset
+    draw_from_dim_reduced_dataset, gaussian_mixture, supervised_gaussian_mixture
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, \
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
@@ -23,7 +23,7 @@ from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_a
     create_gif
 
 
-class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
+class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
         # whether only the autoencoder and not the generative network should be trained
@@ -45,6 +45,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         params for the data 
         """
+
+        self.n_classes = 10 + 1
 
         self.input_dim_x = parameter_dictionary["input_dim_x"]
         self.input_dim_y = parameter_dictionary["input_dim_y"]
@@ -173,16 +175,33 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
 
         # holds the input data
-        self.X = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim], name='Input')
+        self.X_unlabeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim],
+                                          name='Input_unlabeled')
         # holds the desired output of the autoencoder
-        self.X_target = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim], name='Target')
+        self.X_target_unlabeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim],
+                                                 name='Target_unlabeled')
+
+        # holds the input data
+        self.X_labeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim], name='Input_labeled')
+        # holds the desired output of the autoencoder
+        self.X_target_labeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.input_dim],
+                                               name='Target_labeled')
+
         # holds the real distribution p(z) used as positive sample for the discriminator
-        self.real_distribution = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
-                                                name='Real_distribution')
+        self.real_distribution_labeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
+                                                name='Real_distribution_labeled')
+        self.real_distribution_unlabeled = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
+                                                name='Real_distribution_unlabeled')
+
         # holds the input samples for the decoder (only for generating the images; NOT used for training)
         self.decoder_input = tf.placeholder(dtype=tf.float32, shape=[1, self.z_dim], name='Decoder_input')
         self.decoder_input_multiple = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.z_dim],
                                                      name='Decoder_input_multiple')
+
+        self.discriminator_unlabeled_labels = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.n_classes],
+                                                             name='Unlabeled_labels')
+        self.discriminator_labeled_labels = tf.placeholder(dtype=tf.float32, shape=[self.batch_size, self.n_classes],
+                                                           name='Labeled_labels')
 
         # for proper batch normalization
         self.is_training = tf.placeholder(tf.bool, name='is_training')
@@ -194,18 +213,37 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # init autoencoder
         with tf.variable_scope(tf.get_variable_scope()):
             # encoder part of the autoencoder and also the generator
-            self.encoder_output = self.encoder(self.X)
+            self.encoder_output_unlabeled = self.encoder(self.X_unlabeled)
             # decoder part of the autoencoder
-            self.decoder_output = self.decoder(self.encoder_output)
+            self.decoder_output_unlabeled = self.decoder(self.encoder_output_unlabeled)
+
+            # encoder part of the autoencoder and also the generator
+            self.encoder_output_labeled = self.encoder(self.X_labeled, reuse=True)
+            # decoder part of the autoencoder
+            self.decoder_output_labeled = self.decoder(self.encoder_output_labeled, reuse=True)
 
         # init discriminator
         with tf.variable_scope(tf.get_variable_scope()):
+
+            # create the input for the discriminator
+            discriminator_pos_unlabeled = tf.concat([self.real_distribution_unlabeled, self.discriminator_unlabeled_labels], 1)
+            discriminator_neg_unlabeled = tf.concat([self.encoder_output_unlabeled, self.discriminator_unlabeled_labels], 1)
+            discriminator_pos_labeled = tf.concat([self.real_distribution_labeled, self.discriminator_labeled_labels], 1)
+            discriminator_neg_labeled = tf.concat([self.encoder_output_labeled, self.discriminator_labeled_labels], 1)
+
             # discriminator for the positive samples p(z) (from a real data distribution)
-            self.discriminator_pos_samples = \
-                self.discriminator(self.real_distribution)
+            self.discriminator_true_samples_unlabeled = \
+                self.discriminator(discriminator_pos_unlabeled)
             # discriminator for the negative samples q(z) (generated by the generator)
-            self.discriminator_neg_samples = \
-                self.discriminator(self.encoder_output, reuse=True)
+            self.discriminator_fake_samples_unlabeled = \
+                self.discriminator(discriminator_neg_unlabeled, reuse=True)
+
+            # discriminator for the positive samples p(z) (from a real data distribution)
+            self.discriminator_true_samples_labeled = \
+                self.discriminator(discriminator_pos_labeled, reuse=True)
+            # discriminator for the negative samples q(z) (generated by the generator)
+            self.discriminator_fake_samples_labeled = \
+                self.discriminator(discriminator_neg_labeled, reuse=True)
 
         # output of the decoder
         with tf.variable_scope(tf.get_variable_scope()):
@@ -222,24 +260,45 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
 
         # Autoencoder loss
-        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
+        autoencoder_loss_unlabeled = tf.reduce_mean(tf.square(self.X_target_unlabeled - self.decoder_output_unlabeled))
+        autoencoder_loss_labeled = tf.reduce_mean(tf.square(self.X_target_labeled - self.decoder_output_labeled))
+        self.autoencoder_loss = autoencoder_loss_unlabeled + autoencoder_loss_labeled
 
         # Discriminator Loss
-        discriminator_loss_pos_samples = tf.reduce_mean(
+        # TODO: check if this is correct; especially whether ones_like should be zeros_like and the other way round
+        discriminator_loss_true_samples_unlabeled = tf.reduce_mean(
             get_loss_function(loss_function=self.loss_function_discriminator,
-                              labels=tf.ones_like(self.discriminator_pos_samples),
-                              logits=self.discriminator_pos_samples))
-        discriminator_loss_neg_samples = tf.reduce_mean(
+                              labels=tf.ones_like(self.discriminator_true_samples_unlabeled),
+                              logits=self.discriminator_true_samples_unlabeled))
+        discriminator_loss_fake_samples_unlabeled = tf.reduce_mean(
             get_loss_function(loss_function=self.loss_function_discriminator,
-                              labels=tf.zeros_like(self.discriminator_neg_samples),
-                              logits=self.discriminator_neg_samples))
-        self.discriminator_loss = discriminator_loss_neg_samples + discriminator_loss_pos_samples
+                              labels=tf.zeros_like(self.discriminator_fake_samples_unlabeled),
+                              logits=self.discriminator_fake_samples_unlabeled))
+
+        discriminator_loss_true_samples_labeled = tf.reduce_mean(
+            get_loss_function(loss_function=self.loss_function_discriminator,
+                              labels=tf.ones_like(self.discriminator_true_samples_labeled),
+                              logits=self.discriminator_true_samples_labeled))
+        discriminator_loss_fake_samples_labeled = tf.reduce_mean(
+            get_loss_function(loss_function=self.loss_function_discriminator,
+                              labels=tf.zeros_like(self.discriminator_fake_samples_labeled),
+                              logits=self.discriminator_fake_samples_labeled))
+
+        self.discriminator_loss = discriminator_loss_fake_samples_unlabeled + discriminator_loss_true_samples_unlabeled \
+                                  + discriminator_loss_fake_samples_labeled + discriminator_loss_true_samples_labeled
 
         # Generator loss
-        self.generator_loss = tf.reduce_mean(
+        generator_loss_unlabeled = tf.reduce_mean(
             get_loss_function(loss_function=self.loss_function_generator,
-                              labels=tf.ones_like(self.discriminator_neg_samples),
-                              logits=self.discriminator_neg_samples))
+                              labels=tf.ones_like(self.discriminator_fake_samples_unlabeled),
+                              logits=self.discriminator_fake_samples_unlabeled))
+
+        generator_loss_labeled = tf.reduce_mean(
+            get_loss_function(loss_function=self.loss_function_generator,
+                              labels=tf.ones_like(self.discriminator_fake_samples_labeled),
+                              logits=self.discriminator_fake_samples_labeled))
+
+        self.generator_loss = generator_loss_unlabeled + generator_loss_labeled
 
         """
         Init the optimizers
@@ -274,12 +333,14 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         Create the tensorboard summary and the tf.saver and tf.session vars
         """
+        # TODO: include decoder_output labeled; encoder labeled, real_distribution_unlabeled
         self.tensorboard_summary = \
-            self.create_tensorboard_summary(decoder_output=self.decoder_output, encoder_output=self.encoder_output,
+            self.create_tensorboard_summary(decoder_output=self.decoder_output_unlabeled,
+                                            encoder_output=self.encoder_output_unlabeled,
                                             autoencoder_loss=self.autoencoder_loss,
                                             discriminator_loss=self.discriminator_loss,
                                             generator_loss=self.generator_loss,
-                                            real_distribution=self.real_distribution,
+                                            real_distribution=self.real_distribution_labeled,
                                             decoder_output_multiple=self.decoder_output_multiple)
 
         # for saving the model
@@ -596,7 +657,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is no hidden layer
             if n__hidden_layers == 0:
                 discriminator_output = \
-                    create_dense_layer(X, self.z_dim, 1, 'discriminator_output',
+                    create_dense_layer(X, self.z_dim + self.n_classes, 1, 'discriminator_output',
                                        weight_initializer=self.weights_initializer_discriminator[0],
                                        weight_initializer_params=self.weights_initializer_params_discriminator[0],
                                        bias_initializer=self.bias_initializer_discriminator[0],
@@ -610,7 +671,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is only one hidden layer
             elif n__hidden_layers == 1:
                 dense_layer_1 = \
-                    create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    create_dense_layer(X, self.z_dim + self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                        'discriminator_dense_layer_1',
                                        weight_initializer=self.weights_initializer_discriminator[0],
                                        weight_initializer_params=
@@ -639,7 +700,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # there is an arbitrary number of hidden layers
             else:
                 dense_layer_i = \
-                    create_dense_layer(X, self.z_dim, self.n_neurons_of_hidden_layer_x_discriminator[0],
+                    create_dense_layer(X, self.z_dim + self.n_classes, self.n_neurons_of_hidden_layer_x_discriminator[0],
                                        'discriminator_dense_layer_1',
                                        weight_initializer=self.weights_initializer_discriminator[0],
                                        weight_initializer_params=
@@ -700,13 +761,13 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Reshape input images and the decoder outputs accordingly to the color scale to display them
         if self.color_scale == "rgb_scale":
-            input_images = reshape_tensor_to_rgb_image(self.X, self.input_dim_x, self.input_dim_y)
+            input_images = reshape_tensor_to_rgb_image(self.X_unlabeled, self.input_dim_x, self.input_dim_y)
             generated_images = reshape_tensor_to_rgb_image(decoder_output, self.input_dim_x,
                                                            self.input_dim_y)
             generated_images_z_dist = reshape_tensor_to_rgb_image(decoder_output_multiple,
                                                                   self.input_dim_x, self.input_dim_y)
         else:
-            input_images = tf.reshape(self.X, [-1, self.input_dim_x, self.input_dim_y, 1])
+            input_images = tf.reshape(self.X_unlabeled, [-1, self.input_dim_x, self.input_dim_y, 1])
             generated_images = tf.reshape(decoder_output, [-1, self.input_dim_x, self.input_dim_y, 1])
             generated_images_z_dist = tf.reshape(decoder_output_multiple, [-1, self.input_dim_x,
                                                                            self.input_dim_y, 1])
@@ -869,8 +930,12 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
         epochs_completed = 0
-
         step = 0
+
+        # create the labels for the unlabeled data with the extra class turned on
+        y_unlabeled = np.zeros((self.batch_size, self.n_classes))
+        y_unlabeled[:, -1] = 1
+
         # with tf.Session() as sess:
         with self.session as sess:
 
@@ -912,29 +977,37 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         self.process_requested_swagger_operations(sess)
 
-                        # draw a sample from p(z) and use it as real distribution for the discriminator
-                        # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
-                        z_real_dist = \
-                            draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
-                        # TODO:
-                        # z_real_dist = draw_from_dim_reduced_dataset(self.batch_size, self.selected_dataset, self.z_dim)
-
                         # get the batch from the training data
                         # TODO:
-                        batch_x, batch_labels = data.train.next_batch(self.batch_size)
-                        # batch_x, batch_labels = data.train.get_class_specific_batch(self.batch_size, 1)
-                        # batch_x, batch_labels = \
-                        #     data.train.get_color_specific_image_combinations(self.batch_size, 0, 5, 1, self.input_dim_x,
-                        #                                                      self.input_dim_y)
+                        batch_x_labeled, y_labeled = data.train.next_batch(self.batch_size)
+                        batch_x_unlabeled, _ = data.train.next_batch(self.batch_size)
+
+                        # convert one-hot to integer
+                        batch_labels_int = np.argmax(y_labeled, axis=1)
+
+                        # draw a sample from p(z) and use it as real distribution for the discriminator
+                        # TODO: draw from two gaussians
+                        z_real_dist_labeled = supervised_gaussian_mixture(self.batch_size, self.z_dim, batch_labels_int,
+                                                                          self.n_classes - 1)
+                        z_real_dist_unlabeled = gaussian_mixture(self.batch_size, self.z_dim, self.n_classes - 1)
+
+                        # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
+                        #z_real_dist = \
+                        #    draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
+                        # z_real_dist = draw_from_dim_reduced_dataset(self.batch_size, self.selected_dataset, self.z_dim)
+
+                        # add the extra label
+                        extra_labels = np.zeros((self.batch_size, 1))
+                        y_labeled = np.append(y_labeled, extra_labels, axis=1)
 
                         """
                         Reconstruction phase: the autoencoder updates the encoder and the decoder to minimize the
                         reconstruction error of the inputs
                         """
                         # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
-                        # sess.run(self.autoencoder_optimizer, feed_dict={self.X_unlabeled: batch_x, self.X_target_unlabeled: batch_x})
                         sess.run(self.autoencoder_trainer,
-                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                 feed_dict={self.X_unlabeled: batch_x_unlabeled, self.X_target_unlabeled: batch_x_unlabeled,
+                                            self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
                                             self.is_training: True,
                                             self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
                                             self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
@@ -948,44 +1021,62 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         (which is also the encoder of the autoencoder) to confuse the discriminative network.
                         """
                         if not self.only_train_autoencoder:
+
                             # train the discriminator to distinguish the true samples from the fake samples generated
                             # by the generator
                             sess.run(self.discriminator_trainer,
-                                     feed_dict={self.X: batch_x, self.X_target: batch_x,
-                                                self.real_distribution: z_real_dist,
+                                     feed_dict={self.X_unlabeled: batch_x_unlabeled,
+                                                self.X_target_unlabeled: batch_x_unlabeled,
+                                                self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
+                                                self.real_distribution_labeled: z_real_dist_labeled,
+                                                self.real_distribution_unlabeled: z_real_dist_unlabeled,
                                                 self.is_training: True,
                                                 self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
                                                 self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
                                                 self.dropout_discriminator:
-                                                    self.parameter_dictionary["dropout_discriminator"]})
+                                                    self.parameter_dictionary["dropout_discriminator"],
+                                                self.discriminator_labeled_labels: y_labeled,
+                                                self.discriminator_unlabeled_labels: y_unlabeled
+                                                })
                             # train the generator to fool the discriminator with its generated samples.
                             sess.run(self.generator_trainer,
-                                     feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                     feed_dict={self.X_unlabeled: batch_x_unlabeled,
+                                                self.X_target_unlabeled: batch_x_unlabeled,
+                                                self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
                                                 self.is_training: True,
                                                 self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
                                                 self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
                                                 self.dropout_discriminator:
-                                                    self.parameter_dictionary["dropout_discriminator"]})
+                                                    self.parameter_dictionary["dropout_discriminator"],
+                                                self.discriminator_labeled_labels: y_labeled,
+                                                self.discriminator_unlabeled_labels: y_unlabeled})
 
                         # every x epochs: write a summary for every 50th minibatch
                         if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
+                            # TODO:
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output = \
                                 sess.run(
                                     [self.autoencoder_loss, self.discriminator_loss, self.generator_loss,
-                                     self.tensorboard_summary, self.real_distribution, self.encoder_output,
-                                     self.discriminator_neg_samples, self.discriminator_pos_samples,
-                                     self.decoder_output],
-                                    feed_dict={self.X: batch_x, self.X_target: batch_x,
+                                     self.tensorboard_summary, self.real_distribution_labeled, self.encoder_output_labeled,
+                                     self.discriminator_fake_samples_labeled, self.discriminator_true_samples_labeled,
+                                     self.decoder_output_labeled],
+                                    feed_dict={self.X_unlabeled: batch_x_unlabeled,
+                                               self.X_target_unlabeled: batch_x_unlabeled,
+                                               self.X_labeled: batch_x_labeled,
+                                               self.X_target_labeled: batch_x_labeled,
+                                               self.discriminator_labeled_labels: y_labeled,
+                                               self.discriminator_unlabeled_labels: y_unlabeled,
                                                self.is_training: False,
-                                               self.real_distribution: z_real_dist,
-                                               self.decoder_input_multiple: z_real_dist})
+                                               self.real_distribution_labeled: z_real_dist_labeled,
+                                               self.real_distribution_unlabeled: z_real_dist_unlabeled,
+                                               self.decoder_input_multiple: z_real_dist_labeled})
                             if self.write_tensorboard:
                                 writer.add_summary(summary, global_step=step)
 
                             latent_representations_current_epoch.extend(latent_representation)
-                            labels_current_epoch.extend(batch_labels)
+                            labels_current_epoch.extend(y_labeled)
 
                             # update the dictionary holding the losses
                             self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
@@ -1007,10 +1098,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             self.epoch_summary_vars["latent_representation"].extend(latent_representation)
                             self.epoch_summary_vars["discriminator_neg"].extend(discriminator_neg)
                             self.epoch_summary_vars["discriminator_pos"].extend(discriminator_pos)
-                            self.epoch_summary_vars["batch_x"].extend(batch_x)
+                            self.epoch_summary_vars["batch_x"].extend(batch_x_labeled)
                             self.epoch_summary_vars["reconstructed_images"].extend(decoder_output)
                             self.epoch_summary_vars["epoch"] = epoch
-                            self.epoch_summary_vars["batch_labels"].extend(batch_labels)
+                            self.epoch_summary_vars["batch_labels"].extend(y_labeled)
 
                             if self.verbose:
                                 print("Epoch: {}, iteration: {}".format(epoch, b))

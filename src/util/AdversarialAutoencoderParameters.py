@@ -20,6 +20,8 @@ def get_result_path_for_selected_autoencoder(selected_autoencoder):
         return '../results/UnsupervisedClustering'
     elif selected_autoencoder == "DimensionalityReduction":
         return '../results/DimensionalityReduction'
+    elif selected_autoencoder == "IncorporatingLabelInformation":
+        return '../results/IncorporatingLabelInformation'
     else:
         print(selected_autoencoder + " has no result path associated with it!")
         raise NotImplementedError

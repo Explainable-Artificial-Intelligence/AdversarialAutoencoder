@@ -27,7 +27,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
         # whether only the autoencoder and not the generative network should be trained
-        self.only_train_autoencoder = True
+        self.only_train_autoencoder = False
 
         # vars for the swagger server
         self.requested_operations_by_swagger = []
@@ -907,7 +907,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         Reconstruction phase: the autoencoder updates the encoder and the decoder to minimize the
                         reconstruction error of the inputs
                         """
-                        # train the autoencoder by minimizing the reconstruction error between X and X_target
+                        # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
                         sess.run(self.autoencoder_trainer,
                                  feed_dict={self.X: batch_x, self.X_target: batch_x, self.y: batch_labels,
                                             self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],

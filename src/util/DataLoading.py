@@ -443,7 +443,7 @@ def read_mat_file(filename, one_hot=False, num_classes=10):
     with shape [num_of_images, num_classes] if one_hot is true and shape [num_of_images] otherwise
     """
     data = loadmat(filename)
-    imgs = data['X']
+    imgs = data['X_unlabeled']
     labels = data['y'].flatten()
     labels[labels == 10] = 0  # Fix for weird labeling in dataset
     if one_hot:

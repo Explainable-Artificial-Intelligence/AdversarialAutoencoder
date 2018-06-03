@@ -1,6 +1,8 @@
+import random
+
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+from math import *
 
 
 def draw_from_np_distribution(n_samples=1, **distribution_parameters):
@@ -445,6 +447,55 @@ def walk_along_multiple_gaussians(center=(0, 0), radius=10, n_points_to_return=1
     :return:
     """
     return np.array(points_on_circumference(center=center, radius=radius, n=n_points_to_return))
+
+
+# TODO: taken from: https://github.com/musyoku/adversarial-autoencoder/blob/master/aae/sampler.py
+def gaussian_mixture(batchsize, ndim, num_labels):
+    if ndim % 2 != 0:
+        raise Exception("ndim must be a multiple of 2.")
+
+    def sample(x, y, label, num_labels):
+        shift = 1.4
+        r = 2.0 * np.pi / float(num_labels) * float(label)
+        new_x = x * cos(r) - y * sin(r)
+        new_y = x * sin(r) + y * cos(r)
+        new_x += shift * cos(r)
+        new_y += shift * sin(r)
+        return np.array([new_x, new_y]).reshape((2,))
+
+    x_var = 0.5
+    y_var = 0.05
+    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
+    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
+    z = np.empty((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], random.randint(0, num_labels - 1), num_labels)
+    return z
+
+
+def supervised_gaussian_mixture(batchsize, ndim, label_indices, num_labels):
+    if ndim % 2 != 0:
+        raise Exception("ndim must be a multiple of 2.")
+
+    def sample(x, y, label, num_labels):
+        shift = 1.4
+        r = 2.0 * np.pi / float(num_labels) * float(label)
+        new_x = x * cos(r) - y * sin(r)
+        new_y = x * sin(r) + y * cos(r)
+        new_x += shift * cos(r)
+        new_y += shift * sin(r)
+        return np.array([new_x, new_y]).reshape((2,))
+
+    x_var = 0.5
+    y_var = 0.05
+    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
+    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
+    z = np.empty((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], label_indices[batch], num_labels)
+    return z
 
 
 def walk_along_swiss_roll():
