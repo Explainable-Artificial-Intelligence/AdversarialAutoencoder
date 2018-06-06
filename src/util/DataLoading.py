@@ -443,7 +443,7 @@ def read_mat_file(filename, one_hot=False, num_classes=10):
     with shape [num_of_images, num_classes] if one_hot is true and shape [num_of_images] otherwise
     """
     data = loadmat(filename)
-    imgs = data['X_unlabeled']
+    imgs = data['X']
     labels = data['y'].flatten()
     labels[labels == 10] = 0  # Fix for weird labeling in dataset
     if one_hot:
@@ -767,11 +767,247 @@ def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test
     test = DataSet(test_images, test_labels, **options)
     return test, train, validation
 
+#################
+# Mass spec data
+#################
+
+
+def create_mass_spec_spectrum_unidentified(single_entry):
+
+    # create the iterator
+    iterator = iter(single_entry)
+
+    # skip the BEGIN IONS header and the empty row, if it exists
+    if not next(iterator).startswith("BEGIN IONS"):
+        next(iterator)
+
+    title = next(iterator).split("=")[1].split(",")[0]
+    pepmass = next(iterator).split("=")[1]
+    charge = next(iterator).split("=")[1]
+    sequence = next(iterator).split("=")[1]
+    peaks = []
+
+    next_row = next(iterator)
+    while not next_row.startswith("END IONS"):
+        peaks.append([float(a) for a in next_row.split(" ")])
+        next_row = next(iterator)
+
+    return {"title": title, "pepmass": pepmass, "charge": charge, "sequence": sequence, "peaks": peaks}
+
+
+def load_mgf_file(filename):
+
+    file_content = []
+
+    with open(filename) as f:
+        single_entry = []
+        for line in f.readlines():
+
+            single_entry.append(line.strip())
+            if line.startswith("END IONS"):
+                mass_spec_spectrum = create_mass_spec_spectrum_unidentified(single_entry)
+
+                file_content.append(mass_spec_spectrum)
+                single_entry = []
+
+    return file_content
+
+
+def create_mass_spec_spectrum_identified(single_entry):
+
+    # create the iterator
+    iterator = iter(single_entry)
+
+    first_row = next(iterator)
+    if not first_row.startswith("Name:"):
+        first_row = next(iterator)
+
+    title = first_row.split(" ")[1]
+    sequence = title.split("/")[0]
+    charge = title.split("/")[1]
+
+    pepmass = next(iterator).split(" ")[1]
+    comment = next(iterator).split(" ")[1]
+    peaks = []
+
+    # skip the num peaks row, if it exists
+    next_row = next(iterator)
+    if next_row.startswith("Num"):
+        next(iterator)
+    else:
+        peaks.append(next_row.split(" "))
+
+    # iterate over the remaining rows holding the peptide masses
+    for row in iterator:
+        # first if m/z, second is intensity
+        try:
+            la = [float(a) for a in row.split(" ")]
+            if len(la) != 2:
+                return None
+            else:
+                peaks.append(la)
+        except ValueError:
+            return None
+
+    return {"title": title, "sequence": sequence, "charge": charge, "pepmass": pepmass, "comment": comment,
+            "peaks": peaks}
+
+
+def load_msp_file(filename):
+
+    file_content = []
+
+    with open(filename) as f:
+        single_entry = []
+        for line in f.readlines():
+            if line == "\n" and len(single_entry) > 1:
+                mass_spec_spectrum = create_mass_spec_spectrum_identified(single_entry)
+                if mass_spec_spectrum:
+                    file_content.append(mass_spec_spectrum)
+                single_entry = []
+            single_entry.append(line.strip())
+
+    return file_content
+
+
+def preprocess_mass_spec_data(mass_spec_data, n_peaks_to_keep=30):
+
+    # get the peaks for all spectra
+    peaks = [spectrum["peaks"] for spectrum in mass_spec_data]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = [filter_peaks(a, n_peaks_to_keep) for a in peaks]
+
+    # remove None from the list
+    filtered_peaks = [i for i in filtered_peaks if i is not None]
+
+    peak_features = [create_features_for_peak(peak) for peak in filtered_peaks]
+
+    return peak_features
+
+
+def create_features_for_peak(peak):
+    """
+    represent each peak by 3 numbers (1) square root of its height (2) its location (mz distance from 0) and (3) its location relative
+to the precursor (mz distance relative to precursor)
+    """
+
+    # (1) square root of its height
+    intensities = peak[:, 1]
+
+    try:
+        intensities = np.sqrt(intensities)
+    except TypeError:
+        intensities = np.sqrt(intensities.astype(float))      # convert to float if necessary
+
+    # (2) its location (mz distance from 0)
+    mz_distance = peak[:, 0]
+
+    # (3) its location relative to the precursor (mz distance relative to precursor)
+    try:
+        rel_distances = np.array([round(x - y, 2) for x, y in zip(mz_distance[1:], mz_distance)])
+    except TypeError:
+        mz_distance = mz_distance.astype(float)
+        rel_distances = np.array([round(x - y, 2) for x, y in zip(mz_distance[1:], mz_distance)])
+
+    return np.array([intensities, mz_distance, rel_distances])
+
+
+def filter_peaks(peaks_to_filter, n_peaks_to_keep):
+
+    # convert list to np.array
+    peaks_to_filter = np.array(peaks_to_filter)
+
+    if len(peaks_to_filter) < n_peaks_to_keep:
+        return None
+
+    # get the intensities
+    intensities = peaks_to_filter[:, 1]
+
+    # get the indices for the n highest intensities
+    indices_to_keep = np.argsort(intensities)[:n_peaks_to_keep]
+
+    # sort the indices, so the m/z values are in proper order
+    indices_to_keep = np.sort(indices_to_keep)
+
+    return peaks_to_filter[indices_to_keep]
+
 
 def testing():
     """
     :return:
     """
+
+    """
+    read mass spec data
+    """
+
+    if True:
+
+        # TODO: save preprocessed data to some file
+
+        """
+        Unidentified spectra
+        """
+        if True:
+
+            print("#"*5 + " Unidentified spectra " + "#"*5)
+
+            unidentified_spectra = load_mgf_file("../../data/mass_spec_data/results_saccharomyces_cerevisiae_unidentified.mgf")
+            print(unidentified_spectra[15])
+
+            peak_features_unidentified = preprocess_mass_spec_data(unidentified_spectra, 50)
+            print(peak_features_unidentified[5])
+
+            if True:
+
+                num_peaks_unidentified_spectra = [len(spectrum["peaks"]) for spectrum in unidentified_spectra]
+                print(len(num_peaks_unidentified_spectra))
+                print(np.mean(num_peaks_unidentified_spectra))
+                print(np.std(num_peaks_unidentified_spectra))
+                print(np.min(num_peaks_unidentified_spectra))
+                print(np.max(num_peaks_unidentified_spectra))
+
+                la = [a for a in num_peaks_unidentified_spectra if a > 50]
+                print(len(la))
+
+                plt.hist(num_peaks_unidentified_spectra)
+                plt.title("Num. peaks - unidentified spectra")
+                plt.xlabel("Num. peaks")
+                plt.show()
+
+        """
+        Identified spectra
+        """
+
+        if True:
+
+            print("#"*5 + " Identified spectra " + "#"*5)
+            identified_spectra = load_msp_file("../../data/mass_spec_data/Saccharomyces_cerevisiae_identified_fixed.txt")
+            print(identified_spectra[15000])
+
+            peak_features_identified = preprocess_mass_spec_data(identified_spectra, 50)
+            print(peak_features_identified[5])
+
+            if True:
+
+                # some analysis regarding the number of peaks
+                num_peaks_identified_spectra = [len(spectrum["peaks"]) for spectrum in identified_spectra]
+                print(len(num_peaks_identified_spectra))
+                print(np.mean(num_peaks_identified_spectra))
+                print(np.std(num_peaks_identified_spectra))
+                print(np.min(num_peaks_identified_spectra))
+                print(np.max(num_peaks_identified_spectra))
+
+                la = [a for a in num_peaks_identified_spectra if a > 50]
+                print(len(la))
+
+                plt.hist(num_peaks_identified_spectra)
+                plt.title("Num. peaks - identified spectra")
+                plt.xlabel("Num. peaks")
+                plt.show()
+
+
 
     """
     read cifar10
@@ -791,7 +1027,7 @@ def testing():
     read .mat file
     """
 
-    if True:
+    if False:
 
         grey_scale = False
 

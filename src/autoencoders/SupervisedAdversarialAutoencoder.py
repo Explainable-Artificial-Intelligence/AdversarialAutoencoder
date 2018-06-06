@@ -1048,11 +1048,6 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         reconstructed_images = np.array(self.epoch_summary_vars["reconstructed_images"])
                         create_reconstruction_grid(self, real_images, reconstructed_images, epoch=epoch)
 
-                        self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
-                                                   "discriminator_neg": [],
-                                                   "discriminator_pos": [], "batch_x": [], "reconstructed_images": [],
-                                                   "epoch": None, "batch_labels": []}
-
                         # draw randomly from the latent representation; those points will be then be used to create the
                         # images on the image grid
                         random_indices = np.random.choice(np.array(latent_representations_current_epoch).shape[0],
@@ -1085,6 +1080,11 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         self.random_points_for_image_grid = None
 
                     # reset the list holding the latent representations for the current epoch
+                    self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
+                                               "discriminator_neg": [],
+                                               "discriminator_pos": [], "batch_x": [], "reconstructed_images": [],
+                                               "epoch": None, "batch_labels": []}
+
                     latent_representations_current_epoch = []
                     labels_current_epoch = []
 

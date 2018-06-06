@@ -1069,6 +1069,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         visualize_autoencoder_weights_and_biases(self, epoch=epoch)
 
                     # reset the list holding the latent representations for the current epoch
+                    self.epoch_summary_vars = {"real_dist": [], "latent_representation": [], "discriminator_neg": [],
+                                               "discriminator_pos": [], "batch_x": [], "reconstructed_images": [],
+                                               "epoch": None, "batch_labels": []}
                     latent_representations_current_epoch = []
                     labels_current_epoch = []
 

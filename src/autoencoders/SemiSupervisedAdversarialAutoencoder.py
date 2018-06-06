@@ -1440,14 +1440,6 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         reconstructed_images = np.array(self.epoch_summary_vars["reconstructed_images"])
                         create_reconstruction_grid(self, real_images, reconstructed_images, epoch=epoch)
 
-                        self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
-                                                   "batch_X_unlabeled": [],
-                                                   "reconstructed_images": [], "epoch": [], "b": [],
-                                                   "real_cat_dist": [],
-                                                   "encoder_cat_dist": [], "batch_labels": [],
-                                                   "discriminator_gaussian_neg": [], "discriminator_gaussian_pos": [],
-                                                   "discriminator_cat_neg": [], "discriminator_cat_pos": []}
-
                         # draw randomly from the latent representation; those points will be then be used to create the
                         # images on the image grid
                         random_indices = np.random.choice(np.array(latent_representations_current_epoch).shape[0],
@@ -1479,6 +1471,14 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         visualize_autoencoder_weights_and_biases(self, epoch=epoch)
 
                     # reset the list holding the latent representations for the current epoch
+                    self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
+                                               "batch_X_unlabeled": [],
+                                               "reconstructed_images": [], "epoch": [], "b": [],
+                                               "real_cat_dist": [],
+                                               "encoder_cat_dist": [], "batch_labels": [],
+                                               "discriminator_gaussian_neg": [], "discriminator_gaussian_pos": [],
+                                               "discriminator_cat_neg": [], "discriminator_cat_pos": []}
+
                     latent_representations_current_epoch = []
                     labels_current_epoch = []
 

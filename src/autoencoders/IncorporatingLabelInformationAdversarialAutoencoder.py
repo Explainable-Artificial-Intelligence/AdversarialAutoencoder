@@ -15,7 +15,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from swagger_server.utils.Storage import Storage
 from util.DataLoading import get_input_data
 from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll, \
-    draw_from_dim_reduced_dataset, gaussian_mixture, supervised_gaussian_mixture
+    draw_from_dim_reduced_dataset, gaussian_mixture, supervised_gaussian_mixture, supervised_swiss_roll, swiss_roll
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, \
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
@@ -25,6 +25,8 @@ from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_a
 
 class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
+
+        self.distribution_to_sample = "gaussian"
 
         # whether only the autoencoder and not the generative network should be trained
         self.only_train_autoencoder = False
@@ -359,8 +361,9 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         # variables for the minibatch summary image
         self.epoch_summary_vars = {"real_dist": [], "latent_representation": [], "discriminator_neg": [],
-                                   "discriminator_pos": [], "batch_x": [], "reconstructed_images": [],
-                                   "epoch": None, "batch_labels": []}
+                                   "discriminator_pos": [], "batch_x_labeled": [], "reconstructed_images_labeled": [],
+                                   "batch_x": [], "reconstructed_images": [], "epoch": None,
+                                   "batch_labels": []}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
         # minibatch summary plots
@@ -784,6 +787,53 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         summary_op = tf.summary.merge_all()
         return summary_op
 
+    def walk_along_latent_space(self, sess, op, epoch):
+
+        nx, ny = 10, 10
+        label_indices = [i for i in range(self.n_classes-1)] * ny
+
+        # TODO: get the points
+        if self.distribution_to_sample == "gaussian":
+            points = supervised_gaussian_mixture(nx*ny, 2, label_indices, self.n_classes-1)
+        else:
+            points = supervised_swiss_roll(nx*ny, 2, label_indices, self.n_classes-1)
+
+        # create the image grid
+        plt.subplot()
+        gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
+
+        # iterate over the image grid
+        for i, g in enumerate(gs):
+
+            # create a data point from the x_points and y_points array as input for the decoder
+            z = points[i]
+
+            z = np.reshape(z, (1, self.z_dim))
+
+            # run the decoder
+            x = sess.run(op, feed_dict={self.decoder_input: z, self.is_training: False})
+            x = np.array(x).reshape(self.input_dim)
+
+            ax = plt.subplot(g)
+
+            # reshape the image array and display it
+            img = reshape_image_array(self, x)
+            if self.color_scale == "gray_scale":
+                plt.imshow(img, cmap="gray")
+            else:
+                plt.imshow(img)
+
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_aspect('auto')
+
+            # create the label x for the x axis
+            if ax.is_last_row():
+                ax.set_xlabel(label_indices[i], fontsize=9)
+
+        # save the created image grid
+        plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + "_gen_images" + '.png')
+
     def generate_image_grid(self, sess, op, epoch, points, left_cell=None, save_image_grid=True):
         """
         Generates and saves a grid of images by passing a set of numbers to the decoder and getting its output.
@@ -810,8 +860,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         else:
             # creates evenly spaced values within [-10, 10] with a spacing of 1.5
-            x_points = np.arange(10, -10, -1.5).astype(np.float32)
-            y_points = np.arange(-10, 10, 1.5).astype(np.float32)
+            x_points = np.arange(10, -10, -2.0).astype(np.float32)
+            y_points = np.arange(-10, 10, 2.0).astype(np.float32)
             # x_points = np.arange(60, -60, -12).astype(np.float32)
             # y_points = np.arange(-60, 60, 12).astype(np.float32)
 
@@ -866,7 +916,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                 if ax.is_first_col():
                     ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
 
-                # create the label x for the x axis
+                # create the label for the x axis
                 if ax.is_last_row():
                     ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
 
@@ -980,16 +1030,21 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                         # get the batch from the training data
                         # TODO:
                         batch_x_labeled, y_labeled = data.train.next_batch(self.batch_size)
-                        batch_x_unlabeled, _ = data.train.next_batch(self.batch_size)
+                        batch_x, _ = data.train.next_batch(self.batch_size)
 
                         # convert one-hot to integer
                         batch_labels_int = np.argmax(y_labeled, axis=1)
 
                         # draw a sample from p(z) and use it as real distribution for the discriminator
-                        # TODO: draw from two gaussians
-                        z_real_dist_labeled = supervised_gaussian_mixture(self.batch_size, self.z_dim, batch_labels_int,
-                                                                          self.n_classes - 1)
-                        z_real_dist_unlabeled = gaussian_mixture(self.batch_size, self.z_dim, self.n_classes - 1)
+
+                        if self.distribution_to_sample == "gaussian":
+                            z_real_dist_labeled = supervised_gaussian_mixture(self.batch_size, self.z_dim,
+                                                                              batch_labels_int, self.n_classes - 1)
+                            z_real_dist_unlabeled = gaussian_mixture(self.batch_size, self.z_dim, self.n_classes - 1)
+                        else:
+                            z_real_dist_labeled = supervised_swiss_roll(self.batch_size, self.z_dim, batch_labels_int,
+                                                                        self.n_classes - 1)
+                            z_real_dist_unlabeled = swiss_roll(self.batch_size, self.z_dim, self.n_classes - 1)
 
                         # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
                         #z_real_dist = \
@@ -998,7 +1053,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                         # add the extra label
                         extra_labels = np.zeros((self.batch_size, 1))
-                        y_labeled = np.append(y_labeled, extra_labels, axis=1)
+                        y_labeled_extra_label = np.append(y_labeled, extra_labels, axis=1)
 
                         """
                         Reconstruction phase: the autoencoder updates the encoder and the decoder to minimize the
@@ -1006,7 +1061,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                         """
                         # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
                         sess.run(self.autoencoder_trainer,
-                                 feed_dict={self.X_unlabeled: batch_x_unlabeled, self.X_target_unlabeled: batch_x_unlabeled,
+                                 feed_dict={self.X_unlabeled: batch_x, self.X_target_unlabeled: batch_x,
                                             self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
                                             self.is_training: True,
                                             self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
@@ -1025,8 +1080,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                             # train the discriminator to distinguish the true samples from the fake samples generated
                             # by the generator
                             sess.run(self.discriminator_trainer,
-                                     feed_dict={self.X_unlabeled: batch_x_unlabeled,
-                                                self.X_target_unlabeled: batch_x_unlabeled,
+                                     feed_dict={self.X_unlabeled: batch_x,
+                                                self.X_target_unlabeled: batch_x,
                                                 self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
                                                 self.real_distribution_labeled: z_real_dist_labeled,
                                                 self.real_distribution_unlabeled: z_real_dist_unlabeled,
@@ -1035,20 +1090,20 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                                                 self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
                                                 self.dropout_discriminator:
                                                     self.parameter_dictionary["dropout_discriminator"],
-                                                self.discriminator_labeled_labels: y_labeled,
+                                                self.discriminator_labeled_labels: y_labeled_extra_label,
                                                 self.discriminator_unlabeled_labels: y_unlabeled
                                                 })
                             # train the generator to fool the discriminator with its generated samples.
                             sess.run(self.generator_trainer,
-                                     feed_dict={self.X_unlabeled: batch_x_unlabeled,
-                                                self.X_target_unlabeled: batch_x_unlabeled,
+                                     feed_dict={self.X_unlabeled: batch_x,
+                                                self.X_target_unlabeled: batch_x,
                                                 self.X_labeled: batch_x_labeled, self.X_target_labeled: batch_x_labeled,
                                                 self.is_training: True,
                                                 self.dropout_encoder: self.parameter_dictionary["dropout_encoder"],
                                                 self.dropout_decoder: self.parameter_dictionary["dropout_decoder"],
                                                 self.dropout_discriminator:
                                                     self.parameter_dictionary["dropout_discriminator"],
-                                                self.discriminator_labeled_labels: y_labeled,
+                                                self.discriminator_labeled_labels: y_labeled_extra_label,
                                                 self.discriminator_unlabeled_labels: y_unlabeled})
 
                         # every x epochs: write a summary for every 50th minibatch
@@ -1056,17 +1111,18 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                             # TODO:
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
-                            latent_representation, discriminator_neg, discriminator_pos, decoder_output = \
+                            latent_representation, discriminator_neg, discriminator_pos, decoder_output,\
+                                decoder_output_labeled = \
                                 sess.run(
                                     [self.autoencoder_loss, self.discriminator_loss, self.generator_loss,
                                      self.tensorboard_summary, self.real_distribution_labeled, self.encoder_output_labeled,
                                      self.discriminator_fake_samples_labeled, self.discriminator_true_samples_labeled,
-                                     self.decoder_output_labeled],
-                                    feed_dict={self.X_unlabeled: batch_x_unlabeled,
-                                               self.X_target_unlabeled: batch_x_unlabeled,
+                                     self.decoder_output_unlabeled, self.decoder_output_labeled],
+                                    feed_dict={self.X_unlabeled: batch_x,
+                                               self.X_target_unlabeled: batch_x,
                                                self.X_labeled: batch_x_labeled,
                                                self.X_target_labeled: batch_x_labeled,
-                                               self.discriminator_labeled_labels: y_labeled,
+                                               self.discriminator_labeled_labels: y_labeled_extra_label,
                                                self.discriminator_unlabeled_labels: y_unlabeled,
                                                self.is_training: False,
                                                self.real_distribution_labeled: z_real_dist_labeled,
@@ -1098,8 +1154,10 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                             self.epoch_summary_vars["latent_representation"].extend(latent_representation)
                             self.epoch_summary_vars["discriminator_neg"].extend(discriminator_neg)
                             self.epoch_summary_vars["discriminator_pos"].extend(discriminator_pos)
-                            self.epoch_summary_vars["batch_x"].extend(batch_x_labeled)
+                            self.epoch_summary_vars["batch_x"].extend(batch_x)
+                            self.epoch_summary_vars["batch_x_labeled"].extend(batch_x_labeled)
                             self.epoch_summary_vars["reconstructed_images"].extend(decoder_output)
+                            self.epoch_summary_vars["reconstructed_images_labeled"].extend(decoder_output_labeled)
                             self.epoch_summary_vars["epoch"] = epoch
                             self.epoch_summary_vars["batch_labels"].extend(y_labeled)
 
@@ -1135,9 +1193,15 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                         # create the summary image for the current minibatch
                         create_epoch_summary_image(self, epoch, self.include_tuning_performance)
 
-                        real_images = np.array(self.epoch_summary_vars["batch_x"])
-                        reconstructed_images = np.array(self.epoch_summary_vars["reconstructed_images"])
-                        create_reconstruction_grid(self, real_images, reconstructed_images, epoch=epoch)
+                        real_images_unlabeled = np.array(self.epoch_summary_vars["batch_x"])
+                        reconstructed_images_unlabeled = np.array(self.epoch_summary_vars["reconstructed_images"])
+                        real_images_labeled = np.array(self.epoch_summary_vars["batch_x_labeled"])
+                        reconstructed_images_labeled = np.array(self.epoch_summary_vars["reconstructed_images_labeled"])
+
+                        create_reconstruction_grid(self, real_images_unlabeled, reconstructed_images_unlabeled,
+                                                   epoch=str(epoch) + "_unlabeled")
+                        create_reconstruction_grid(self, real_images_labeled, reconstructed_images_labeled,
+                                                   epoch=str(epoch) + "_labeled")
 
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4 * 2, 4.8)
@@ -1150,9 +1214,12 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                         # draw the class distribution on the latent space
                         result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
+
                         draw_class_distribution_on_latent_space(latent_representations_current_epoch,
                                                                 labels_current_epoch, result_path, epoch,
                                                                 None, combined_plot=True)
+
+                        self.walk_along_latent_space(sess,op=self.decoder_output_real_dist, epoch=epoch)
 
                         """
                         Weights + biases visualization
@@ -1160,6 +1227,12 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                         visualize_autoencoder_weights_and_biases(self, epoch=epoch)
 
                     # reset the list holding the latent representations for the current epoch
+                    self.epoch_summary_vars = {"real_dist": [], "latent_representation": [], "discriminator_neg": [],
+                                               "discriminator_pos": [], "batch_x_labeled": [],
+                                               "reconstructed_images_labeled": [],
+                                               "batch_x": [], "reconstructed_images": [], "epoch": None,
+                                               "batch_labels": []}
+
                     latent_representations_current_epoch = []
                     labels_current_epoch = []
 

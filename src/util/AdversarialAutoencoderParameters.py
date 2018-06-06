@@ -271,7 +271,7 @@ def get_default_parameters_svhn():
             'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
             'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
 
-            'dropout_encoder': [0.2, 0.0, 0.0, 0.0, 0.0],
+            'dropout_encoder': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator_c': [0.0, 0.0, 0.0],
@@ -477,7 +477,7 @@ def get_default_parameters_svhn():
             'loss_function_discriminator': 'sigmoid_cross_entropy',
             'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
             'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
-            'loss_function_generator': 'hinge_loss'}
+            'loss_function_generator': 'sigmoid_cross_entropy'}
 
 
 def get_default_parameters_cifar10():

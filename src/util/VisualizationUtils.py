@@ -116,20 +116,11 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
 
     # perform PCA if the dimension of the latent space is higher than 2
     if z_dim > 2:
-        mu = np.mean(latent_representations_current_epoch, axis=0)
-
         pca.fit(latent_representations_current_epoch)
         latent_representations_current_epoch = pca.transform(latent_representations_current_epoch)
 
         plt.xlabel("Principal component 1: " + "{:6.4f}".format(pca.explained_variance_ratio_[0]))
         plt.ylabel("Principal component 2: " + "{:6.4f}".format(pca.explained_variance_ratio_[1]))
-
-        # TODO: whats this for?
-        Xhat = np.dot(latent_representations_current_epoch[:, :2], pca.components_[:2, :])
-        Xhat += mu
-        print()
-        print(Xhat.shape)
-        print(Xhat[0])
 
     # plot the different classes on the latent space
     for class_label in range(n_classes):
@@ -1200,6 +1191,41 @@ def visualize_single_layer_with_histogram(all_values_for_layers, layer_name, var
     plt.title("Epoch: " + str(epoch))
     plt.savefig(result_path + layer_name + "_" + var_to_visualize + ".png")
     plt.close()
+
+
+def visualize_incorporating_label_information(list_of_images):
+
+    nx, ny = 10, 10
+    # create the image grid
+    plt.subplot()
+    gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
+
+    # iterate over the image grid
+    for i, g in enumerate(gs):
+
+        ax = plt.subplot(g)
+
+        # reshape the image array and display it
+        img = reshape_image_array(self, x)
+        if self.color_scale == "gray_scale":
+            plt.imshow(img, cmap="gray")
+        else:
+            plt.imshow(img)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_aspect('auto')
+
+        if self.z_dim == 2:
+            # create the label for the y axis
+            if ax.is_first_col():
+                ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
+
+            # create the label x for the x axis
+            if ax.is_last_row():
+                ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
+
+
 
 
 def visualize_weights_single_layer_as_img_grid(weights, input_dim, layer_name, var_to_visualize, result_path, epoch):

@@ -449,78 +449,29 @@ def walk_along_multiple_gaussians(center=(0, 0), radius=10, n_points_to_return=1
     return np.array(points_on_circumference(center=center, radius=radius, n=n_points_to_return))
 
 
-# TODO: taken from: https://github.com/musyoku/adversarial-autoencoder/blob/master/aae/sampler.py
-def gaussian_mixture(batchsize, ndim, num_labels):
-    if ndim % 2 != 0:
-        raise Exception("ndim must be a multiple of 2.")
-
-    def sample(x, y, label, num_labels):
-        shift = 1.4
-        r = 2.0 * np.pi / float(num_labels) * float(label)
-        new_x = x * cos(r) - y * sin(r)
-        new_y = x * sin(r) + y * cos(r)
-        new_x += shift * cos(r)
-        new_y += shift * sin(r)
-        return np.array([new_x, new_y]).reshape((2,))
-
-    x_var = 0.5
-    y_var = 0.05
-    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
-    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
-    z = np.empty((batchsize, ndim), dtype=np.float32)
-    for batch in range(batchsize):
-        for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], random.randint(0, num_labels - 1), num_labels)
-    return z
-
-
-def supervised_gaussian_mixture(batchsize, ndim, label_indices, num_labels):
-    if ndim % 2 != 0:
-        raise Exception("ndim must be a multiple of 2.")
-
-    def sample(x, y, label, num_labels):
-        shift = 1.4
-        r = 2.0 * np.pi / float(num_labels) * float(label)
-        new_x = x * cos(r) - y * sin(r)
-        new_y = x * sin(r) + y * cos(r)
-        new_x += shift * cos(r)
-        new_y += shift * sin(r)
-        return np.array([new_x, new_y]).reshape((2,))
-
-    x_var = 0.5
-    y_var = 0.05
-    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
-    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
-    z = np.empty((batchsize, ndim), dtype=np.float32)
-    for batch in range(batchsize):
-        for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], label_indices[batch], num_labels)
-    return z
-
-
-def walk_along_swiss_roll():
-
-    # TODO: draw from swiss roll without random shuffling and get every nth item
-
-    n_classes = 10
-    shape = (1000, 2)
-    spread = 1.5
-    noise = 0.0
-
-    # number of points we want at max for each class
-    n_samples = shape[0]
-    n_samples_per_class = int(math.ceil(n_samples / n_classes))
-
-    # holds the generated x and y points
-    generated_points_x = np.array([])
-    generated_points_y = np.array([])
-
-    # generate the points and app them to the arrays
-    for class_i in range(n_classes):
-        x, y = create_class_specific_samples_swiss_roll(class_i=class_i, n_classes=n_classes, spread=spread, noise=noise,
-                                                        n_samples_per_class=n_samples_per_class, no_noise=True)
-        generated_points_x = np.append(generated_points_x, x)
-        generated_points_y = np.append(generated_points_y, y)
+# def walk_along_swiss_roll():
+#
+#     # TODO: draw from swiss roll without random shuffling and get every nth item
+#
+#     n_classes = 10
+#     shape = (1000, 2)
+#     spread = 1.5
+#     noise = 0.0
+#
+#     # number of points we want at max for each class
+#     n_samples = shape[0]
+#     n_samples_per_class = int(math.ceil(n_samples / n_classes))
+#
+#     # holds the generated x and y points
+#     generated_points_x = np.array([])
+#     generated_points_y = np.array([])
+#
+#     # generate the points and app them to the arrays
+#     for class_i in range(n_classes):
+#         x, y = create_class_specific_samples_swiss_roll(class_i=class_i, n_classes=n_classes, spread=spread, noise=noise,
+#                                                         n_samples_per_class=n_samples_per_class, no_noise=True)
+#         generated_points_x = np.append(generated_points_x, x)
+#         generated_points_y = np.append(generated_points_y, y)
 
 
 def walk_along_single_gaussian(min_value=-10, max_value=10, n_points_to_return=(14, 14)):
@@ -562,12 +513,116 @@ def walk_along_single_gaussian(min_value=-10, max_value=10, n_points_to_return=(
     return lala
 
 
+# TODO: taken from: https://github.com/musyoku/adversarial-autoencoder/blob/master/aae/sampler.py
+def gaussian_mixture(batchsize, ndim, num_labels):
+    if ndim % 2 != 0:
+        raise Exception("ndim must be a multiple of 2.")
+
+    def sample(x, y, label, num_labels):
+        shift = 1.4
+        r = 2.0 * np.pi / float(num_labels) * float(label)
+        new_x = x * cos(r) - y * sin(r)
+        new_y = x * sin(r) + y * cos(r)
+        new_x += shift * cos(r)
+        new_y += shift * sin(r)
+        return np.array([new_x, new_y]).reshape((2,))
+
+    x_var = 0.5
+    y_var = 0.05
+    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
+    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
+    z = np.empty((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], random.randint(0, num_labels - 1), num_labels)
+    return z*5
+
+
+def supervised_gaussian_mixture(batchsize, ndim, label_indices, num_labels):
+    if ndim % 2 != 0:
+        raise Exception("ndim must be a multiple of 2.")
+
+    def sample(x, y, label, num_labels):
+        shift = 1.4
+        r = 2.0 * np.pi / float(num_labels) * float(label)
+        new_x = x * cos(r) - y * sin(r)
+        new_y = x * sin(r) + y * cos(r)
+        new_x += shift * cos(r)
+        new_y += shift * sin(r)
+        return np.array([new_x, new_y]).reshape((2,))
+
+    x_var = 0.5
+    y_var = 0.05
+    x = np.random.normal(0, x_var, (batchsize, ndim // 2))
+    y = np.random.normal(0, y_var, (batchsize, ndim // 2))
+    z = np.empty((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], label_indices[batch], num_labels)
+    return z*5
+
+
+def swiss_roll(batchsize, ndim, num_labels):
+    def sample(label, num_labels):
+        uni = np.random.uniform(0.0, 1.0) / float(num_labels) + float(label) / float(num_labels)
+        r = sqrt(uni) * 3.0
+        rad = np.pi * 4.0 * sqrt(uni)
+        x = r * cos(rad)
+        y = r * sin(rad)
+        return np.array([x, y]).reshape((2,))
+
+    z = np.zeros((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(random.randint(0, num_labels - 1), num_labels)
+    return z*5
+
+
+def supervised_swiss_roll(batchsize, ndim, label_indices, num_labels):
+    def sample(label, num_labels):
+        uni = np.random.uniform(0.0, 1.0) / float(num_labels) + float(label) / float(num_labels)
+        r = sqrt(uni) * 3.0
+        rad = np.pi * 4.0 * sqrt(uni)
+        x = r * cos(rad)
+        y = r * sin(rad)
+        return np.array([x, y]).reshape((2,))
+
+    z = np.zeros((batchsize, ndim), dtype=np.float32)
+    for batch in range(batchsize):
+        for zi in range(ndim // 2):
+            z[batch, zi*2:zi*2+2] = sample(label_indices[batch], num_labels)
+    return z*5
+
+
+# def walk_along_swiss_roll():
+
+
+
+
 def testing():
     """
     """
 
     # walk_along_multiple_gaussians()
     # walk_along_single_gaussian()
+
+    if True:
+        batch_size = 10000
+        z_dim = 2
+        n_classes = 10
+        batch_labels_int = np.random.choice(n_classes, batch_size)
+        z_real_dist_labeled = supervised_gaussian_mixture(batch_size, z_dim, batch_labels_int, n_classes)
+        plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
+        plt.show()
+
+    if True:
+        batch_size = 10000
+        z_dim = 2
+        n_classes = 10
+        batch_labels_int = np.random.choice(n_classes, batch_size)
+        z_real_dist_labeled = supervised_swiss_roll(batch_size, z_dim, batch_labels_int, n_classes)
+        plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
+        plt.show()
 
     # test multiple gaussians
     if False:
@@ -578,7 +633,7 @@ def testing():
         plt.show()
 
     # test swiss roll
-    if True:
+    if False:
         generated_points = draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(1000, 2), shuffle=True)
         print(generated_points)
         print(generated_points.shape)
