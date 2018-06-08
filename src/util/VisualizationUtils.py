@@ -127,7 +127,8 @@ def draw_class_distribution_on_latent_space(latent_representations_current_epoch
         # get the points corresponding to the same classes
         points_for_current_class_label = latent_representations_current_epoch[np.where(int_labels == class_label)]
         # plot them
-        plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label))
+        plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label),
+                    alpha=0.5)
 
     # draw the random points on the latent space if we have any
     if random_points_for_image_grid is not None:
@@ -278,9 +279,12 @@ def create_epoch_summary_image(aae_class, epoch, include_tuning_performance=Fals
     # plot the real distribution
     plt.subplot(4, 3, 7)
     if aae_class.z_dim > 2:
-        plt.hist(real_dist.flatten())
+        pca = PCA(n_components=2)
+        pca.fit(real_dist)
+        real_dist_transformed = pca.transform(real_dist)
+        plt.scatter(real_dist_transformed[:, 0], real_dist_transformed[:, 1], alpha=0.5)
     else:
-        plt.scatter(real_dist[:, 0], real_dist[:, 1])
+        plt.scatter(real_dist[:, 0], real_dist[:, 1], alpha=0.5)
     plt.title("real dist")
 
     # plot the latent representation
@@ -289,7 +293,14 @@ def create_epoch_summary_image(aae_class, epoch, include_tuning_performance=Fals
         pca = PCA(n_components=2)
         pca.fit(latent_representation)
         latent_representations_current_epoch = pca.transform(latent_representation)
-        plt.scatter(latent_representations_current_epoch[:, 0], latent_representations_current_epoch[:, 1])
+        # plot the different classes on the latent space
+        for class_label in range(n_classes):
+            # get the points corresponding to the same classes
+            points_for_current_class_label = \
+                latent_representations_current_epoch[np.where(batch_integer_labels == class_label)]
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label), alpha=0.5)
     else:
         # plot the different classes on the latent space
         for class_label in range(n_classes):
@@ -297,7 +308,7 @@ def create_epoch_summary_image(aae_class, epoch, include_tuning_performance=Fals
             points_for_current_class_label = latent_representation[np.where(batch_integer_labels == class_label)]
             # plot them
             plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
-                        label=str(class_label))
+                        label=str(class_label), alpha=0.5)
     plt.legend()
     plt.title("encoder dist")
 
@@ -554,7 +565,10 @@ def create_epoch_summary_image_semi_supervised(aae_class, epoch, include_tuning_
     # plot the real distribution
     plt.subplot(5, 4, 11)
     if aae_class.z_dim > 2:
-        plt.hist(real_dist.flatten())
+        pca = PCA(n_components=2)
+        pca.fit(real_dist)
+        real_dist_transformed = pca.transform(real_dist)
+        plt.scatter(real_dist_transformed[:, 0], real_dist_transformed[:, 1], alpha=0.5)
     else:
         plt.scatter(real_dist[:, 0], real_dist[:, 1])
     plt.title("real dist")
@@ -565,7 +579,13 @@ def create_epoch_summary_image_semi_supervised(aae_class, epoch, include_tuning_
         pca = PCA(n_components=2)
         pca.fit(latent_representation)
         latent_representations_current_epoch = pca.transform(latent_representation)
-        plt.scatter(latent_representations_current_epoch[:, 0], latent_representations_current_epoch[:, 1])
+        # plot the different classes on the latent space
+        for class_label in range(n_classes):
+            # get the points corresponding to the same classes
+            points_for_current_class_label = latent_representations_current_epoch[np.where(batch_integer_labels == class_label)]
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label))
     else:
         # plot the different classes on the latent space
         for class_label in range(n_classes):
@@ -675,72 +695,31 @@ def create_epoch_summary_image_semi_supervised(aae_class, epoch, include_tuning_
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
 
-def visualize_cluster_heads(aae_class, cluster_heads, epoch, mini_batch_i):
-
-    # increase figure size
-    plt.rcParams["figure.figsize"] = (15, 20)
-
-    # create the subplots
-    plt.subplots(nrows=6, ncols=3)     # TODO: depending on n_clusters
-
-    for i, cluster_head in enumerate(cluster_heads):
-        plt.subplot(6, 3, i+1)
-
-        img = reshape_image_array(aae_class, cluster_head)
-        if aae_class.color_scale == "gray_scale":
-            plt.imshow(img, cmap="gray")
-        else:
-            plt.imshow(img)
-        plt.title("cluster head: " + str(i))
-
-    # save the figure in the results folder
-    plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch)
-                + "_" + str(mini_batch_i) + '_cluster_heads.png')
-    plt.close('all')
-
-    # change figsize back to default
-    plt.rcParams["figure.figsize"] = (6.4, 4.8)
-
-
-def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist, latent_representation, batch_x, decoder_output,
-                                                   epoch, mini_batch_i, real_cat_dist, encoder_cat_dist, batch_labels,
-                                                   discriminator_gaussian_neg, discriminator_gaussian_pos,
-                                                   discriminator_cat_neg, discriminator_cat_pos,
-                                                   include_tuning_performance=False):
+def create_epoch_summary_image_unsupervised_clustering(aae_class, epoch, include_tuning_performance=False):
     """
     creates a summary image displaying the losses and the learning rates over time, the real distribution and the latent
     representation, the discriminator outputs (pos and neg) and one input image and its reconstruction image
     :param aae_class: AAE instance to access some important fields from it
-    :param real_dist: real distribution the AAE should map to
-    :param latent_representation: latent representation of the AAE
-    :param batch_x: current batch of input images
-    :param decoder_output: output of the decoder for the current batch
     :param epoch: current epoch of the training (only used for the image filename)
-    :param mini_batch_i: current iteration of the minibatch (only used for the image filename)
-    :param real_cat_dist: real categorical distribution
-    :param encoder_cat_dist: encoder output of the categorical distribution
-    :param batch_labels: labels of the current batch
-    :param discriminator_gaussian_neg: output of the gaussian discriminator for the negative samples q(z) (generated by
-    the generator)
-    :param discriminator_gaussian_pos: output of the gaussian discriminator  for the positive samples p(z) (from real
-    data distribution)
-    :param discriminator_cat_neg: output of the categorical discriminator for the negative samples
-    :param discriminator_cat_pos: output of the categorical discriminator for the positive samples
     :param include_tuning_performance: whether to include the losses and learning rates from the other adversarial
     autoencoders in the same tuning process in the plots
     :return:
     """
 
-    # TODO:
-
     epoch_summary_vars = aae_class.get_epoch_summary_vars()
 
-    real_dist = epoch_summary_vars["real_dist"]
-
-
     # convert lists to numpy array
-    latent_representation = np.array(latent_representation)
-    batch_labels = np.array(batch_labels)
+    latent_representation = np.array(epoch_summary_vars["latent_representation"])
+    batch_labels = np.array(epoch_summary_vars["batch_labels"])
+    real_img = np.array(epoch_summary_vars["batch_x"])[0, :]    # get the first input image
+    created_img = np.array(epoch_summary_vars["reconstructed_images"])[0, :] # get the reconstruction of it
+    real_dist = np.array(epoch_summary_vars["real_dist"])
+    discriminator_gaussian_neg = np.array(epoch_summary_vars["discriminator_gaussian_neg"])
+    discriminator_gaussian_pos = np.array(epoch_summary_vars["discriminator_gaussian_pos"])
+    discriminator_cat_neg = np.array(epoch_summary_vars["discriminator_cat_neg"])
+    discriminator_cat_pos = np.array(epoch_summary_vars["discriminator_cat_pos"])
+    real_cat_dist = np.array(epoch_summary_vars["real_cat_dist"])
+    encoder_cat_dist = np.array(epoch_summary_vars["encoder_cat_dist"])
 
     # convert one hot vectors to integer labels
     batch_integer_labels = np.argmax(batch_labels, axis=1)
@@ -845,7 +824,6 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
 
     # # plot one input image..
     plt.subplot(5, 4, 7)
-    real_img = batch_x[0, :]
     img = reshape_image_array(aae_class, real_img)
     if aae_class.color_scale == "gray_scale":
         plt.imshow(img, cmap="gray")
@@ -854,7 +832,6 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
 
     # .. and its reconstruction
     plt.subplot(5, 4, 8)
-    created_img = decoder_output[0, :]
     # if the aae is not trained enough/has unfavorable parameters, it's possible that the reconstruction can hold
     # pixels with negative value
     if (created_img < 0).any():
@@ -880,9 +857,12 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
     # plot the real distribution
     plt.subplot(5, 4, 11)
     if aae_class.z_dim > 2:
-        plt.hist(real_dist.flatten())
+        pca = PCA(n_components=2)
+        pca.fit(real_dist)
+        real_dist_transformed = pca.transform(real_dist)
+        plt.scatter(real_dist_transformed[:, 0], real_dist_transformed[:, 1], alpha=0.5)
     else:
-        plt.scatter(real_dist[:, 0], real_dist[:, 1])
+        plt.scatter(real_dist[:, 0], real_dist[:, 1], alpha=0.5)
     plt.title("real dist")
 
     # plot the latent representation
@@ -891,7 +871,14 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
         pca = PCA(n_components=2)
         pca.fit(latent_representation)
         latent_representations_current_epoch = pca.transform(latent_representation)
-        plt.scatter(latent_representations_current_epoch[:, 0], latent_representations_current_epoch[:, 1])
+
+        # plot the different classes on the latent space
+        for class_label in range(n_classes):
+            # get the points corresponding to the same classes
+            points_for_current_class_label = latent_representations_current_epoch[np.where(batch_integer_labels == class_label)]
+            # plot them
+            plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
+                        label=str(class_label), alpha=0.5)
     else:
         # plot the different classes on the latent space
         for class_label in range(n_classes):
@@ -899,7 +886,7 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
             points_for_current_class_label = latent_representation[np.where(batch_integer_labels == class_label)]
             # plot them
             plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1],
-                        label=str(class_label))
+                        label=str(class_label), alpha=0.5)
     plt.legend()
     plt.title("encoder dist")
 
@@ -979,8 +966,34 @@ def create_minibatch_summary_image_unsupervised_clustering(aae_class, real_dist,
     plt.xlabel("epoch")
 
     # save the figure in the results folder
+    plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch) + '.png')
+    plt.close('all')
+
+    # change figsize back to default
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
+
+
+def visualize_cluster_heads(aae_class, cluster_heads, epoch, mini_batch_i):
+
+    # increase figure size
+    plt.rcParams["figure.figsize"] = (15, 20)
+
+    # create the subplots
+    plt.subplots(nrows=6, ncols=3)     # TODO: depending on n_clusters
+
+    for i, cluster_head in enumerate(cluster_heads):
+        plt.subplot(6, 3, i+1)
+
+        img = reshape_image_array(aae_class, cluster_head)
+        if aae_class.color_scale == "gray_scale":
+            plt.imshow(img, cmap="gray")
+        else:
+            plt.imshow(img)
+        plt.title("cluster head: " + str(i))
+
+    # save the figure in the results folder
     plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch)
-                + "_" + str(mini_batch_i) + '.png')
+                + "_" + str(mini_batch_i) + '_cluster_heads.png')
     plt.close('all')
 
     # change figsize back to default
@@ -1191,41 +1204,6 @@ def visualize_single_layer_with_histogram(all_values_for_layers, layer_name, var
     plt.title("Epoch: " + str(epoch))
     plt.savefig(result_path + layer_name + "_" + var_to_visualize + ".png")
     plt.close()
-
-
-def visualize_incorporating_label_information(list_of_images):
-
-    nx, ny = 10, 10
-    # create the image grid
-    plt.subplot()
-    gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
-
-    # iterate over the image grid
-    for i, g in enumerate(gs):
-
-        ax = plt.subplot(g)
-
-        # reshape the image array and display it
-        img = reshape_image_array(self, x)
-        if self.color_scale == "gray_scale":
-            plt.imshow(img, cmap="gray")
-        else:
-            plt.imshow(img)
-
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_aspect('auto')
-
-        if self.z_dim == 2:
-            # create the label for the y axis
-            if ax.is_first_col():
-                ax.set_ylabel(x_points[int(i / ny)], fontsize=9)
-
-            # create the label x for the x axis
-            if ax.is_last_row():
-                ax.set_xlabel(y_points[int(i % ny)], fontsize=9)
-
-
 
 
 def visualize_weights_single_layer_as_img_grid(weights, input_dim, layer_name, var_to_visualize, result_path, epoch):

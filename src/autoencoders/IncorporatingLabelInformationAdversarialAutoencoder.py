@@ -26,7 +26,7 @@ from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_a
 class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
-        self.distribution_to_sample = "gaussian"
+        self.distribution_to_sample = "swiss_roll"
 
         # whether only the autoencoder and not the generative network should be trained
         self.only_train_autoencoder = False
@@ -267,7 +267,6 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         self.autoencoder_loss = autoencoder_loss_unlabeled + autoencoder_loss_labeled
 
         # Discriminator Loss
-        # TODO: check if this is correct; especially whether ones_like should be zeros_like and the other way round
         discriminator_loss_true_samples_unlabeled = tf.reduce_mean(
             get_loss_function(loss_function=self.loss_function_discriminator,
                               labels=tf.ones_like(self.discriminator_true_samples_unlabeled),
@@ -833,6 +832,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         # save the created image grid
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + "_gen_images" + '.png')
+        plt.close('all')
 
     def generate_image_grid(self, sess, op, epoch, points, left_cell=None, save_image_grid=True):
         """
@@ -979,6 +979,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
             data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
+        autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
         epochs_completed = 0
         step = 0
 
@@ -1134,11 +1135,10 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                             latent_representations_current_epoch.extend(latent_representation)
                             labels_current_epoch.extend(y_labeled)
 
-                            # update the dictionary holding the losses
-                            self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
-                            self.performance_over_time["discriminator_losses"].append(discriminator_loss)
-                            self.performance_over_time["generator_losses"].append(generator_loss)
-                            self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
+                            # update the lists holding the losses for each epoch
+                            autoencoder_epoch_losses.append(autoencoder_loss)
+                            discriminator_epoch_losses.append(discriminator_loss)
+                            generator_epoch_losses.append(generator_loss)
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
@@ -1190,7 +1190,16 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                     # every x epochs ..
                     if epoch % self.summary_image_frequency == 0:
-                        # create the summary image for the current minibatch
+
+                        # update the lists holding the losses
+                        self.performance_over_time["autoencoder_losses"].append(np.mean(autoencoder_epoch_losses))
+                        self.performance_over_time["discriminator_losses"].append(np.mean(discriminator_epoch_losses))
+                        self.performance_over_time["generator_losses"].append(np.mean(generator_epoch_losses))
+                        self.performance_over_time["list_of_epochs"].append(epoch)
+
+                        autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
+
+                        # create the summary image for the current epoch
                         create_epoch_summary_image(self, epoch, self.include_tuning_performance)
 
                         real_images_unlabeled = np.array(self.epoch_summary_vars["batch_x"])

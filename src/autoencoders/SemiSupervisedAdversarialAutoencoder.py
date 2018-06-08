@@ -1181,6 +1181,9 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         supervised_encoder_loss_final = 0
         epochs_completed = 0
 
+        autoencoder_epoch_losses, discriminator_gaussian_epoch_losses, discriminator_categorical_epoch_losses, \
+        generator_epoch_losses, supervised_epoch_losses = [], [], [], [], []
+
         step = 0
         with self.session as sess:
 
@@ -1336,14 +1339,12 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 writer.add_summary(summary, global_step=step)
 
                             # update the dictionary holding the losses
-                            self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
-                            self.performance_over_time["discriminator_gaussian_losses"].append(
-                                discriminator_gaussian_loss)
-                            self.performance_over_time["discriminator_categorical_losses"].append(
-                                discriminator_categorical_loss)
-                            self.performance_over_time["generator_losses"].append(generator_loss)
-                            self.performance_over_time["supervised_encoder_loss"].append(supervised_encoder_loss)
-                            self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
+                            # update the lists holding the losses
+                            autoencoder_epoch_losses.append(autoencoder_loss)
+                            discriminator_gaussian_epoch_losses.append(discriminator_gaussian_loss)
+                            discriminator_categorical_epoch_losses.append(discriminator_categorical_loss)
+                            generator_epoch_losses.append(generator_loss)
+                            supervised_epoch_losses.append(supervised_encoder_loss)
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
@@ -1429,6 +1430,18 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # every x epochs..
                     if epoch % self.summary_image_frequency == 0:
+
+                        # update the dictionary holding the losses
+                        self.performance_over_time["autoencoder_losses"].append(np.mean(autoencoder_epoch_losses))
+                        self.performance_over_time["discriminator_gaussian_losses"].append(np.mean(discriminator_gaussian_epoch_losses))
+                        self.performance_over_time["discriminator_categorical_losses"].append(
+                            np.mean(discriminator_categorical_epoch_losses))
+                        self.performance_over_time["generator_losses"].append(np.mean(generator_epoch_losses))
+                        self.performance_over_time["supervised_encoder_loss"].append(np.mean(supervised_epoch_losses))
+                        self.performance_over_time["list_of_epochs"].append(epoch)
+
+                        autoencoder_epoch_losses, discriminator_gaussian_epoch_losses, discriminator_categorical_epoch_losses, \
+                        generator_epoch_losses, supervised_epoch_losses = [], [], [], [], []
 
                         """
                         Summary images and reconstruction grid visualization

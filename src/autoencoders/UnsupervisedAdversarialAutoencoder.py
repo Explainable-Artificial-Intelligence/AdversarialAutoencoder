@@ -865,9 +865,11 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         if Storage.get_all_input_data():
             data = Storage.get_all_input_data()
         else:
-            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False)
+            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
+                                  add_noise=False)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
+        autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
         epochs_completed = 0
 
         step = 0
@@ -987,11 +989,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             latent_representations_current_epoch.extend(latent_representation)
                             labels_current_epoch.extend(batch_labels)
 
-                            # update the dictionary holding the losses
-                            self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
-                            self.performance_over_time["discriminator_losses"].append(discriminator_loss)
-                            self.performance_over_time["generator_losses"].append(generator_loss)
-                            self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
+                            # update the lists holding the losses for each epoch
+                            autoencoder_epoch_losses.append(autoencoder_loss)
+                            discriminator_epoch_losses.append(discriminator_loss)
+                            generator_epoch_losses.append(generator_loss)
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
@@ -1041,6 +1042,15 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                     # every x epochs ..
                     if epoch % self.summary_image_frequency == 0:
+
+                        # update the lists holding the losses
+                        self.performance_over_time["autoencoder_losses"].append(np.mean(autoencoder_epoch_losses))
+                        self.performance_over_time["discriminator_losses"].append(np.mean(discriminator_epoch_losses))
+                        self.performance_over_time["generator_losses"].append(np.mean(generator_epoch_losses))
+                        self.performance_over_time["list_of_epochs"].append(epoch)
+
+                        autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
+
                         # create the summary image for the current minibatch
                         create_epoch_summary_image(self, epoch, self.include_tuning_performance)
 

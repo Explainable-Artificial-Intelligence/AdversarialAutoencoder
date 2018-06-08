@@ -19,7 +19,8 @@ from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_
     get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
     create_reconstruction_grid, draw_class_distribution_on_latent_space, visualize_autoencoder_weights_and_biases, \
-    create_gif, visualize_cluster_heads, create_minibatch_summary_image_unsupervised_clustering
+    create_gif, visualize_cluster_heads, \
+    create_epoch_summary_image_unsupervised_clustering
 
 
 class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMixin):
@@ -415,12 +416,13 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         self.learning_rates = {"autoencoder_lr": [], "discriminator_g_lr": [], "discriminator_c_lr": [],
                                "generator_lr": [], "supervised_encoder_lr": [], "list_of_epochs": []}
 
-        self.epoch_summary_vars = {"real_dist": None, "latent_representation": None, "batch_X_unlabeled": None,
-                                       "reconstructed_image": None, "epoch": None, "b": None,
-                                       "real_cat_dist": None, "encoder_cat_dist": None,
-                                       "batch_X_unlabeled_labels": None, "discriminator_gaussian_neg": None,
-                                       "discriminator_gaussian_pos": None, "discriminator_cat_neg": None,
-                                   "discriminator_cat_pos": None}
+        self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
+                                   "batch_x": [],
+                                   "reconstructed_images": [], "epoch": None,
+                                   "real_cat_dist": [], "encoder_cat_dist": [],
+                                   "batch_labels": [], "discriminator_gaussian_neg": [],
+                                   "discriminator_gaussian_pos": [], "discriminator_cat_neg": [],
+                                   "discriminator_cat_pos": []}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
         # minibatch summary plots
@@ -1152,7 +1154,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         if Storage.get_all_input_data():
             data = Storage.get_all_input_data()
         else:
-            data = get_input_data(self.selected_dataset, self.color_scale)
+            data = get_input_data(self.selected_dataset, color_scale=self.color_scale)
 
         autoencoder_loss_final = 0
         discriminator_loss_g_final = 0
@@ -1160,6 +1162,9 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         generator_loss_final = 0
         supervised_encoder_loss_final = 0
         epochs_completed = 0
+
+        autoencoder_epoch_losses, discriminator_gaussian_epoch_losses, discriminator_categorical_epoch_losses, \
+        generator_epoch_losses = [], [], [], []
 
         step = 0
         with self.session as sess:
@@ -1272,7 +1277,7 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                             self.is_training: True})
 
                         # every 5 epochs: write a summary for every 10th minibatch
-                        if epoch % self.summary_image_frequency == 0 and b % 100 == 0:
+                        if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
                             # prepare the decoder inputs
                             n_images_per_class = int(np.ceil(self.batch_size / self.n_clusters))
@@ -1317,8 +1322,8 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                             # class_label_one_hot = np.reshape(batch_X_unlabeled_labels[0, :], (1, self.n_classes))
                             dec_input = np.concatenate((class_label_one_hot, r), 1)
 
-                            # # reconstruct the image
-                            reconstructed_image = sess.run(self.decoder_output_real_dist,
+                            # reconstruct the image
+                            reconstructed_images = sess.run(self.decoder_output_real_dist,
                                                            feed_dict={self.decoder_input: dec_input,
                                                                       self.is_training: False})
 
@@ -1337,12 +1342,11 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                                 cluster_heads.append(cluster_head)
                             visualize_cluster_heads(self, cluster_heads, epoch, b)
 
-                            # update the dictionary holding the losses
-                            self.performance_over_time["autoencoder_losses"].append(autoencoder_loss)
-                            self.performance_over_time["discriminator_gaussian_losses"].append(discriminator_gaussian_loss)
-                            self.performance_over_time["discriminator_categorical_losses"].append(discriminator_categorical_loss)
-                            self.performance_over_time["generator_losses"].append(generator_loss)
-                            self.performance_over_time["list_of_epochs"].append(epoch + (b / n_batches))
+                            # update the lists holding the losses for each epoch
+                            autoencoder_epoch_losses.append(autoencoder_loss)
+                            discriminator_gaussian_epoch_losses.append(discriminator_gaussian_loss)
+                            discriminator_categorical_epoch_losses.append(discriminator_categorical_loss)
+                            generator_epoch_losses.append(generator_loss)
 
                             # update the dictionary holding the learning rates
                             self.learning_rates["autoencoder_lr"].append(
@@ -1360,35 +1364,18 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                             labels_current_epoch.extend(batch_X_unlabeled_labels)
 
                             # updates vars for the swagger server
-                            self.epoch_summary_vars["real_dist"] = real_dist
-                            self.epoch_summary_vars["latent_representation"] = latent_representation
-                            self.epoch_summary_vars["batch_X_unlabeled"] = batch_X_unlabeled
-                            self.epoch_summary_vars["reconstructed_image"] = reconstructed_image
+                            self.epoch_summary_vars["real_dist"].extend(real_dist)
+                            self.epoch_summary_vars["latent_representation"].extend(latent_representation)
+                            self.epoch_summary_vars["batch_x"].extend(batch_X_unlabeled)
+                            self.epoch_summary_vars["reconstructed_images"].extend(reconstructed_images)
                             self.epoch_summary_vars["epoch"] = epoch
-                            self.epoch_summary_vars["b"] = b
-                            self.epoch_summary_vars["real_cat_dist"] = real_cat_dist
-                            self.epoch_summary_vars["encoder_cat_dist"] = encoder_cat_dist
-                            self.epoch_summary_vars["batch_X_unlabeled_labels"] = batch_X_unlabeled_labels
-                            self.epoch_summary_vars["discriminator_gaussian_neg"] = discriminator_gaussian_neg
-                            self.epoch_summary_vars["discriminator_gaussian_pos"] = discriminator_gaussian_pos
-                            self.epoch_summary_vars["discriminator_cat_neg"] = discriminator_cat_neg
-                            self.epoch_summary_vars["discriminator_cat_pos"] = discriminator_cat_pos
-
-                            # create the summary image for the current minibatch
-                            create_minibatch_summary_image_unsupervised_clustering(self, real_dist,
-                                                                                      latent_representation,
-                                                                                      batch_X_unlabeled,
-                                                                                      reconstructed_image, epoch, b,
-                                                                                      real_cat_dist,
-                                                                                      encoder_cat_dist,
-                                                                                      batch_X_unlabeled_labels,
-                                                                                      discriminator_gaussian_neg,
-                                                                                      discriminator_gaussian_pos,
-                                                                                      discriminator_cat_neg,
-                                                                                      discriminator_cat_pos,
-                                                                                      include_tuning_performance=
-                                                                                      self.include_tuning_performance
-                                                                                      )
+                            self.epoch_summary_vars["real_cat_dist"].extend(real_cat_dist)
+                            self.epoch_summary_vars["encoder_cat_dist"].extend(encoder_cat_dist)
+                            self.epoch_summary_vars["batch_labels"].extend(batch_X_unlabeled_labels)
+                            self.epoch_summary_vars["discriminator_gaussian_neg"].extend(discriminator_gaussian_neg)
+                            self.epoch_summary_vars["discriminator_gaussian_pos"].extend(discriminator_gaussian_pos)
+                            self.epoch_summary_vars["discriminator_cat_neg"].extend(discriminator_cat_neg)
+                            self.epoch_summary_vars["discriminator_cat_pos"].extend(discriminator_cat_pos)
 
                             # set the latest loss as final loss
                             autoencoder_loss_final = autoencoder_loss
@@ -1419,6 +1406,22 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
                     # every x epochs..
                     if epoch % self.summary_image_frequency == 0:
+
+                        # update the dictionary holding the losses
+                        self.performance_over_time["autoencoder_losses"].append(np.mean(autoencoder_epoch_losses))
+                        self.performance_over_time["discriminator_categorical_losses"].append(np.mean(discriminator_gaussian_epoch_losses))
+                        self.performance_over_time["discriminator_gaussian_losses"].append(np.mean(discriminator_categorical_epoch_losses))
+                        self.performance_over_time["generator_losses"].append(np.mean(generator_epoch_losses))
+                        self.performance_over_time["list_of_epochs"].append(epoch)
+
+                        autoencoder_epoch_losses, discriminator_gaussian_epoch_losses, discriminator_categorical_epoch_losses, \
+                        generator_epoch_losses = [], [], [], []
+
+                        # create the summary image for the current minibatch
+                        create_epoch_summary_image_unsupervised_clustering(self,
+                                                                           epoch, include_tuning_performance=
+                                                                           self.include_tuning_performance)
+
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
                         outer_grid = gridspec.GridSpec(1, 2)
@@ -1440,6 +1443,14 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
                         Weights + biases visualization
                         """
                         visualize_autoencoder_weights_and_biases(self, epoch=epoch)
+
+                    self.epoch_summary_vars = {"real_dist": [], "latent_representation": [],
+                                               "batch_x": [],
+                                               "reconstructed_images": [], "epoch": None,
+                                               "real_cat_dist": [], "encoder_cat_dist": [],
+                                               "batch_labels": [], "discriminator_gaussian_neg": [],
+                                               "discriminator_gaussian_pos": [], "discriminator_cat_neg": [],
+                                               "discriminator_cat_pos": []}
 
                     # reset the list holding the latent representations for the current epoch
                     latent_representations_current_epoch = []
