@@ -5,18 +5,21 @@ import imageio as imageio
 import numpy as np
 import pandas
 from six.moves import xrange  # pylint: disable=redefined-builtin
+from sklearn.decomposition import PCA
 from tensorflow.contrib.learn.python.learn.datasets import base
 from tensorflow.python.framework import dtypes
 from tensorflow.python.platform import gfile
 from tensorflow.python.framework import random_seed
 import tensorflow as tf
 import glob
+import os
 import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from six.moves import cPickle
 
 import timeit
 
+from swagger_server.utils.Storage import Storage
 
 Datasets = collections.namedtuple('Datasets', ['train', 'validation', 'test'])
 
@@ -29,7 +32,8 @@ class DataSet(object):
                  one_hot=False,
                  dtype=dtypes.float32,
                  reshape=True,
-                 seed=None):
+                 seed=None,
+                 rescale=True):
         """Construct a DataSet.
         one_hot arg is used only if fake_data is true.    `dtype` can be either
         `uint8` to leave the input as `[0, 255]`, or `float32` to rescale into
@@ -59,7 +63,9 @@ class DataSet(object):
             if dtype == dtypes.float32:
                 # Convert from [0, 255] -> [0.0, 1.0].
                 images = images.astype(np.float32)
-                images = np.multiply(images, 1.0 / 255.0)
+                if rescale:
+                    images = np.multiply(images, 1.0 / 255.0)
+
         self._images = images
         self._labels = labels
         self._epochs_completed = 0
@@ -223,7 +229,7 @@ def add_gaussian_noise_to_array(np_array, std_dev=0.1):
 
 
 def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale", data_normalized=False,
-                   add_noise=False):
+                   add_noise=False, mass_spec_data_properties=None):
     """
     returns the input data set based on self.selected_dataset
     :return: object holding the train data, the test data and the validation data
@@ -245,10 +251,9 @@ def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale
             data = read_cifar10(filepath, one_hot=True, validation_size=5000, grey_scale=True)
         else:
             data = read_cifar10(filepath, one_hot=True, validation_size=5000)
-    elif selected_dataset == "yeast_mass_spec":
-        data = read_yeast_mass_spec(filepath, one_hot=True, validation_size=5000)
+    elif selected_dataset == "mass_spec":
+        data = read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, validation_size=1)
     elif selected_dataset == "custom":
-        # TODO:
         print("not yet implemented")
         raise NotImplementedError
 
@@ -327,7 +332,6 @@ def read_tfrecords(data_dir, one_hot=False, num_classes=10, dtype=dtypes.float32
 
     # instantiate a new protocol buffer, and fill in some of its fields.
     example = tf.train.Example()
-    # TODO: remove hard coded filename
     for record in tf.python_io.tf_record_iterator("data/ship_train.tfrecords"):
         example.ParseFromString(record)
         f = example.features.feature
@@ -344,16 +348,78 @@ Read pre-processed mass spec data
 """
 
 
-def read_yeast_mass_spec(filepath, one_hot=True, validation_size=1, dtype=dtypes.float32):
+def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, validation_size=1, dtype=dtypes.float32):
+    """
+    reads the mass spec data and return a Datasets object with the train, test and validation data
+    :param filepath: filepath of the data
+    :param mass_spec_data_properties: dictionary holding some properties of the mass spec data; e.g. the organism name,
+    the peak encoding, the charge (if any) etc
+    :param one_hot: whether or not to return the labels as one_hot vectors
+    :param validation_size: size of the validation dataset
+    :param dtype: return type of the data
+    :return:
+    """
 
-    # TODO: human data
-    # TODO: fix one_hot
+    if not mass_spec_data_properties:
+        raise ValueError("Mass spec data not properly specified. Please provide a dictionary holding the properties "
+                         "like the organism name, the peak encoding, the charge (if any), etc. when calling this "
+                         "method.")
 
-    # read the (un)-identified spectra
-    identified_spectra = np.loadtxt("../../data/mass_spec_data/yeast_identified_preprocessed.txt")
+    # read the properties for the mass spec data to parse the correct input file
+    organism_name = mass_spec_data_properties["organism_name"]                  # either "yeast" or "human"
+    peak_encoding = mass_spec_data_properties["peak_encoding"]                  # either "location" or "distance"
+    include_charge_in_encoding = \
+        mass_spec_data_properties["include_charge_in_encoding"]                 # True or False
+    include_molecular_weight_in_encoding = \
+        mass_spec_data_properties["include_molecular_weight_in_encoding"]       # True or False
+    charge = mass_spec_data_properties["charge"]                                # e.g. "2" or None
+    if include_charge_in_encoding and include_molecular_weight_in_encoding:
+        include_other_values = "include_charge_and_weight"
+    elif include_charge_in_encoding:
+        include_other_values = "include_charge"
+    elif include_molecular_weight_in_encoding:
+        include_other_values = "include_weight"
+    else:
+        include_other_values = None
+    n_peaks_to_keep = mass_spec_data_properties["n_peaks_to_keep"]              # e.g. 50
+    max_intensity_value = mass_spec_data_properties["max_intensity_value"]      # e.g. 5000
+
+    # create the input file name: e.g. "yeast_identified_distance_charge_2"
+    input_file_name = filepath + "/mass_spec_data/" + organism_name + "/"
+    input_file_name += "_".join(filter(None, [organism_name, "identified", peak_encoding, include_other_values]))
+    if charge:
+        input_file_name += "_charge_" + charge
+    input_file_name += "_n_peaks_" + str(n_peaks_to_keep)
+    input_file_name += "_max_intensity_" + str(max_intensity_value)
+    input_file_name += ".txt"
+
+    """
+    read the identified spectra
+    """
+    if not os.path.isfile(input_file_name):     # check if file exists
+        print("Pre-processed data not found! Data is now getting pre-processed..")
+        preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
+                                  + "_identified.msp", organism_name,
+                                  n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
+                                  max_intensity_value=max_intensity_value, filter_on_charge=charge,
+                                  include_charge_in_encoding=include_charge_in_encoding,
+                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+    identified_spectra = np.loadtxt(input_file_name)
     identified_spectra_labels = [1] * identified_spectra.shape[0]
 
-    unidentified_spectra = np.loadtxt("../../data/mass_spec_data/yeast_unidentified_preprocessed.txt")
+    """
+    read the unidentified spectra
+    """
+    input_file_name = input_file_name.replace("identified", "unidentified")
+    if not os.path.isfile(input_file_name):     # check if file exists
+        print("Pre-processed data not found! Data is now getting pre-processed..")
+        preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
+                                  + "_unidentified.mgf", organism_name,
+                                  n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
+                                  max_intensity_value=max_intensity_value, filter_on_charge=charge,
+                                  include_charge_in_encoding=include_charge_in_encoding,
+                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+    unidentified_spectra = np.loadtxt(input_file_name)
     unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
 
     # combine identified and unidentified spectra into one array
@@ -367,6 +433,41 @@ def read_yeast_mass_spec(filepath, one_hot=True, validation_size=1, dtype=dtypes
 
     # separate data in train and test data
     n_training_points = int(all_spectra.shape[0]*0.8)       # ratio of train and test data is 80-20
+
+    if mass_spec_data_properties["normalize_data"]:
+        # the last n_special_features columns could encode the charge and/or the molecular weight; so we need to ignore
+        # them for normalizing the feature vectors
+        # TODO: deal with charge and weight
+        n_special_features = sum([include_charge_in_encoding, include_molecular_weight_in_encoding])
+        feature_dim = all_spectra.shape[1]
+
+        def normalize_feature_vector(feature_vector):
+            return (feature_vector - np.min(feature_vector)) / np.ptp(feature_vector), np.min(feature_vector), \
+                   np.ptp(feature_vector)
+
+        # every third value encodes the first feature; so we need to normalize only them (and ignore the special
+        # features); furthermore we need the minimum and the peak to peak distance for reverting the normalization later
+        all_spectra[:, :feature_dim - n_special_features][:, ::3], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
+            all_spectra[:, :feature_dim - n_special_features][:, ::3])
+        # normalize second feature vector
+        all_spectra[:, :feature_dim - n_special_features][:,
+        1::3], min_second_feature_vector, ptp_second_feature_vector = normalize_feature_vector(
+            all_spectra[:, :feature_dim - n_special_features][:, 1::3])
+        # normalize third feature vector
+        all_spectra[:, :feature_dim - n_special_features][:,
+        2::3], min_third_feature_vector, ptp_third_feature_vector = normalize_feature_vector(
+            all_spectra[:, :feature_dim - n_special_features][:, 2::3])
+
+        # save the respective minima and peak to peak distances in the storage class (so we can revert the
+        # normalization later on)
+        Storage.set_mass_spec_data_normalization_properties(
+            {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector],
+             "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
+             "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
+
+    # TODO: remove hard coded n_training_points
+    n_training_points = 101
+
     train_images = all_spectra[:n_training_points]
     train_labels = all_spectra_labels[:n_training_points]
 
@@ -375,7 +476,7 @@ def read_yeast_mass_spec(filepath, one_hot=True, validation_size=1, dtype=dtypes
 
     # create the dataset holding the test, train and validation data
     test, train, validation = create_dataset(dtype, 2, one_hot, False, None, test_images, test_labels,
-                                             train_images, train_labels, validation_size)
+                                             train_images, train_labels, validation_size, rescale=False)
 
     return Datasets(train=train, validation=validation, test=test)
 
@@ -796,7 +897,7 @@ def read_mnist_from_png(data_dir, one_hot=False, num_classes=10, dtype=dtypes.fl
 
 
 def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test_labels, train_images, train_labels,
-                   validation_size):
+                   validation_size, rescale=True):
     """
     creates three datasets holding the test, train and the validation data and labels and returns them
     :param dtype: dtype` can be either 'uint8' to leave the input as `[0, 255]`, or `float32` to rescale into `[0, 1]
@@ -822,7 +923,7 @@ def create_dataset(dtype, num_classes, one_hot, reshape, seed, test_images, test
     validation_labels = train_labels[:validation_size]
     train_images = train_images[validation_size:]
     train_labels = train_labels[validation_size:]
-    options = dict(dtype=dtype, reshape=reshape)
+    options = dict(dtype=dtype, reshape=reshape, rescale=rescale)
     train = DataSet(train_images, train_labels, **options)
     validation = DataSet(validation_images, validation_labels, **options)
     test = DataSet(test_images, test_labels, **options)
@@ -931,13 +1032,109 @@ def load_msp_file(filename):
     return file_content
 
 
-def preprocess_mass_spec_data(mass_spec_data, n_peaks_to_keep=30):
+def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, peak_encoding, max_intensity_value,
+                              filter_on_charge=None, include_charge_in_encoding=False,
+                              include_molecular_weight_in_encoding=False):
+    """
+    preprocesses the mass spec file by fixing the number of peaks for each spectra to n_peaks_to_keep
+    (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
+    as input for the network
+    :param input_filename: filename of the mass spec data
+    :param organism_name: e.g. "yeast"; used for output filename
+    :param n_peaks_to_keep: how many peaks the spectra should contain
+    :param filter_on_charge: which charge should be kept (e.g. "2" to keep only spectra with a charge of 2)
+    :param peak_encoding: "location" or "distance": encoding of the peaks
+        - "location":
+            (1) square root of its height
+            (2) its location (mz distance from 0)
+            (3) its location relative to the precursor (mz distance relative to precursor)
+        - "distance":
+            (1) square root of its height
+            (2) its location relative to the successor (mz distance relative to successor)
+            (3) its location relative to the precursor (mz distance relative to precursor)
+    :param max_intensity_value: at which value a peak should be considered as an outlier
+    :param include_charge_in_encoding: whether or not the charge should be appended to the peak_encoding
+    :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
+    peak_encoding
+    :return:
+    """
+
+    # load the input data
+    print("Loading data..")
+    is_identified_data = False
+    if input_filename.endswith(".mgf"):
+        unprocessed_spectra = load_mgf_file(input_filename)
+    else:
+        unprocessed_spectra = load_msp_file(input_filename)
+        is_identified_data = True
+
+    # get the encoding for the peaks
+    print("Encoding the data..")
+    peak_features = get_peaks_encoding(unprocessed_spectra, peak_encoding=peak_encoding,
+                                       n_peaks_to_keep=n_peaks_to_keep, filter_on_charge=filter_on_charge,
+                                       include_charge_in_encoding=include_charge_in_encoding,
+                                       include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+
+    # filter the outliers
+    print("Filtering the outliers..")
+    n_data_points = len(peak_features)
+    feature_dim = n_peaks_to_keep * 3
+    n_special_values = sum([include_molecular_weight_in_encoding, include_charge_in_encoding])
+    # filter for intensity
+    peak_features = peak_features[np.all(peak_features[:, :feature_dim][:, ::3] < np.sqrt(max_intensity_value), axis=1)]
+    # filter for negative values
+    peak_features = peak_features[np.all(peak_features >= 0, axis=1)]
+    print(str(n_data_points - len(peak_features)) + " outliers out of " + str(n_data_points) + " data points have "
+                                                                                               "been removed.")
+
+    # save the pre-processed data to some file
+    data_identified = "identified" if is_identified_data else "unidentified"
+    if include_charge_in_encoding and include_molecular_weight_in_encoding:
+        include_other_values = "include_charge_and_weight"
+    elif include_charge_in_encoding:
+        include_other_values = "include_charge"
+    elif include_molecular_weight_in_encoding:
+        include_other_values = "include_weight"
+    else:
+        include_other_values = None
+
+    # create the output file name: e.g. "yeast_identified_distance_charge_2"
+    index_of_last_path_delimiter = input_filename.rfind("/")
+    output_filename = input_filename[:index_of_last_path_delimiter+1] if index_of_last_path_delimiter > -1 else ""
+    output_filename += "_".join(filter(None, [organism_name, data_identified, peak_encoding, include_other_values]))
+    if filter_on_charge:
+        output_filename += "_charge_" + filter_on_charge
+    output_filename += "_n_peaks_" + str(n_peaks_to_keep)
+    output_filename += "_max_intensity_" + str(max_intensity_value)
+    output_filename += ".txt"
+
+    # save the numpy array to the file
+    np.savetxt(output_filename, peak_features)
+
+    print("Pre-processed data saved to " + output_filename)
+
+
+def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter_on_charge=None,
+                       include_charge_in_encoding=True, include_molecular_weight_in_encoding=True):
     """
     preprocesses the mass spec data by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
     as input for the network
     :param mass_spec_data: list of dictionaries holding the data
+    :param peak_encoding: "location" or "distance": encoding of the peaks
+        - "location":
+            (1) square root of its height
+            (2) its location (mz distance from 0)
+            (3) its location relative to the precursor (mz distance relative to precursor)
+        - "distance":
+            (1) square root of its height
+            (2) its location relative to the successor (mz distance relative to successor)
+            (3) its location relative to the precursor (mz distance relative to precursor)
     :param n_peaks_to_keep: how many peaks the spectra should contain
+    :param filter_on_charge: which charge should be kept (e.g. "2" to keep only spectra with a charge of 2)
+    :param include_charge_in_encoding: whether or not the charge should be appended to the peak_encoding
+    :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
+    peak_encoding
     :return: list of lists with the feature representation of the spectra
     """
 
@@ -953,7 +1150,7 @@ def preprocess_mass_spec_data(mass_spec_data, n_peaks_to_keep=30):
 
     # create the features for the peaks ((1) square root of its height (2) its location (mz distance from 0) and
     # (3) its location relative to the precursor (mz distance relative to precursor))
-    peak_features = np.array([create_features_for_peak(peak) for peak in filtered_peaks])
+    peak_features = np.array([create_features_for_peak(peak, peak_encoding) for peak in filtered_peaks])
 
     # get the charge
     charge_list = np.array([spectrum["charge"] for spectrum in mass_spec_data])[indices_to_keep].reshape(-1, 1)
@@ -961,15 +1158,44 @@ def preprocess_mass_spec_data(mass_spec_data, n_peaks_to_keep=30):
     # get the molecular weight
     molecular_weight_list = np.array([spectrum["pepmass"] for spectrum in mass_spec_data])[indices_to_keep].reshape(-1, 1)
 
-    # combine the peaks, the charges and the molecular weight in one numpy array
-    return np.hstack((peak_features, charge_list, molecular_weight_list)).astype(float)
+    # we are only interested in spectra with charge "filter_on_charge"
+    if filter_on_charge:
+        indices = [i for i, e in enumerate(charge_list) if e == [filter_on_charge]]
+        peak_features = peak_features[indices]
+        charge_list = charge_list[indices]
+        molecular_weight_list = molecular_weight_list[indices]
+
+    if include_charge_in_encoding and include_molecular_weight_in_encoding:
+        # combine the peaks, the charges and the molecular weight in one numpy array
+        pre_processed_mass_spec_data = np.hstack((peak_features, charge_list, molecular_weight_list)).astype(float)
+    elif include_charge_in_encoding:
+        # combine the peaks and the charges in one numpy array
+        pre_processed_mass_spec_data = np.hstack((peak_features, charge_list)).astype(float)
+    elif include_molecular_weight_in_encoding:
+        # combine the peaks and the molecular weight in one numpy array
+        pre_processed_mass_spec_data = np.hstack((peak_features, molecular_weight_list)).astype(float)
+    else:
+        # combine the peaks, the charges and the molecular weight in one numpy array
+        pre_processed_mass_spec_data = peak_features.astype(float)
+
+    return pre_processed_mass_spec_data
 
 
-def create_features_for_peak(peak):
+def create_features_for_peak(peak, peak_encoding):
     """
     creates the feature vector for the list of peaks and returns it as array with shape [-1, 3]:
     represents each peak by 3 numbers (1) square root of its height (2) its location (mz distance from 0) and
     (3) its location relative to the precursor (mz distance relative to precursor)
+    :param peak: np array [mz_values, intensities]
+    :param peak_encoding: "location" or "distance": encoding of the peaks
+    - "location":
+        (1) square root of its height
+        (2) its location (mz distance from 0)
+        (3) its location relative to the precursor (mz distance relative to precursor)
+    - "distance":
+        (1) square root of its height
+        (2) its location relative to the successor (mz distance relative to successor)
+        (3) its location relative to the precursor (mz distance relative to precursor)
     """
 
     # (1) square root of its height
@@ -979,19 +1205,26 @@ def create_features_for_peak(peak):
     except TypeError:
         intensities = np.sqrt(intensities.astype(float))      # convert to float if necessary
 
+    # get the mz values
+    mz_values = peak[:, 0].astype(float)
+    # calculate the relativ distances between the current value and its precursor
+    rel_distances = [round(x - y, 2) for x, y in zip(mz_values[1:], mz_values)]
+
     # (2) its location (mz distance from 0)
-    mz_distance = peak[:, 0]
+    if peak_encoding == "location":
+        second_feature_vector = mz_values
+    # (2) its location relative to the successor (mz distance relative to successor)
+    elif peak_encoding == "distance":
+        second_feature_vector = rel_distances.copy()
+        second_feature_vector.insert(len(second_feature_vector), 0)  # last element has distance 0 to its successor
+    else:
+        raise ValueError(str(peak_encoding) + " is an invalid value for this parameter. Try 'location' or 'distance'.")
 
     # (3) its location relative to the precursor (mz distance relative to precursor)
-    try:
-        rel_distances = [round(x - y, 2) for x, y in zip(mz_distance[1:], mz_distance)]
-        rel_distances.insert(0, 0)      # first element has distance 0 to its precursor
-    except TypeError:
-        mz_distance = mz_distance.astype(float)
-        rel_distances = [round(x - y, 2) for x, y in zip(mz_distance[1:], mz_distance)]
-        rel_distances.insert(0, 0)      # first element has distance 0 to its precursor
+    third_feature_vector = rel_distances.copy()
+    third_feature_vector.insert(0, mz_values[0])  # first element has distance 0 to its precursor
 
-    return np.hstack((intensities, mz_distance, rel_distances)).reshape(-1, 3, order='F').reshape(-1)
+    return np.hstack((intensities, second_feature_vector, third_feature_vector)).reshape(-1, 3, order='F').reshape(-1)
 
 
 def filter_spectrum(peaks_in_spectrum, n_peaks_to_keep):
@@ -1020,6 +1253,167 @@ def filter_spectrum(peaks_in_spectrum, n_peaks_to_keep):
     return peaks_in_spectrum[indices_to_keep]
 
 
+def run_pca_on_mass_spec_data():
+
+    unidentified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_preprocessed.txt")
+    identified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_preprocessed.txt")
+
+    # remove the outliers
+    identified_spectra = identified_spectra[np.all((0 <= identified_spectra) & (identified_spectra < 5000), axis=1)]
+
+    print(np.min(identified_spectra))
+    print(np.max(identified_spectra))
+    print(np.mean(identified_spectra))
+
+    print(np.min(unidentified_spectra))
+    print(np.max(unidentified_spectra))
+    print(np.mean(unidentified_spectra))
+
+    print(unidentified_spectra.shape)
+    print(identified_spectra.shape)
+
+    # combine unidentified and identified into one array
+    all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
+
+    """
+    fit both spectra at the same time
+    """
+    pca = PCA(n_components=2)
+    pca.fit(all_spectra)
+
+    unidentified_spectra_transformed = pca.transform(unidentified_spectra)
+    plt.scatter(unidentified_spectra_transformed[:, 0], unidentified_spectra_transformed[:, 1], alpha=0.5,
+                label="Unidentified")
+
+    identified_spectra_transformed = pca.transform(identified_spectra)
+    plt.scatter(identified_spectra_transformed[:, 0], identified_spectra_transformed[:, 1], alpha=0.5,
+                label="Identified")
+
+    plt.xlabel("Principal component 1: " + "{:6.4f}".format(pca.explained_variance_ratio_[0]))
+    plt.ylabel("Principal component 2: " + "{:6.4f}".format(pca.explained_variance_ratio_[1]))
+
+    np.savetxt("../../data/mass_spec_data/yeast/yeast_unidentified_preprocessed_transformed.txt",
+               unidentified_spectra_transformed)
+    np.savetxt("../../data/mass_spec_data/yeast/yeast_identified_preprocessed_transformed.txt",
+               identified_spectra_transformed)
+
+    plt.legend()
+    plt.savefig("../../data/mass_spec_data/yeast/yeast_pca.png")
+    plt.show()
+
+
+def plot_spectras_stem_plot():
+
+    unidentified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_preprocessed.txt")
+    identified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_preprocessed.txt")
+
+    all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
+
+    from util.VisualizationUtils import reconstruct_spectrum_from_feature_vector
+
+    mz_values_all, intensities_all, _, _ \
+        = reconstruct_spectrum_from_feature_vector(all_spectra, 152)
+    mean_mz_values_all = np.mean(mz_values_all, axis=0)
+    mean_intensities_all = np.mean(intensities_all, axis=0)
+
+    mz_values_unidentified, intensities_unidentified, _, _ \
+        = reconstruct_spectrum_from_feature_vector(unidentified_spectra, 152)
+    mean_mz_values_unidentified = np.mean(mz_values_unidentified, axis=0)
+    mean_intensities_unidentified = np.mean(intensities_unidentified, axis=0)
+
+    mz_values_identified, intensities_identified, _, _ \
+        = reconstruct_spectrum_from_feature_vector(identified_spectra, 152)
+    mean_mz_values_identified = np.mean(mz_values_identified, axis=0)
+    mean_intensities_identified = np.mean(intensities_identified, axis=0)
+
+    plt.stem(mean_mz_values_all, mean_intensities_all, 'b', label="all", markerfmt=' ')
+    plt.stem(mean_mz_values_unidentified, mean_intensities_unidentified, 'r', label="unidentified", markerfmt=' ')
+    plt.stem(mean_mz_values_identified, mean_intensities_identified, 'g', label="identified", markerfmt=' ')
+
+    plt.legend()
+    plt.ylabel("intensity")
+    plt.xlabel("m/z value")
+    plt.title("Avg. spectra - yeast")
+
+    plt.show()
+
+
+def plot_spectras_boxplot():
+    unidentified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_preprocessed.txt")
+    identified_spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_preprocessed.txt")
+
+    all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
+
+    from util.VisualizationUtils import reconstruct_spectrum_from_feature_vector
+
+    mz_values_all, intensities_all, _, _ \
+        = reconstruct_spectrum_from_feature_vector(all_spectra, 152)
+    mean_mz_values_all = np.mean(mz_values_all, axis=0)
+    mean_intensities_all = np.mean(intensities_all, axis=0)
+
+    mz_values_unidentified, intensities_unidentified, _, _ \
+        = reconstruct_spectrum_from_feature_vector(unidentified_spectra, 152)
+    mean_mz_values_unidentified = np.mean(mz_values_unidentified, axis=0)
+    mean_intensities_unidentified = np.mean(intensities_unidentified, axis=0)
+
+    mz_values_identified, intensities_identified, _, _ \
+        = reconstruct_spectrum_from_feature_vector(identified_spectra, 152)
+    mean_mz_values_identified = np.mean(mz_values_identified, axis=0)
+    mean_intensities_identified = np.mean(intensities_identified, axis=0)
+
+    values_to_plot = [mean_mz_values_all, mean_intensities_all,
+                      mean_mz_values_unidentified, mean_intensities_unidentified,
+                      mean_mz_values_identified, mean_intensities_identified]
+
+    plt.boxplot(values_to_plot, labels=["mean_mz_values_all", "mean_intensities_all",
+                                        "mean_mz_values_unidentified", "mean_intensities_unidentified",
+                                        "mean_mz_values_identified", "mean_intensities_identified"])
+
+    plt.legend()
+    plt.title("Avg. spectra - yeast")
+    plt.show()
+
+    return
+
+
+def plot_avg_spectra_for_sequence(mass_spec_data, sequence, n_peaks_to_keep=50):
+
+    sequences = [spectrum["sequence"] for spectrum in mass_spec_data]
+
+    indices = [i for i, e in enumerate(sequences) if e == sequence]
+
+    peaks = [spectrum["peaks"] for spectrum in mass_spec_data]
+    peaks = np.array(peaks)[indices]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = [filter_spectrum(a, n_peaks_to_keep) for a in peaks]
+    indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
+
+    # remove None from the list
+    filtered_peaks = [i for i in filtered_peaks if i is not None]
+
+    # peak_features = np.array([create_features_for_peak(peak) for peak in filtered_peaks])
+
+    mz_values = [peak[:, 0] for peak in filtered_peaks]
+    intensities = [peak[:, 1] for peak in filtered_peaks]
+
+    for i, (mz_measurement, intensity_measurement) in enumerate(zip(mz_values, intensities)):
+        plt.stem(mz_measurement, intensity_measurement, label=str(i), markerfmt='o')
+
+    mean_mz_values = np.mean(mz_values, axis=0)
+    mean_intensities = np.mean(intensities, axis=0)
+
+    plt.stem(mean_mz_values, mean_intensities, label="average", markerfmt='o', linefmt=":")
+
+    plt.legend()
+
+    plt.ylabel("intensity")
+    plt.xlabel("m/z value")
+    plt.title("Avg. spectra (" + sequence + ") - yeast")
+
+    plt.show()
+
+
 def testing():
     """
     :return:
@@ -1029,19 +1423,79 @@ def testing():
     read mass spec data
     """
 
-    data = read_yeast_mass_spec("", one_hot=False, validation_size=1, dtype=dtypes.float32)
+    # run_pca_on_mass_spec_data()
+    # plot_spectras_stem_plot()
 
-    print("n training examples:", data.train.num_examples)
+    # identified_spectra = load_msp_file(
+    #      "../../data/mass_spec_data/yeast/Saccharomyces_cerevisiae_identified_fixed.txt")
+    # plot_avg_spectra_for_sequence(identified_spectra, "RYPIVSIEDPFAEDDWEAWSHFFK")
 
-    batch_x, batch_labels = data.train.next_batch(5)
-
-    print(batch_x)
-    print(batch_labels)
+    # plot_spectras_boxplot()
 
     # yeast
-    if False:
+    if True:
 
-        # TODO: save preprocessed data to some file
+        if False:
+
+            mass_spec_properties = {"organism_name": "yeast", "peak_encoding": "distance",
+                                    "include_charge_in_encoding": False, "include_molecular_weight_in_encoding": False,
+                                    "charge": "2", "is_data_normalized": True}
+
+            preprocessed_spectra_unidentified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_distance_charge_2.txt")
+            print(np.min(preprocessed_spectra_unidentified))
+            print(np.max(preprocessed_spectra_unidentified))
+
+            preprocessed_spectra_identified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_distance_charge_2.txt")
+            print(np.min(preprocessed_spectra_identified))
+            print(np.max(preprocessed_spectra_identified))
+
+            data = read_mass_spec_files("../../data", one_hot=False, validation_size=1, dtype=dtypes.float32,
+                                        mass_spec_data_properties=mass_spec_properties)
+
+            images = data.train.images
+
+            print(np.max(images))
+            print(np.min(images))
+            print(images.shape)
+
+            return
+
+            unidentified_spectra = load_mgf_file(
+                "../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+
+            peaks = [spectrum["peaks"] for spectrum in unidentified_spectra]
+
+            # filter to keep only the n highest peaks
+            filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+
+            # remove None from the list
+            filtered_peaks = np.array([i for i in filtered_peaks if i is not None])
+
+            # filter outliers
+            indices_to_keep = np.all(filtered_peaks[:, :, 1] < 2500, axis=1)
+            filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+
+            print(filtered_peaks.shape)
+
+            # intensities
+            intensities = filtered_peaks[:, :, 1]
+            print(intensities.shape)
+
+            print(np.max(intensities))
+            print(np.mean(intensities))
+            print(np.std(intensities))
+
+            plt.hist(intensities.flatten(), bins=np.arange(0, np.max(intensities), 5))
+            plt.show()
+
+            print("n training examples:", data.train.num_examples)
+
+            # batch_x, batch_labels = data.train.next_batch(5)
+            #
+            # print(batch_x)
+            # print(batch_labels)
+
+            return
 
         """
         Unidentified spectra
@@ -1050,14 +1504,15 @@ def testing():
 
             print("#"*5 + " Unidentified spectra " + "#"*5)
 
-            unidentified_spectra = load_mgf_file("../../data/mass_spec_data/results_saccharomyces_cerevisiae_unidentified.mgf")
-
-            peak_features_unidentified = preprocess_mass_spec_data(unidentified_spectra, 50)
-
-            # save the pre-processed data to some file
-            np.savetxt("../../data/mass_spec_data/yeast_unidentified_preprocessed.txt", peak_features_unidentified)
+            preprocess_mass_spec_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf",
+                                      "yeast",
+                                      n_peaks_to_keep=50, peak_encoding="distance", max_intensity_value=5000,
+                                      filter_on_charge="2",
+                                      include_charge_in_encoding=False, include_molecular_weight_in_encoding=True)
 
             if False:
+                unidentified_spectra = load_mgf_file(
+                    "../../data/mass_spec_data/yeast/results_saccharomyces_cerevisiae_unidentified.mgf")
 
                 num_peaks_unidentified_spectra = [len(spectrum["peaks"]) for spectrum in unidentified_spectra]
                 print(len(num_peaks_unidentified_spectra))
@@ -1077,18 +1532,19 @@ def testing():
         """
         Identified spectra
         """
-
         if True:
 
             print("#"*5 + " Identified spectra " + "#"*5)
-            identified_spectra = load_msp_file("../../data/mass_spec_data/Saccharomyces_cerevisiae_identified_fixed.txt")
 
-            peak_features_identified = preprocess_mass_spec_data(identified_spectra, 50)
-
-            # save the pre-processed data to some file
-            np.savetxt("../../data/mass_spec_data/yeast_identified_preprocessed.txt", peak_features_identified)
+            preprocess_mass_spec_file("../../data/mass_spec_data/yeast/yeast_identified.msp",
+                                      "yeast",
+                                      n_peaks_to_keep=50, peak_encoding="distance", max_intensity_value=5000,
+                                      filter_on_charge="2",
+                                      include_charge_in_encoding=False, include_molecular_weight_in_encoding=True)
 
             if False:
+                identified_spectra = load_msp_file(
+                    "../../data/mass_spec_data/yeast/Saccharomyces_cerevisiae_identified_fixed.txt")
 
                 # some analysis regarding the number of peaks
                 num_peaks_identified_spectra = [len(spectrum["peaks"]) for spectrum in identified_spectra]
@@ -1119,7 +1575,7 @@ def testing():
                 "../../data/mass_spec_data/human/human_unidentified.mgf")
             print(unidentified_spectra[15])
 
-            peak_features_unidentified = preprocess_mass_spec_data(unidentified_spectra, 50)
+            peak_features_unidentified = get_peaks_encoding(unidentified_spectra, 50)
             print(peak_features_unidentified[5])
 
             if True:
@@ -1146,10 +1602,10 @@ def testing():
 
             print("#" * 5 + " Identified spectra " + "#" * 5)
             identified_spectra = load_msp_file(
-                "../../data/mass_spec_data/human/Human_identified.txt")
+                "../../data/mass_spec_data/human/human_identified.txt")
             print(identified_spectra[15000])
 
-            peak_features_identified = preprocess_mass_spec_data(identified_spectra, 50)
+            peak_features_identified = get_peaks_encoding(identified_spectra, 50)
             print(peak_features_identified[5])
 
             if True:

@@ -40,10 +40,6 @@ def get_default_parameters_mnist():
             'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
 
             'dropout_encoder': [0.2, 0.0, 0.0, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
@@ -250,7 +246,7 @@ def get_default_parameters_mnist():
             'loss_function_discriminator': 'sigmoid_cross_entropy',
             'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
             'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
-            'loss_function_generator': 'hinge_loss'}
+            'loss_function_generator': 'sigmoid_cross_entropy'}
 
 
 def get_default_parameters_svhn():
@@ -266,10 +262,6 @@ def get_default_parameters_svhn():
             'n_neurons_of_hidden_layer_x_discriminator': [3000, 1500, 750, 375],
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
 
             'dropout_encoder': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
@@ -493,10 +485,6 @@ def get_default_parameters_cifar10():
             'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_autoencoder': [0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator': [0.0, 0.0, 0.0],
-            'bias_init_value_of_hidden_layer_x_discriminator_c': [0.0, 0.0, 0.0],  # for semi-supervised
-            'bias_init_value_of_hidden_layer_x_discriminator_g': [0.0, 0.0, 0.0],  # for semi-supervised
 
             'dropout_encoder': [0.2, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0],
@@ -694,6 +682,233 @@ def get_default_parameters_cifar10():
             'loss_function_generator': 'hinge_loss'}
 
 
+def get_default_parameters_mass_spec():
+    """
+    returns the default parameters for the MNIST dataset
+    :return: dictionary holding the parameters needed to create the Autoencoder
+    """
+    return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2, 'n_classes': 10,
+            'color_scale': "gray_scale", 'verbose': False, 'save_final_model': False, 'write_tensorboard': False,
+            'n_labeled': 1000,  # for semi-supervised
+            'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
+
+            'mass_spec_data_properties': {"organism_name": "yeast", "peak_encoding": "distance",
+                                          "include_charge_in_encoding": False,
+                                          "include_molecular_weight_in_encoding": False, "charge": "2"},
+
+            'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
+            'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
+            'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
+            'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
+
+            'dropout_encoder': [0.2, 0.0, 0.0, 0.0, 0.0],
+            'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'dropout_discriminator': [0.0, 0.0, 0.0, 0.0],
+            'dropout_discriminator_c': [0.0, 0.0, 0.0],
+            'dropout_discriminator_g': [0.0, 0.0, 0.0],
+
+            'batch_normalization_encoder': ["post_activation", "post_activation", "post_activation", "post_activation",
+                                            "post_activation"],
+            'batch_normalization_decoder': ["post_activation", "post_activation", "post_activation", "post_activation",
+                                            "post_activation"],
+            'batch_normalization_discriminator': [None, None, None, None, None],
+            # for semi-supervised:
+            'batch_normalization_discriminator_c': ["post_activation", "post_activation", "post_activation"],
+            'batch_normalization_discriminator_g': ["post_activation", "post_activation", "post_activation"],
+
+            'bias_initializer_encoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
+                                         "zeros_initializer", "zeros_initializer"],
+            'bias_initializer_decoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
+                                         "zeros_initializer", "zeros_initializer"],
+            'bias_initializer_discriminator': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
+                                               "zeros_initializer"],
+            'bias_initializer_discriminator_c': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
+            'bias_initializer_discriminator_g': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
+
+            'bias_initializer_params_encoder': [{}, {}, {}, {}, {}],
+            'bias_initializer_params_decoder': [{}, {}, {}, {}, {}],
+            'bias_initializer_params_discriminator': [{}, {}, {}, {}],
+            'bias_initializer_params_discriminator_c': [{}, {}, {}],
+            'bias_initializer_params_discriminator_g': [{}, {}, {}],
+
+            'weights_initializer_encoder': ["truncated_normal_initializer", "truncated_normal_initializer",
+                                            "truncated_normal_initializer", "truncated_normal_initializer",
+                                            "truncated_normal_initializer"],
+            'weights_initializer_decoder': ["truncated_normal_initializer", "truncated_normal_initializer",
+                                            "truncated_normal_initializer", "truncated_normal_initializer",
+                                            "truncated_normal_initializer"],
+            'weights_initializer_discriminator': ["truncated_normal_initializer", "truncated_normal_initializer",
+                                                  "truncated_normal_initializer", "truncated_normal_initializer"],
+            'weights_initializer_discriminator_c': ["truncated_normal_initializer", "truncated_normal_initializer",
+                                                    "truncated_normal_initializer"],
+            'weights_initializer_discriminator_g': ["truncated_normal_initializer", "truncated_normal_initializer",
+                                                    "truncated_normal_initializer"],
+
+            'weights_initializer_params_encoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                   {"mean": 0, "stddev": 0.1}],
+            'weights_initializer_params_decoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                   {"mean": 0, "stddev": 0.1}],
+            'weights_initializer_params_discriminator': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                         {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}],
+            'weights_initializer_params_discriminator_c': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                           {"mean": 0, "stddev": 0.1}],
+            'weights_initializer_params_discriminator_g': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                                                           {"mean": 0, "stddev": 0.1}],
+
+
+            'activation_function_encoder': ['relu', 'relu', 'relu', 'relu', 'linear'],
+            'activation_function_decoder': ['sigmoid', 'relu', 'relu', 'relu', 'linear'],
+            'activation_function_discriminator': ['relu', 'relu', 'relu', 'linear'],
+            'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
+            'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
+            'learning_rate_autoencoder': 0.0001,
+            'learning_rate_discriminator': 0.0001,
+            'learning_rate_generator': 0.0001,
+            'learning_rate_discriminator_gaussian': 0.0001,
+            'learning_rate_discriminator_categorical': 0.0001,
+            'learning_rate_supervised_encoder': 0.0001,
+
+            'decaying_learning_rate_name_autoencoder': "static",
+            'decaying_learning_rate_name_discriminator': "static",
+            'decaying_learning_rate_name_generator': "static",
+            'decaying_learning_rate_name_discriminator_gaussian': "static",
+            'decaying_learning_rate_name_discriminator_categorical': "static",
+            'decaying_learning_rate_name_supervised_encoder': "static",
+
+            'decaying_learning_rate_params_autoencoder': {"learning_rate": 0.0001},
+            'decaying_learning_rate_params_discriminator': {"learning_rate": 0.0001},
+            'decaying_learning_rate_params_generator': {"learning_rate": 0.0001},
+            'decaying_learning_rate_params_discriminator_gaussian': {"learning_rate": 0.0001},
+            'decaying_learning_rate_params_discriminator_categorical': {"learning_rate": 0.0001},
+            'decaying_learning_rate_params_supervised_encoder': {"learning_rate": 0.0001},
+
+            'optimizer_autoencoder': 'AdamOptimizer',
+            'optimizer_discriminator': 'AdamOptimizer',
+            'optimizer_generator': 'AdamOptimizer',
+            'optimizer_discriminator_gaussian': 'AdamOptimizer',
+            'optimizer_discriminator_categorical': 'AdamOptimizer',
+            'optimizer_supervised_encoder': 'AdamOptimizer',
+            'AdadeltaOptimizer_rho_autoencoder': 0.95, 'AdadeltaOptimizer_epsilon_autoencoder': 1e-08,
+            'AdadeltaOptimizer_rho_discriminator': 0.95, 'AdadeltaOptimizer_epsilon_discriminator': 1e-08,
+            'AdadeltaOptimizer_rho_discriminator_gaussian': 0.95,
+            'AdadeltaOptimizer_epsilon_discriminator_gaussian': 1e-08,
+            'AdadeltaOptimizer_rho_discriminator_categorical': 0.95, 'AdadeltaOptimizer_epsilon_categorical': 1e-08,
+            'AdadeltaOptimizer_rho_supervised_encoder': 0.95, 'AdadeltaOptimizer_epsilon_supervised_encoder': 1e-08,
+            'AdadeltaOptimizer_rho_generator': 0.95, 'AdadeltaOptimizer_epsilon_generator': 1e-08,
+            'AdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
+            'AdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+            'AdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+            'AdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+            'AdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+            'AdagradOptimizer_initial_accumulator_value_generator': 0.1,
+            'MomentumOptimizer_momentum_autoencoder': 0.9, 'MomentumOptimizer_use_nesterov_autoencoder': False,
+            'MomentumOptimizer_momentum_discriminator': 0.9, 'MomentumOptimizer_use_nesterov_discriminator': False,
+            'MomentumOptimizer_momentum_discriminator_gaussian': 0.9,
+            'MomentumOptimizer_use_nesterov_discriminator_gaussian': False,
+            'MomentumOptimizer_momentum_discriminator_categorical': 0.9,
+            'MomentumOptimizer_use_nesterov_discriminator_categorical': False,
+            'MomentumOptimizer_momentum_supervised_encoder': 0.9,
+            'MomentumOptimizer_use_nesterov_supervised_encoder': False,
+            'MomentumOptimizer_momentum_generator': 0.9, 'MomentumOptimizer_use_nesterov_generator': False,
+            'AdamOptimizer_beta1_autoencoder': 0.9, 'AdamOptimizer_beta2_autoencoder': 0.999,
+            'AdamOptimizer_epsilon_autoencoder': 1e-08, 'AdamOptimizer_beta1_discriminator': 0.9,
+            'AdamOptimizer_beta2_discriminator': 0.999, 'AdamOptimizer_epsilon_discriminator': 1e-08,
+            'AdamOptimizer_beta1_discriminator_gaussian': 0.9,
+            'AdamOptimizer_beta2_discriminator_gaussian': 0.999,
+            'AdamOptimizer_epsilon_discriminator_gaussian': 1e-08,
+            'AdamOptimizer_beta1_discriminator_categorical': 0.9,
+            'AdamOptimizer_beta2_discriminator_categorical': 0.999,
+            'AdamOptimizer_epsilon_discriminator_categorical': 1e-08,
+            'AdamOptimizer_beta1_supervised_encoder': 0.9,
+            'AdamOptimizer_beta2_supervised_encoder': 0.999, 'AdamOptimizer_epsilon_supervised_encoder': 1e-08,
+            'AdamOptimizer_beta1_generator': 0.9, 'AdamOptimizer_beta2_generator': 0.999,
+            'AdamOptimizer_epsilon_generator': 1e-08, 'FtrlOptimizer_learning_rate_power_autoencoder': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_autoencoder': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_autoencoder': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_autoencoder': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_autoencoder': 0.0,
+            'FtrlOptimizer_learning_rate_power_discriminator': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_discriminator': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_discriminator': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_discriminator': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator': 0.0,
+            'FtrlOptimizer_learning_rate_power_discriminator_gaussian': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_gaussian': 0.0,
+            'FtrlOptimizer_learning_rate_power_discriminator_categorical': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_discriminator_categorical': 0.0,
+            'FtrlOptimizer_learning_rate_power_supervised_encoder': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_supervised_encoder': 0.0,
+            'FtrlOptimizer_learning_rate_power_generator': -0.5,
+            'FtrlOptimizer_initial_accumulator_value_generator': 0.1,
+            'FtrlOptimizer_l1_regularization_strength_generator': 0.0,
+            'FtrlOptimizer_l2_regularization_strength_generator': 0.0,
+            'FtrlOptimizer_l2_shrinkage_regularization_strength_generator': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_autoencoder': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_autoencoder': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+            'ProximalGradientDescentOptimizer_l1_regularization_strength_generator': 0.0,
+            'ProximalGradientDescentOptimizer_l2_regularization_strength_generator': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_autoencoder': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_autoencoder': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_autoencoder': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_supervised_encoder': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_supervised_encoder': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_supervised_encoder': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_gaussian': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_gaussian': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_gaussian': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_discriminator_categorical': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_discriminator_categorical': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_discriminator_categorical': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_discriminator': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_discriminator': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_discriminator': 0.0,
+            'ProximalAdagradOptimizer_initial_accumulator_value_generator': 0.1,
+            'ProximalAdagradOptimizer_l1_regularization_strength_generator': 0.0,
+            'ProximalAdagradOptimizer_l2_regularization_strength_generator': 0.0,
+            'RMSPropOptimizer_decay_autoencoder': 0.9,
+            'RMSPropOptimizer_momentum_autoencoder': 0.0,
+            'RMSPropOptimizer_epsilon_autoencoder': 1e-10, 'RMSPropOptimizer_centered_autoencoder': False,
+            'RMSPropOptimizer_decay_discriminator': 0.9, 'RMSPropOptimizer_momentum_discriminator': 0.0,
+            'RMSPropOptimizer_epsilon_discriminator': 1e-10,
+            'RMSPropOptimizer_centered_discriminator': False,
+            'RMSPropOptimizer_decay_discriminator_gaussian': 0.9,
+            'RMSPropOptimizer_momentum_discriminator_gaussian': 0.0,
+            'RMSPropOptimizer_epsilon_discriminator_gaussian': 1e-10,
+            'RMSPropOptimizer_centered_discriminator_gaussian': False,
+            'RMSPropOptimizer_decay_discriminator_categorical': 0.9,
+            'RMSPropOptimizer_momentum_discriminator_categorical': 0.0,
+            'RMSPropOptimizer_epsilon_discriminator_categorical': 1e-10,
+            'RMSPropOptimizer_centered_discriminator_categorical': False,
+            'RMSPropOptimizer_decay_supervised_encoder': 0.9, 'RMSPropOptimizer_momentum_supervised_encoder': 0.0,
+            'RMSPropOptimizer_epsilon_supervised_encoder': 1e-10,
+            'RMSPropOptimizer_centered_supervised_encoder': False,
+            'RMSPropOptimizer_decay_generator': 0.9, 'RMSPropOptimizer_momentum_generator': 0.0,
+            'RMSPropOptimizer_epsilon_generator': 1e-10, 'RMSPropOptimizer_centered_generator': False,
+            'loss_function_discriminator': 'sigmoid_cross_entropy',
+            'loss_function_discriminator_gaussian': 'sigmoid_cross_entropy',
+            'loss_function_discriminator_categorical': 'sigmoid_cross_entropy',
+            'loss_function_generator': 'sigmoid_cross_entropy'}
+
+
 def create_network_topology(n_layers, init_n_neurons, n_neurons_decay_factor, n_decaying_layers):
     """
     creates a network topology based on the provided parameters
@@ -803,12 +1018,6 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
     n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]
     n_neurons_of_hidden_layer_x_discriminator_c = [500, 250, 125]
     n_neurons_of_hidden_layer_x_discriminator_g = [500, 250, 125]
-
-    # initial bias values for the hidden layers
-    bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0, 0.0]
-    bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0, 0.0]
-    bias_init_value_of_hidden_layer_x_discriminator_c = [0.0, 0.0, 0.0, 0.0]
-    bias_init_value_of_hidden_layer_x_discriminator_g = [0.0, 0.0, 0.0, 0.0]
 
     # individual learning rates
     learning_rate_autoencoder = [0.001, 0.01, 0.1]
@@ -1110,9 +1319,7 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
         local_vars_to_ignore = ["loss_functions", "param_dict_mnist", "optimizers", "autoencoder_optimizers",
                                 "local_vars_to_ignore", "args", "kwargs", "default_params_selected_for_gridsearch",
                                 "n_neurons_of_hidden_layer_x_autoencoder",
-                                "n_neurons_of_hidden_layer_x_discriminator",
-                                "bias_init_value_of_hidden_layer_x_autoencoder",
-                                "bias_init_value_of_hidden_layer_x_discriminator"]
+                                "n_neurons_of_hidden_layer_x_discriminator"]
         # check for hard coded grid search parameters (they are lists)
         for var_name in list(
                 locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
@@ -1128,9 +1335,7 @@ def get_gridsearch_parameters(selected_autoencoder, selected_dataset, *args, **k
 
     # these parameters are by default lists; so we can't use them for itertools.product
     params_default_as_list = ["n_neurons_of_hidden_layer_x_autoencoder",
-                              "n_neurons_of_hidden_layer_x_discriminator",
-                              "bias_init_value_of_hidden_layer_x_autoencoder",
-                              "bias_init_value_of_hidden_layer_x_discriminator"]
+                              "n_neurons_of_hidden_layer_x_discriminator"]
 
     # check if the parameters which are by default lists are hard coded selected for gridsearch
     for param_default_as_list in params_default_as_list:
@@ -1192,16 +1397,6 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     n_neurons_of_hidden_layer_x_discriminator = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
     n_neurons_of_hidden_layer_x_discriminator_c = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
     n_neurons_of_hidden_layer_x_discriminator_g = [500, 250, 125]  # TODO: and neurons; should be smaller to the end
-
-    # initial bias values for the hidden layers
-    bias_init_value_of_hidden_layer_x_autoencoder = [0.0, 0.0, 0.0,
-                                                     0.0]  # TODO: function to create a random number of layers
-    bias_init_value_of_hidden_layer_x_discriminator = [0.0, 0.0, 0.0,
-                                                       0.0]  # TODO: and neurons; should be smaller to the end
-    bias_init_value_of_hidden_layer_x_discriminator_c = [0.0, 0.0, 0.0,
-                                                         0.0]  # TODO: and neurons; should be smaller to the end
-    bias_init_value_of_hidden_layer_x_discriminator_g = [0.0, 0.0, 0.0,
-                                                         0.0]  # TODO: and neurons; should be smaller to the end
 
     # individual learning rates
     learning_rate_autoencoder = \

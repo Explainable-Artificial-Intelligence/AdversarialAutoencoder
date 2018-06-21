@@ -65,6 +65,10 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         # dataset selected by the user (MNIST, SVHN, cifar10, custom)
         self.selected_dataset = parameter_dictionary["selected_dataset"]
 
+        # dictionary holding some properties of the mass spec data; e.g. the organism name, the peak encoding,
+        # the charge (if any) etc
+        self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+
         """
         params for network topology
         """
@@ -149,6 +153,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         # Create a variable to track the global step.
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
+        self.increment_global_step_op = tf.assign_add(self.global_step, 1)
 
         # learning rate for the different parts of the network
         self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
@@ -319,17 +324,18 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
             get_optimizer(self.parameter_dictionary, optimizer_autoencoder, "autoencoder", global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_autoencoder)
         self.autoencoder_trainer = self.autoencoder_optimizer.minimize(self.autoencoder_loss)
+
         self.discriminator_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_discriminator, "discriminator",
                           global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_discriminator)
         self.discriminator_trainer = self.discriminator_optimizer.minimize(self.discriminator_loss,
                                                                            var_list=discriminator_vars)
+
         self.generator_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_generator, "generator", global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_generator)
-        self.generator_trainer = self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars,
-                                                                   global_step=self.global_step)
+        self.generator_trainer = self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars)
 
         """
         Create the tensorboard summary and the tf.saver and tf.session vars
@@ -976,7 +982,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         if Storage.get_all_input_data():
             data = Storage.get_all_input_data()
         else:
-            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False)
+            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
+                                  mass_spec_data_properties=self.mass_spec_data_properties)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
         autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
@@ -1186,6 +1193,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                         step += 1
 
+                    # increment the global step:
+                    sess.run(self.increment_global_step_op)
                     epochs_completed += 1
 
                     # every x epochs ..

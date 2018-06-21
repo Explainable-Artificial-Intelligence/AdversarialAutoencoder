@@ -18,6 +18,11 @@ class Storage(object):
     input_dim_x = None
     input_dim_y = None
 
+    # holds the minimum and the peak to peak for the respective feature vectors of the mass spec data to enable
+    # the reconstruction of the normalized data
+    mass_spec_data_normalization_properties = {"first_feature_vector": None, "second_feature_vector": None,
+                                               "third_feature_vector": None}
+
     # stores the data in this dictionary; default keys: train, test and validation
     # train images/labels can then be accessed like this: input_data.train.images/input_data.train.labels
     input_data = {}
@@ -129,6 +134,14 @@ class Storage(object):
     @classmethod
     def get_input_data(cls, dataset_name="train"):
         return getattr(cls.input_data, dataset_name)
+
+    @classmethod
+    def set_mass_spec_data_normalization_properties(cls, mass_spec_data_normalization_properties):
+        cls.mass_spec_data_normalization_properties = mass_spec_data_normalization_properties
+
+    @classmethod
+    def get_mass_spec_data_normalization_properties(cls):
+        return cls.mass_spec_data_normalization_properties
 
     @classmethod
     def get_all_input_data(cls):

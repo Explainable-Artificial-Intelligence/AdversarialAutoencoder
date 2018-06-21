@@ -20,14 +20,17 @@ from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
     create_reconstruction_grid, draw_class_distribution_on_latent_space, visualize_autoencoder_weights_and_biases, \
-    create_gif
+    create_gif, write_mass_spec_to_mgf_file, visualize_spectra
 
 
 class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
         # whether only the autoencoder and not the generative network should be trained
-        self.only_train_autoencoder = False
+        if parameter_dictionary.get("only_train_autoencoder"):
+            self.only_train_autoencoder = parameter_dictionary["only_train_autoencoder"]
+        else:
+            self.only_train_autoencoder = False
 
         # vars for the swagger server
         self.requested_operations_by_swagger = []
@@ -60,6 +63,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # dataset selected by the user (MNIST, SVHN, cifar10, custom)
         self.selected_dataset = parameter_dictionary["selected_dataset"]
+
+        # dictionary holding some properties of the mass spec data; e.g. the organism name, the peak encoding,
+        # the charge (if any) etc
+        self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
 
         """
         params for network topology
@@ -145,6 +152,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Create a variable to track the global step.
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
+        self.increment_global_step_op = tf.assign_add(self.global_step, 1)
 
         # learning rate for the different parts of the network
         self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
@@ -256,7 +264,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # Optimizers
         self.autoencoder_optimizer = \
-            get_optimizer(self.parameter_dictionary, optimizer_autoencoder, "autoencoder", global_step=self.global_step,
+            get_optimizer(self.parameter_dictionary, optimizer_autoencoder, "autoencoder",
+                          global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_autoencoder)
         self.autoencoder_trainer = self.autoencoder_optimizer.minimize(self.autoencoder_loss)
         self.discriminator_optimizer = \
@@ -268,8 +277,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.generator_optimizer = \
             get_optimizer(self.parameter_dictionary, optimizer_generator, "generator", global_step=self.global_step,
                           decaying_learning_rate_name=self.decaying_learning_rate_name_generator)
-        self.generator_trainer = self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars,
-                                                                   global_step=self.global_step)
+        self.generator_trainer = self.generator_optimizer.minimize(self.generator_loss, var_list=encoder_vars)
 
         """
         Create the tensorboard summary and the tf.saver and tf.session vars
@@ -866,7 +874,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             data = Storage.get_all_input_data()
         else:
             data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
-                                  add_noise=False)
+                                  add_noise=False,
+                                  mass_spec_data_properties=self.mass_spec_data_properties)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
         autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
@@ -970,7 +979,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                     self.parameter_dictionary["dropout_discriminator"]})
 
                         # every x epochs: write a summary for every 50th minibatch
-                        if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
+                        # if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
+                        # TODO:
+                        if epoch % self.summary_image_frequency == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output = \
@@ -1038,6 +1049,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         step += 1
 
+                    # increment the global step:
+                    sess.run(self.increment_global_step_op)
                     epochs_completed += 1
 
                     # every x epochs ..
@@ -1057,6 +1070,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         real_images = np.array(self.epoch_summary_vars["batch_x"])
                         reconstructed_images = np.array(self.epoch_summary_vars["reconstructed_images"])
                         create_reconstruction_grid(self, real_images, reconstructed_images, epoch=epoch)
+
+                        if self.selected_dataset == "mass_spec":
+                            write_mass_spec_to_mgf_file(self, epoch, reconstructed_images, real_images)
+                            visualize_spectra(self, epoch, reconstructed_images, real_images)
 
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4 * 2, 4.8)

@@ -88,8 +88,6 @@ def get_decaying_learning_rate(decaying_learning_rate_name, decaying_learning_ra
     :return:
     """
 
-    # TODO: params of different learning rates as kwargs
-
     if decaying_learning_rate_name == "exponential_decay":
         """
         decayed_learning_rate = learning_rate * decay_rate ^ (global_step / decay_steps)
