@@ -135,7 +135,7 @@ def param_search_incorporating_label_information():
 def param_search_mass_spec_data():
     params = get_default_parameters_mass_spec()
     params["summary_image_frequency"] = 50
-    params["n_epochs"] = 10001
+    params["n_epochs"] = 1
 
     params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "distance",
                                            "include_charge_in_encoding": False,
@@ -249,20 +249,20 @@ def update_basic_network_params(params):
     params["batch_normalization_decoder"] = [None] * n_autoencoder_layers
     params["batch_normalization_discriminator"] = [None] * n_discriminator_layers
     params["bias_initializer_encoder"] = ["zeros_initializer"] * n_autoencoder_layers
-    params["bias_initializer_decoder"] = ["zeros_initializer"] * n_discriminator_layers
+    params["bias_initializer_decoder"] = ["zeros_initializer"] * n_autoencoder_layers
     params["bias_initializer_discriminator"] = ["zeros_initializer"] * n_discriminator_layers
     params["bias_initializer_params_encoder"] = [{}] * n_autoencoder_layers
     params["bias_initializer_params_decoder"] = [{}] * n_autoencoder_layers
-    params["bias_initializer_params_discriminator"] = [{}] * n_autoencoder_layers
+    params["bias_initializer_params_discriminator"] = [{}] * n_discriminator_layers
     params["dropout_encoder"] = [0.0] * n_autoencoder_layers
-    params["dropout_decoder"] = [0.0] * n_discriminator_layers
+    params["dropout_decoder"] = [0.0] * n_autoencoder_layers
     params["dropout_discriminator"] = [0.0] * n_discriminator_layers
     params["weights_initializer_encoder"] = ["truncated_normal_initializer"] * n_autoencoder_layers
     params["weights_initializer_decoder"] = ["truncated_normal_initializer"] * n_autoencoder_layers
-    params["weights_initializer_discriminator"] = ["truncated_normal_initializer"] * n_autoencoder_layers
-    params["weights_initializer_params_encoder"] = [{"mean": 0, "stddev": 0.1}]
-    params["weights_initializer_params_decoder"] = [{"mean": 0, "stddev": 0.1}]
-    params["weights_initializer_params_discriminator"] = [{"mean": 0, "stddev": 0.1}]
+    params["weights_initializer_discriminator"] = ["truncated_normal_initializer"] * n_discriminator_layers
+    params["weights_initializer_params_encoder"] = [{"mean": 0, "stddev": 0.1}] * n_autoencoder_layers
+    params["weights_initializer_params_decoder"] = [{"mean": 0, "stddev": 0.1}] * n_autoencoder_layers
+    params["weights_initializer_params_discriminator"] = [{"mean": 0, "stddev": 0.1}] * n_discriminator_layers
 
 
 def testing():
@@ -289,8 +289,9 @@ def testing():
     #   uniform_unit_scaling_initializer: factor: Float. A multiplicative factor by which the values will be scaled.
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
 
-    if False:
-        param_search_incorporating_label_information()
+    if True:
+        # param_search_incorporating_label_information()
+        param_search_mass_spec_data()
 
         return
 
