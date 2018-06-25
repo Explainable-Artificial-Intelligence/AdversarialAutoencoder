@@ -812,7 +812,7 @@ definitions:
         example: "gray_scale"
       verbose:
         type: "boolean"
-        example: False
+        example: True
       save_final_model:
         type: "boolean"
         example: False
@@ -862,45 +862,6 @@ definitions:
         items:
           type: "integer"
           format: "int32"
-      bias_init_value_of_hidden_layer_x_autoencoder:
-        type: "array"
-        example:
-        - 0.0
-        - 0.0
-        - 0.0
-        - 0.0
-        - 0.0
-        items:
-          type: "number"
-          format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator:
-        type: "array"
-        example:
-        - 0.0
-        - 0.0
-        - 0.0
-        - 0.0
-        items:
-          type: "number"
-          format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator_c:
-        type: "array"
-        example:
-        - 0.0
-        - 0.0
-        - 0.0
-        items:
-          type: "number"
-          format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator_g:
-        type: "array"
-        example:
-        - 0.0
-        - 0.0
-        - 0.0
-        items:
-          type: "number"
-          format: "double"
       dropout_encoder:
         type: "array"
         example:
@@ -1839,7 +1800,7 @@ definitions:
         example: "sigmoid_cross_entropy"
       loss_function_generator:
         type: "string"
-        example: "hinge_loss"
+        example: "sigmoid_cross_entropy"
 
 
 
@@ -1969,7 +1930,20 @@ definitions:
           items:
             type: "integer"
             format: "int32"
-      bias_init_value_of_hidden_layer_x_autoencoder:
+      dropout_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - 0.2
+          - 0.0
+          - 0.0
+          - 0.0
+          - 0.0
+          items:
+            type: "number"
+            format: "double"
+      dropout_decoder:
         type: "array"
         items:
           type: "array"
@@ -1982,7 +1956,7 @@ definitions:
           items:
             type: "number"
             format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator:
+      dropout_discriminator:
         type: "array"
         items:
           type: "array"
@@ -1994,7 +1968,7 @@ definitions:
           items:
             type: "number"
             format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator_c:
+      dropout_discriminator_c:
         type: "array"
         items:
           type: "array"
@@ -2005,7 +1979,7 @@ definitions:
           items:
             type: "number"
             format: "double"
-      bias_init_value_of_hidden_layer_x_discriminator_g:
+      dropout_discriminator_g:
         type: "array"
         items:
           type: "array"
@@ -2016,6 +1990,282 @@ definitions:
           items:
             type: "number"
             format: "double"
+      batch_normalization_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - post_activation
+          - post_activation
+          - post_activation
+          - post_activation
+          - post_activation
+          items:
+            type: "string"
+      batch_normalization_decoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - post_activation
+          - post_activation
+          - post_activation
+          - post_activation
+          - post_activation
+          items:
+            type: "string"
+      batch_normalization_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - "None"
+          - "None"
+          - "None"
+          - "None"
+          - "None"
+          items:
+            type: "string"
+      batch_normalization_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - post_activation
+          - post_activation
+          - post_activation
+          items:
+            type: "string"
+      batch_normalization_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - post_activation
+          - post_activation
+          - post_activation
+          items:
+            type: "string"
+      bias_initializer_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          items:
+            type: "string"
+      bias_initializer_decoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          items:
+            type: "string"
+      bias_initializer_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          items:
+            type: "string"
+      bias_initializer_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          items:
+            type: "string"
+      bias_initializer_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - zeros_initializer
+          - zeros_initializer
+          - zeros_initializer
+          items:
+            type: "string"
+      bias_initializer_params_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          items:
+            type: "object"
+      bias_initializer_params_decoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          items:
+            type: "object"
+      bias_initializer_params_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          items:
+            type: "object"
+      bias_initializer_params_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          items:
+            type: "object"
+      bias_initializer_params_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - not used: -1
+          - not used: -1
+          - not used: -1
+          items:
+            type: "object"
+      weights_initializer_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          items:
+            type: "string"
+      weights_initializer_decoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          items:
+            type: "string"
+      weights_initializer_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          items:
+            type: "string"
+      weights_initializer_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          items:
+            type: "string"
+      weights_initializer_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          - truncated_normal_initializer
+          items:
+            type: "string"
+      weights_initializer_params_encoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          items:
+            type: "object"
+      weights_initializer_params_decoder:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          items:
+            type: "object"
+      weights_initializer_params_discriminator:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          items:
+            type: "object"
+      weights_initializer_params_discriminator_c:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          items:
+            type: "object"
+      weights_initializer_params_discriminator_g:
+        type: "array"
+        items:
+          type: "array"
+          example:
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          - {'mean': 0, 'stddev': 0.1}
+          items:
+            type: "object"
       activation_function_encoder:
         type: "array"
         items:
@@ -2143,6 +2393,42 @@ definitions:
         - static
         items:
           type: "string"
+      decaying_learning_rate_params_autoencoder:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
+      decaying_learning_rate_params_discriminator:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
+      decaying_learning_rate_params_generator:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
+      decaying_learning_rate_params_discriminator_gaussian:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
+      decaying_learning_rate_params_discriminator_categorical:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
+      decaying_learning_rate_params_supervised_encoder:
+        type: "array"
+        example:
+        - {'learning_rate': 0.0001}
+        items:
+          type: "object"
       optimizer_autoencoder:
         type: "array"
         example:
@@ -2992,9 +3278,11 @@ definitions:
       loss_function_generator:
         type: "array"
         example:
-        - hinge_loss
+        - sigmoid_cross_entropy
         items:
           type: "string"
+
+
 
 
 

@@ -4,6 +4,7 @@ import collections
 import imageio as imageio
 import numpy as np
 import pandas
+from scipy.stats import gaussian_kde
 from six.moves import xrange  # pylint: disable=redefined-builtin
 from sklearn.decomposition import PCA
 from tensorflow.contrib.learn.python.learn.datasets import base
@@ -397,7 +398,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     read the identified spectra
     """
     if not os.path.isfile(input_file_name):     # check if file exists
-        print("Pre-processed data not found! Data is now getting pre-processed..")
+        print("Pre-processed data not found! Data is now being pre-processed..")
         preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
                                   + "_identified.msp", organism_name,
                                   n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
@@ -412,7 +413,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     """
     input_file_name = input_file_name.replace("identified", "unidentified")
     if not os.path.isfile(input_file_name):     # check if file exists
-        print("Pre-processed data not found! Data is now getting pre-processed..")
+        print("Pre-processed data not found! Data is now being pre-processed..")
         preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
                                   + "_unidentified.mgf", organism_name,
                                   n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
@@ -1435,17 +1436,86 @@ def testing():
     # yeast
     if True:
 
-        if False:
+        if True:
+
+            unidentified_spectra = load_mgf_file(
+                "../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+
+            peaks = [spectrum["peaks"] for spectrum in unidentified_spectra]
+
+            # filter to keep only the n highest peaks
+            filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+
+            # remove None from the list
+            filtered_peaks = np.array([i for i in filtered_peaks if i is not None])
+
+            # filter outliers
+            indices_to_keep = np.all(filtered_peaks[:, :, 1] < 2500, axis=1)
+            filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+
+            """
+            test run on fake data
+            """
+            # Generate fake data
+            x = np.random.normal(size=1000)
+            y = x * 3 + np.random.normal(size=1000)
+
+            # Calculate the point density
+            xy = np.vstack([x, y])
+            z = gaussian_kde(xy)(xy)
+
+            print(xy.shape)
+            print(z.shape)
+
+            # fig, ax = plt.subplots()
+            # ax.scatter(x, y, c=z, s=100, edgecolor='')
+            # plt.show()
+
+            """
+            scatter plot with density
+            """
+
+            # reduce data set size
+            filtered_peaks = filtered_peaks[:500]
+
+            mz_values = filtered_peaks[:, :, 0]
+            intensities = filtered_peaks[:, :, 1]
+
+            # flatten array
+            mz_values = mz_values.flatten()
+            intensities = intensities.flatten()
+
+            xy = np.vstack([mz_values, intensities])
+
+            print(xy.shape)
+
+            z = gaussian_kde(xy)(xy)
+
+            fig, ax = plt.subplots()
+            ax.scatter(mz_values, intensities, c=z, s=100, edgecolor='')
+            plt.show()
+
+
+            return
 
             mass_spec_properties = {"organism_name": "yeast", "peak_encoding": "distance",
                                     "include_charge_in_encoding": False, "include_molecular_weight_in_encoding": False,
-                                    "charge": "2", "is_data_normalized": True}
+                                    "charge": "2", "normalize_data": True, "n_peaks_to_keep": 50,
+                                    "max_intensity_value": 5000}
 
-            preprocessed_spectra_unidentified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_distance_charge_2.txt")
+            preprocessed_spectra_unidentified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_distance_charge_2_n_peaks_50_max_intensity_5000.txt")
             print(np.min(preprocessed_spectra_unidentified))
             print(np.max(preprocessed_spectra_unidentified))
 
-            preprocessed_spectra_identified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_distance_charge_2.txt")
+            print(preprocessed_spectra_unidentified.shape)
+
+            return
+
+            # plt.hist(preprocessed_spectra_unidentified, bins=[0.1*i for i in range(1, 10000)])
+            plt.hist(preprocessed_spectra_unidentified)
+            plt.show()
+
+            preprocessed_spectra_identified = np.loadtxt("../../data/mass_spec_data/yeast/yeast_identified_distance_charge_2_n_peaks_50_max_intensity_5000.txt")
             print(np.min(preprocessed_spectra_identified))
             print(np.max(preprocessed_spectra_identified))
 

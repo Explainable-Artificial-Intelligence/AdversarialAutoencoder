@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 from autoencoders.AAE_LearningPriorSupervised import LearningPriorsAdversarialAutoencoderSupervised
 from autoencoders.AAE_LearningPriorUnsupervised import LearningPriorsAdversarialAutoencoderUnsupervised
@@ -11,7 +12,8 @@ from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialA
 from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
 from autoencoders.UnsupervisedClusteringAdversarialAutoencoder import UnsupervisedClusteringAdversarialAutoencoder
 from util.AdversarialAutoencoderParameters import get_default_parameters_mnist, \
-    get_result_path_for_selected_autoencoder, get_default_parameters_svhn, get_default_parameters_mass_spec
+    get_result_path_for_selected_autoencoder, get_default_parameters_svhn, get_default_parameters_mass_spec, \
+    create_random_network_architectures
 from util.TuningFunctions import do_randomsearch, do_gridsearch, init_aae_with_params_file
 
 
@@ -133,113 +135,41 @@ def param_search_incorporating_label_information():
 
 
 def param_search_mass_spec_data():
-    params = get_default_parameters_mass_spec()
-    params["summary_image_frequency"] = 50
-    params["n_epochs"] = 1
 
-    params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "distance",
-                                           "include_charge_in_encoding": False,
-                                           "include_molecular_weight_in_encoding": False, "charge": "2",
-                                           "normalize_data": True, "n_peaks_to_keep": 50,
-                                           "max_intensity_value": 5000}
+    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+                    "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
+                    "weights_initializer_params_encoder", "weights_initializer_params_decoder",
+                    selected_autoencoder="Unsupervised", z_dim=2,
+                    selected_dataset="mass_spec", n_epochs=5001,
+                    AdamOptimizer_beta1_autoencoder=0.5)
 
-    params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
-        [params["mass_spec_data_properties"]["include_charge_in_encoding"],
-         params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
-    params["input_dim_x"] = 1
-    params["n_classes"] = 2
-    params["z_dim"] = 2
-    params["selected_dataset"] = "mass_spec"
-    params["only_train_autoencoder"] = True
-    params["verbose"] = True
-    params["selected_autoencoder"] = "Unsupervised"
-    params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
+    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+                    "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
+                    "weights_initializer_params_encoder", "weights_initializer_params_decoder",
+                    selected_autoencoder="Unsupervised", z_dim=10,
+                    selected_dataset="mass_spec", n_epochs=5001,
+                    AdamOptimizer_beta1_autoencoder=0.5)
 
-    """
-    first parameter combination
-    """
-    params["n_neurons_of_hidden_layer_x_autoencoder"] = [1000, 1000, 1000, 1000]
-    params["n_neurons_of_hidden_layer_x_discriminator"] = [1000, 1000, 1000]
+    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+                    "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
+                    "weights_initializer_params_encoder", "weights_initializer_params_decoder",
+                    selected_autoencoder="Unsupervised", z_dim=50,
+                    selected_dataset="mass_spec", n_epochs=5001,
+                    AdamOptimizer_beta1_autoencoder=0.5)
 
-    params["dropout_encoder"] = [0.0, 0.0, 0.0, 0.0, 0.0]
-    params["batch_normalization_encoder"] = [None] * 5
-    params["batch_normalization_decoder"] = [None] * 5
+    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+                    "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
+                    "weights_initializer_params_encoder", "weights_initializer_params_decoder",
+                    selected_autoencoder="Unsupervised", z_dim=100,
+                    selected_dataset="mass_spec", n_epochs=5001,
+                    AdamOptimizer_beta1_autoencoder=0.5)
 
-    params["AdamOptimizer_beta1_discriminator"] = 0.5
-    params["AdamOptimizer_beta1_autoencoder"] = 0.5
-    params["AdamOptimizer_beta1_generator"] = 0.5
-
-    params['decaying_learning_rate_name_autoencoder'] = "piecewise_constant"
-    params['decaying_learning_rate_name_discriminator'] = "piecewise_constant"
-    params['decaying_learning_rate_name_generator'] = "piecewise_constant"
-
-    params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [500, 1500],
-                                                           "values": [0.0001, 0.00001, 0.000001]}
-    params["decaying_learning_rate_params_discriminator"] = {"boundaries": [500, 1500, 2500],
-                                                             "values": [0.1, 0.01, 0.001, 0.0001]}
-    params["decaying_learning_rate_params_generator"] = {"boundaries": [500, 1500, 2500],
-                                                         "values": [0.1, 0.01, 0.001, 0.0001]}
-    aae = UnsupervisedAdversarialAutoencoder(params)
-    aae.train(True)
-    aae.reset_graph()
-
-    """
-    next parameter combination
-    """
-    params["AdamOptimizer_beta1_discriminator"] = 0.9
-    params["AdamOptimizer_beta1_autoencoder"] = 0.9
-    params["AdamOptimizer_beta1_generator"] = 0.9
-    aae = UnsupervisedAdversarialAutoencoder(params)
-    aae.train(True)
-    aae.reset_graph()
-
-    """
-    next parameter combination
-    """
-    params["n_neurons_of_hidden_layer_x_autoencoder"] = [1000, 1000, 1000, 1000]
-    params["n_neurons_of_hidden_layer_x_discriminator"] = [1000, 1000, 1000]
-
-    update_basic_network_params(params)
-
-    params["activation_function_encoder"] = ['relu', 'relu', 'relu', 'relu', 'linear']
-    params["activation_function_decoder"] = ['relu', 'relu', 'relu', 'relu', 'sigmoid']
-    params["activation_function_discriminator"] = ['relu', 'relu', 'relu', 'linear']
-
-    aae = UnsupervisedAdversarialAutoencoder(params)
-    aae.train(True)
-    aae.reset_graph()
-
-    """
-    next parameter combination
-    """
-    params["n_neurons_of_hidden_layer_x_autoencoder"] = [150, 2000, 2000, 150]
-    params["n_neurons_of_hidden_layer_x_discriminator"] = [1000, 1000, 1000]
-
-    update_basic_network_params(params)
-
-    params["activation_function_encoder"] = ['relu', 'relu', 'relu', 'relu', 'linear']
-    params["activation_function_decoder"] = ['relu', 'relu', 'relu', 'relu', 'sigmoid']
-    params["activation_function_discriminator"] = ['relu', 'relu', 'relu', 'linear']
-
-    aae = UnsupervisedAdversarialAutoencoder(params)
-    aae.train(True)
-    aae.reset_graph()
-
-    """
-    next parameter combination
-    """
-    params["n_neurons_of_hidden_layer_x_autoencoder"] = [1000, 1000]
-    params["n_neurons_of_hidden_layer_x_discriminator"] = [1000, 1000, 1000]
-
-    update_basic_network_params(params)
-
-    params["activation_function_encoder"] = ['relu', 'relu', 'linear']
-    params["activation_function_decoder"] = ['relu', 'relu', 'sigmoid']
-    params["activation_function_discriminator"] = ['relu', 'relu', 'relu', 'linear']
-
-    aae = UnsupervisedAdversarialAutoencoder(params)
-    aae.train(True)
-    aae.reset_graph()
+    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+                    "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
+                    "weights_initializer_params_encoder", "weights_initializer_params_decoder",
+                    selected_autoencoder="Unsupervised", z_dim=150,
+                    selected_dataset="mass_spec", n_epochs=5001,
+                    AdamOptimizer_beta1_autoencoder=0.5)
 
 
 def update_basic_network_params(params):
@@ -293,12 +223,48 @@ def testing():
         # param_search_incorporating_label_information()
         param_search_mass_spec_data()
 
+        # TODO: batch_size of 101 is not working
+
+        # do_randomsearch(1, "activation_function_encoder", batch_size=103, n_epochs=2, summary_image_frequency=5,
+        #                 learning_rate_autoencoder=[np.random.uniform(0.2, 0.001)*2])
+        #
+        do_randomsearch(100)
+        # do_randomsearch(2, "batch_size", "activation_function_encoder", n_epochs=5, summary_image_frequency=5,
+        #                 learning_rate_autoencoder=[np.random.uniform(0.2, 0.001)*2])
+        #
+        # return
+
+        """
+        test grid search
+        """
+        do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="MNIST", n_epochs=[2],
+                      n_neurons_of_hidden_layer_x_autoencoder=[[500, 250, 125], [1000, 750, 25]],
+                      n_neurons_of_hidden_layer_x_discriminator=[[500, 250, 125], [1000, 750, 25]],
+                      decaying_learning_rate_params_autoencoder=[{'learning_rate': 0.0001}]
+        )
+
+        return
+
+        do_gridsearch(selected_autoencoder="Unsupervised", selected_dataset="MNIST", n_epochs=[2],
+                      n_neurons_of_hidden_layer_x_autoencoder=[[500, 250, 125], [1000, 750, 25]],
+                      n_neurons_of_hidden_layer_x_discriminator=[[500, 250, 125], [1000, 750, 25]],
+                      weights_initializer_params_discriminator=[
+                          [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                           {"mean": 0, "stddev": 0.1}],
+                      [{"mean": 0, "stddev": 0.12345}, {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+                       {"mean": 0, "stddev": 0.1}],
+        [{"mean": 0, "stddev": 0.67890}, {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+         {"mean": 0, "stddev": 0.1}],
+        [{"mean": 0, "stddev": 0.13579}, {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
+        {"mean": 0, "stddev": 0.1}]]
+        )
+
         return
 
     """
     test yeast mass spec data:
     """
-    if True:
+    if False:
 
         params = get_default_parameters_mass_spec()
 
@@ -430,17 +396,17 @@ def testing():
             aae.reset_graph()
         return
 
-    if False:
+    if True:
 
         params = get_default_parameters_mnist()
         params["selected_dataset"] = "MNIST"
 
-        params["z_dim"] = 2
+        params["z_dim"] = 150
 
         params["verbose"] = True
         params["selected_autoencoder"] = "Unsupervised"
         params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
-        params["summary_image_frequency"] = 1
+        params["summary_image_frequency"] = 50
         params["n_labeled"] = 10000
         params["n_epochs"] = 3
         params["batch_normalization_encoder"] = [None, None, None, None, None, None, None]
@@ -856,12 +822,12 @@ def testing():
     return
 
     n_neurons_of_hidden_layer_x_autoencoder = \
-        create_random_network_topologies(max_layers=3, init_n_neurons=3000,
-                                         n_neurons_decay_factors=[1, 1.5, 2, 3])
+        create_random_network_architectures(max_layers=3, init_n_neurons=3000,
+                                            n_neurons_decay_factors=[1, 1.5, 2, 3])
 
     n_neurons_of_hidden_layer_x_discriminator = \
-        create_random_network_topologies(max_layers=3, init_n_neurons=3000,
-                                         n_neurons_decay_factors=[1, 1.5, 2, 3])
+        create_random_network_architectures(max_layers=3, init_n_neurons=3000,
+                                            n_neurons_decay_factors=[1, 1.5, 2, 3])
 
     bias_init_value_of_hidden_layer_x_autoencoder = [[0.0]*(len(i)+1) for i in n_neurons_of_hidden_layer_x_autoencoder]
     bias_init_value_of_hidden_layer_x_discriminator = [[0.0]*(len(i)+1) for i in n_neurons_of_hidden_layer_x_discriminator]

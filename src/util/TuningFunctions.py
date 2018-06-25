@@ -92,9 +92,9 @@ def do_gridsearch(*args, selected_autoencoder="Unsupervised", selected_dataset="
 
     print("There are", len(gridsearch_parameter_combinations), "combinations:")
 
-    # for a in gridsearch_parameter_combinations:
-    #     print(a)
-    # print()
+    for a in gridsearch_parameter_combinations:
+        print(a)
+    print()
 
     # iterate over each parameter combination
     for gridsearch_parameter_combination in gridsearch_parameter_combinations:
@@ -279,7 +279,9 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
             adv_autoencoder.reset_graph()
 
     # sort combinations by their performance
-    sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])
+    # TODO: change back to summed loss
+    # sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["summed_loss_final"])
+    sorted_list = sorted(performance_for_parameter_combination, key=lambda x: x["performance"]["autoencoder_loss_final"])
 
     # store the tuning results for the swagger server
     Storage.set_tuning_results(performance_for_parameter_combination)

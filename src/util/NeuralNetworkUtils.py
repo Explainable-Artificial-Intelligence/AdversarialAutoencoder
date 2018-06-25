@@ -44,7 +44,6 @@ def get_tf_initializer(initializer_name, initializer_params):
     :param initializer_params: single value or tuple holding the parameter(s) of the initializer
     :return: instance of the initializer
     """
-
     if initializer_name == "constant_initializer":
         # value: A Python scalar, list or tuple of values, or a N-dimensional numpy array. All elements of the
         # initialized variable will be set to the corresponding value in the value argument.

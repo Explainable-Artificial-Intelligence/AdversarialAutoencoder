@@ -66,7 +66,10 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # dictionary holding some properties of the mass spec data; e.g. the organism name, the peak encoding,
         # the charge (if any) etc
-        self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        if parameter_dictionary.get("mass_spec_data_properties"):
+            self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        else:
+            self.mass_spec_data_properties = None
 
         """
         params for network topology

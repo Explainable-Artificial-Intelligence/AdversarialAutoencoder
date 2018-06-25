@@ -111,17 +111,10 @@ def run_gridsearch(aae_parameters, selected_autoencoder):
         aae_parameters["results_path"] = get_result_path_for_selected_autoencoder(selected_autoencoder)
         aae_parameters["selected_autoencoder"] = selected_autoencoder
 
-        # check which params are missing; those will then be used for randomizing the parameters
-        default_params = get_default_parameters(selected_autoencoder, selected_dataset)
-        params_selected_for_random_search = [key for key in default_params if key not in aae_parameters]
-        print("params selected as args for grid search: \n", params_selected_for_random_search)
-
-        # we need a tuple as input for args
-        args = tuple(params_selected_for_random_search)
+        print(aae_parameters)
 
         try:
-            tuning_thread = threading.Thread(target=do_gridsearch, args=args,
-                                             kwargs=aae_parameters)
+            tuning_thread = threading.Thread(target=do_gridsearch, kwargs=aae_parameters)
             tuning_thread.start()
 
         except KeyError:
@@ -154,5 +147,4 @@ def get_tuning_results():
     else:
         return "No tuning results found", 404
 
-# TODO: gridsearch
 
