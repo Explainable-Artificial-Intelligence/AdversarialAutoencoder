@@ -244,16 +244,23 @@ def do_randomsearch(n_parameter_combinations=5, *args, selected_autoencoder="Uns
 
             # we want to include the results from our previous runs on the minibatch summary images
             adv_autoencoder.set_include_tuning_performance(True)
+            try:
 
-            # set the autoencoder for the swagger server
-            Storage.set_aae(adv_autoencoder)
+                # set the autoencoder for the swagger server
+                Storage.set_aae(adv_autoencoder)
 
-            # start the training
-            adv_autoencoder.train(True)
-            # adv_autoencoder.train(False)
+                # start the training
+                adv_autoencoder.train(True)
 
-            # get the performance
-            performance = adv_autoencoder.get_final_performance()
+                # get the performance
+                performance = adv_autoencoder.get_final_performance()
+            except:
+                print("whoops")
+                performance = {"autoencoder_loss_final": float('inf'),
+                                  "discriminator_loss_final": float('inf'),
+                                  "generator_loss_final": float('inf'),
+                                  "summed_loss_final": float('inf')}
+
             print(performance)
 
             # convert performance to float64 (for swagger server)

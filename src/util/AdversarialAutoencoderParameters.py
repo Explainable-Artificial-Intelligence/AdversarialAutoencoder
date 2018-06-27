@@ -1274,21 +1274,23 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
 
     # randomize batch normalization
     batch_normalization_options = ["pre_activation", "post_activation", None]
-    batch_normalization_encoder = [random.choice(batch_normalization_options)] * n_layers_autoencoder
-    batch_normalization_decoder = [random.choice(batch_normalization_options)] * n_layers_autoencoder
-    batch_normalization_discriminator = [random.choice(batch_normalization_options)] * n_layers_discriminator
-    batch_normalization_discriminator_c = [random.choice(batch_normalization_options)] * n_layers_discriminator_c
-    batch_normalization_discriminator_g = [random.choice(batch_normalization_options)] * n_layers_discriminator_g
+    batch_normalization_encoder = [random.choice(batch_normalization_options) for i in range(n_layers_autoencoder)]
+    batch_normalization_decoder = [random.choice(batch_normalization_options) for i in range(n_layers_autoencoder)]
+    batch_normalization_discriminator = [random.choice(batch_normalization_options) for i in range(n_layers_discriminator)]
+    batch_normalization_discriminator_c = [random.choice(batch_normalization_options) for i in range(n_layers_discriminator_c)]
+    batch_normalization_discriminator_g = [random.choice(batch_normalization_options) for i in range(n_layers_discriminator_g)]
 
     # randomize bias initialization
     bias_initializer_options = ["constant_initializer", "random_normal_initializer", "truncated_normal_initializer",
                            "random_uniform_initializer", "uniform_unit_scaling_initializer", "zeros_initializer",
-                           "ones_initializer", "orthogonal_initializer"]
-    bias_initializer_encoder = [random.choice(bias_initializer_options)] * n_layers_autoencoder
-    bias_initializer_decoder = [random.choice(bias_initializer_options)] * n_layers_autoencoder
-    bias_initializer_discriminator = [random.choice(bias_initializer_options)] * n_layers_discriminator
-    bias_initializer_discriminator_c = [random.choice(bias_initializer_options)] * n_layers_discriminator_c
-    bias_initializer_discriminator_g = [random.choice(bias_initializer_options)] * n_layers_discriminator_g
+                           "ones_initializer"]
+    # TODO "orthogonal_initializer" is not working!!
+    bias_initializer_encoder = [random.choice(bias_initializer_options) for i in range(n_layers_autoencoder)]
+    # bias_initializer_encoder = ["orthogonal_initializer"] * n_layers_autoencoder
+    bias_initializer_decoder = [random.choice(bias_initializer_options) for i in range(n_layers_autoencoder)]
+    bias_initializer_discriminator = [random.choice(bias_initializer_options) for i in range(n_layers_discriminator)]
+    bias_initializer_discriminator_c = [random.choice(bias_initializer_options) for i in range(n_layers_discriminator_c)]
+    bias_initializer_discriminator_g = [random.choice(bias_initializer_options) for i in range(n_layers_discriminator_g)]
 
     bias_initializer_params_encoder = [randomize_params_for_tf_initializer(initializer) for initializer in bias_initializer_encoder]
     bias_initializer_params_decoder = [randomize_params_for_tf_initializer(initializer) for initializer in bias_initializer_decoder]
@@ -1299,7 +1301,7 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     # randomize weight initialization
     weights_initializer_options = ["constant_initializer", "random_normal_initializer", "truncated_normal_initializer",
                                    "random_uniform_initializer", "uniform_unit_scaling_initializer",
-                                   "zeros_initializer", "ones_initializer", "orthogonal_initializer"]
+                                   "zeros_initializer", "ones_initializer"]
     weights_initializer_encoder = [random.choice(weights_initializer_options)] * n_layers_autoencoder
     weights_initializer_decoder = [random.choice(weights_initializer_options)] * n_layers_autoencoder
     weights_initializer_discriminator = [random.choice(weights_initializer_options)] * n_layers_discriminator

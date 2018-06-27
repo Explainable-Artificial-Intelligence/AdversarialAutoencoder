@@ -1251,6 +1251,27 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
     :return:
     """
 
+    # TODO: only temporary:
+    if mass_spec_data_properties["peak_encoding"] == "binned":
+        bin_size = 2500 / feature_dim
+
+        def keep_top_peaks(spectrum, n_peaks_to_keep=50):
+            indices_to_keep = np.argsort(spectrum)[::-1][:n_peaks_to_keep]
+            # sort the indices, so the m/z values are in proper order
+            indices_to_keep = np.sort(indices_to_keep)
+            return indices_to_keep, spectrum[indices_to_keep]
+
+        la = np.array([keep_top_peaks(spectrum) for spectrum in mass_spec_data])
+
+        mz_values = la[:, 0, :] * bin_size
+        intensities = la[:, 1, :]
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+
+        return mz_values, intensities, charges, molecular_weights
+
+
+
     is_data_normalized = mass_spec_data_properties["normalize_data"]
 
     if mass_spec_data_properties["include_charge_in_encoding"] \
@@ -1364,7 +1385,12 @@ def create_mgf_file(aae_class, epoch, mass_spec_data, title):
     # create the path where the weight images should be stored
     result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
                        str(epoch) + "_mass_specs_" + title + ".txt"
+
+    # TODO: parameter for n_spectra
     n_spectra = int(mass_spec_data.shape[1] / 3 - 2)
+    if aae_class.mass_spec_data_properties["peak_encoding"] == "binned":
+        n_spectra = 50
+
     with open(result_file_name, "w") as text_file:
         for i in range(mass_spec_data.shape[0]):
             # write the header

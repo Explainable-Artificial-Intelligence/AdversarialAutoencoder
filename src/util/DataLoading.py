@@ -385,6 +385,44 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     n_peaks_to_keep = mass_spec_data_properties["n_peaks_to_keep"]              # e.g. 50
     max_intensity_value = mass_spec_data_properties["max_intensity_value"]      # e.g. 5000
 
+    """
+    #######################################################################
+    for binned data
+    """
+    # TODO: only for testing
+    if mass_spec_data_properties["peak_encoding"] == "binned":
+        input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_binned.txt"
+
+        identified_spectra = np.loadtxt(input_file_name)
+        identified_spectra_labels = [1] * identified_spectra.shape[0]
+
+        input_file_name = input_file_name.replace("identified", "unidentified")
+
+        unidentified_spectra = np.loadtxt(input_file_name)
+        unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
+
+        # combine identified and unidentified spectra into one array
+        all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
+        all_spectra_labels = np.concatenate((identified_spectra_labels, unidentified_spectra_labels))
+
+        n_training_points = 101
+
+        train_images = all_spectra[:n_training_points]
+        train_labels = all_spectra_labels[:n_training_points]
+
+        test_images = all_spectra[n_training_points:]
+        test_labels = all_spectra_labels[n_training_points:]
+
+        # create the dataset holding the test, train and validation data
+        test, train, validation = create_dataset(dtype, 2, one_hot, False, None, test_images, test_labels,
+                                                 train_images, train_labels, validation_size, rescale=False)
+
+        return Datasets(train=train, validation=validation, test=test)
+
+    """
+    #######################################################################
+    """
+
     # create the input file name: e.g. "yeast_identified_distance_charge_2"
     input_file_name = filepath + "/mass_spec_data/" + organism_name + "/"
     input_file_name += "_".join(filter(None, [organism_name, "identified", peak_encoding, include_other_values]))
@@ -438,7 +476,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     if mass_spec_data_properties["normalize_data"]:
         # the last n_special_features columns could encode the charge and/or the molecular weight; so we need to ignore
         # them for normalizing the feature vectors
-        # TODO: deal with charge and weight
         n_special_features = sum([include_charge_in_encoding, include_molecular_weight_in_encoding])
         feature_dim = all_spectra.shape[1]
 
@@ -1080,7 +1117,6 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     print("Filtering the outliers..")
     n_data_points = len(peak_features)
     feature_dim = n_peaks_to_keep * 3
-    n_special_values = sum([include_molecular_weight_in_encoding, include_charge_in_encoding])
     # filter for intensity
     peak_features = peak_features[np.all(peak_features[:, :feature_dim][:, ::3] < np.sqrt(max_intensity_value), axis=1)]
     # filter for negative values
@@ -1415,6 +1451,107 @@ def plot_avg_spectra_for_sequence(mass_spec_data, sequence, n_peaks_to_keep=50):
     plt.show()
 
 
+def create_binning_encoding(spectra, n_bins, return_type=float):
+
+        peaks = [spectrum["peaks"] for spectrum in spectra]
+
+        # filter to keep only the n highest peaks
+        filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+
+        # remove None from the list
+        filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+        print("without filtering: {}".format(filtered_peaks.shape[0]))
+
+        # filter outliers for intensity
+        indices_to_keep = np.all(filtered_peaks[:, :, 1] < 2500, axis=1)
+        filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+
+        print("after filtering: {}".format(filtered_peaks.shape[0]))
+
+        mz_values = filtered_peaks[:, :, 0]
+        intensities = filtered_peaks[:, :, 1]
+
+        # create the bins
+        bin_size = 2500 / n_bins
+        bins = [i * bin_size for i in range(0, n_bins + 1)]
+
+        # bin the mz values
+        mz_values_binned = np.array([np.histogram(mz_value, bins)[0] for mz_value in mz_values])
+
+        # map the intensity values to the mz bins
+        def map_intensity_to_mz_bins(mz_array, intensity_array):
+            counter = 0
+            for index_with_value in np.where(mz_array)[0]:
+                bin_value = int(mz_array[index_with_value])
+                mz_array[index_with_value] = np.sum(intensity_array[counter:counter + bin_value])
+                counter += bin_value
+            return mz_array
+
+        final_data = np.array([map_intensity_to_mz_bins(mz_value, intensity_value) for mz_value, intensity_value in
+                               zip(mz_values_binned.astype(return_type), intensities)])
+
+        return final_data
+
+
+def test_binning_of_mass_spec_data():
+
+    unidentified_spectra = load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+
+    identified_spectra = load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+
+    unidentified_spectra_pre_processed = create_binning_encoding(unidentified_spectra, 1000, float)
+    identified_spectra_pre_processed = create_binning_encoding(identified_spectra, 1000, float)
+
+    np.savetxt("../../data/mass_spec_data/yeast/yeast_unidentified_binned.txt", unidentified_spectra_pre_processed)
+    np.savetxt("../../data/mass_spec_data/yeast/yeast_identified_binned.txt", identified_spectra_pre_processed)
+
+
+def test_restore_old_data():
+
+    mass_spec_data_properties = {"organism_name": "yeast", "peak_encoding": "binned",
+                                           "include_charge_in_encoding": False,
+                                           "include_molecular_weight_in_encoding": True, "charge": "2",
+                                           "normalize_data": True, "n_peaks_to_keep": 50,
+                                           "max_intensity_value": 5000}
+
+    data = get_input_data("mass_spec", filepath="../../data", color_scale="gray_scale", data_normalized=False,
+                   add_noise=False, mass_spec_data_properties=mass_spec_data_properties)
+
+    spectra, _ = data.train.next_batch(10)
+
+    # spectra = np.loadtxt("../../data/mass_spec_data/yeast/yeast_unidentified_binned.txt")
+
+    print(spectra.shape)
+
+    bin_size = 2500 / spectra.shape[1]
+
+    print(bin_size)
+
+    print(spectra[0, :].shape)
+
+    def keep_top_peaks(spectrum, n_peaks_to_keep=50):
+        indices_to_keep = np.argsort(spectrum)[::-1][:n_peaks_to_keep]
+        # sort the indices, so the m/z values are in proper order
+        indices_to_keep = np.sort(indices_to_keep)
+        return indices_to_keep, spectrum[indices_to_keep]
+
+    la = np.array([keep_top_peaks(spectrum) for spectrum in spectra])
+
+    mz_values = la[:, 0, :]*bin_size
+    intensities = la[:, 1, :]
+
+    print(intensities.shape)
+    print(intensities[0])
+    print(intensities[2])
+
+    print(mz_values[0])
+    print(mz_values[0]*bin_size)
+
+    plt.stem(mz_values[0], intensities[0])
+    plt.show()
+
+
 def testing():
     """
     :return:
@@ -1433,8 +1570,12 @@ def testing():
 
     # plot_spectras_boxplot()
 
+    test_restore_old_data()
+
+    # test_binning_of_mass_spec_data()
+
     # yeast
-    if True:
+    if False:
 
         if True:
 

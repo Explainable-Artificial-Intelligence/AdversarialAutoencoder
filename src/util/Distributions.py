@@ -514,18 +514,19 @@ def walk_along_single_gaussian(min_value=-10, max_value=10, n_points_to_return=(
 
 
 # TODO: taken from: https://github.com/musyoku/adversarial-autoencoder/blob/master/aae/sampler.py
+def sample_gaussian_mixture(x, y, label, num_labels):
+    shift = 1.4
+    r = 2.0 * np.pi / float(num_labels) * float(label)
+    new_x = x * cos(r) - y * sin(r)
+    new_y = x * sin(r) + y * cos(r)
+    new_x += shift * cos(r)
+    new_y += shift * sin(r)
+    return np.array([new_x, new_y]).reshape((2,))
+
+
 def gaussian_mixture(batchsize, ndim, num_labels):
     if ndim % 2 != 0:
         raise Exception("ndim must be a multiple of 2.")
-
-    def sample(x, y, label, num_labels):
-        shift = 1.4
-        r = 2.0 * np.pi / float(num_labels) * float(label)
-        new_x = x * cos(r) - y * sin(r)
-        new_y = x * sin(r) + y * cos(r)
-        new_x += shift * cos(r)
-        new_y += shift * sin(r)
-        return np.array([new_x, new_y]).reshape((2,))
 
     x_var = 0.5
     y_var = 0.05
@@ -534,7 +535,8 @@ def gaussian_mixture(batchsize, ndim, num_labels):
     z = np.empty((batchsize, ndim), dtype=np.float32)
     for batch in range(batchsize):
         for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], random.randint(0, num_labels - 1), num_labels)
+            z[batch, zi*2:zi*2+2] = sample_gaussian_mixture(x[batch, zi], y[batch, zi],
+                                                            random.randint(0, num_labels - 1), num_labels)
     return z*5
 
 
@@ -542,15 +544,6 @@ def supervised_gaussian_mixture(batchsize, ndim, label_indices, num_labels):
     if ndim % 2 != 0:
         raise Exception("ndim must be a multiple of 2.")
 
-    def sample(x, y, label, num_labels):
-        shift = 1.4
-        r = 2.0 * np.pi / float(num_labels) * float(label)
-        new_x = x * cos(r) - y * sin(r)
-        new_y = x * sin(r) + y * cos(r)
-        new_x += shift * cos(r)
-        new_y += shift * sin(r)
-        return np.array([new_x, new_y]).reshape((2,))
-
     x_var = 0.5
     y_var = 0.05
     x = np.random.normal(0, x_var, (batchsize, ndim // 2))
@@ -558,43 +551,85 @@ def supervised_gaussian_mixture(batchsize, ndim, label_indices, num_labels):
     z = np.empty((batchsize, ndim), dtype=np.float32)
     for batch in range(batchsize):
         for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(x[batch, zi], y[batch, zi], label_indices[batch], num_labels)
+            z[batch, zi*2:zi*2+2] = sample_gaussian_mixture(x[batch, zi], y[batch, zi], label_indices[batch],
+                                                            num_labels)
     return z*5
 
 
-def swiss_roll(batchsize, ndim, num_labels):
-    def sample(label, num_labels):
-        uni = np.random.uniform(0.0, 1.0) / float(num_labels) + float(label) / float(num_labels)
-        r = sqrt(uni) * 3.0
-        rad = np.pi * 4.0 * sqrt(uni)
-        x = r * cos(rad)
-        y = r * sin(rad)
-        return np.array([x, y]).reshape((2,))
+def sample_swiss_roll(label, num_labels):
+    uni = np.random.uniform(0.0, 1.0) / float(num_labels) + float(label) / float(num_labels)
+    r = sqrt(uni) * 3.0
+    rad = np.pi * 4.0 * sqrt(uni)
+    x = r * cos(rad)
+    y = r * sin(rad)
+    return np.array([x, y]).reshape((2,))
 
+
+def sample_swiss_roll_modified(label, num_labels, random_value):
+    uni = random_value / float(num_labels) + float(label) / float(num_labels)
+    r = sqrt(uni) * 3.0
+    rad = np.pi * 4.0 * sqrt(uni)
+    x = r * cos(rad)
+    y = r * sin(rad)
+    return np.array([x, y]).reshape((2,))
+
+
+def swiss_roll(batchsize, ndim, num_labels):
     z = np.zeros((batchsize, ndim), dtype=np.float32)
     for batch in range(batchsize):
         for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(random.randint(0, num_labels - 1), num_labels)
+            z[batch, zi*2:zi*2+2] = sample_swiss_roll(random.randint(0, num_labels - 1), num_labels)
     return z*5
 
 
 def supervised_swiss_roll(batchsize, ndim, label_indices, num_labels):
-    def sample(label, num_labels):
-        uni = np.random.uniform(0.0, 1.0) / float(num_labels) + float(label) / float(num_labels)
-        r = sqrt(uni) * 3.0
-        rad = np.pi * 4.0 * sqrt(uni)
-        x = r * cos(rad)
-        y = r * sin(rad)
-        return np.array([x, y]).reshape((2,))
-
     z = np.zeros((batchsize, ndim), dtype=np.float32)
     for batch in range(batchsize):
         for zi in range(ndim // 2):
-            z[batch, zi*2:zi*2+2] = sample(label_indices[batch], num_labels)
+            z[batch, zi*2:zi*2+2] = sample_swiss_roll(label_indices[batch], num_labels)
     return z*5
 
 
-# def walk_along_swiss_roll():
+def walk_along_gaussian_mixture():
+    # try default
+    batch_size = 10000
+    z_dim = 2
+    n_classes = 10
+    batch_labels_int = np.random.choice(n_classes, batch_size)
+    z_real_dist_labeled = supervised_gaussian_mixture(batch_size, z_dim, batch_labels_int, n_classes)
+    plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
+
+    for j in range(0, n_classes):
+        for i in np.arange(-1.2, 1.2, 0.1):
+            z = sample_gaussian_mixture(i, i/50, j, n_classes)*5
+            plt.scatter(z[0], z[1], label=str(i) + "," + str(i / 10))
+
+    # plt.legend()
+    plt.show()
+
+
+def walk_along_swiss_roll():
+    # try default
+    batch_size = 10000
+    z_dim = 2
+    n_classes = 10
+    batch_labels_int = np.random.choice(n_classes, batch_size)
+    z_real_dist_labeled = supervised_swiss_roll(batch_size, z_dim, batch_labels_int, n_classes)
+    plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
+
+    # for j in range(0, n_classes):
+    #     for i in np.arange(-1.2, 1.2, 0.1):
+    #         z = sample_swiss_roll(i, i/50, j, n_classes)*5
+    #         plt.scatter(z[0], z[1], label=str(i) + "," + str(i / 10))
+
+    for j in range(0, n_classes):
+        for i in np.arange(0, 1, 0.1):
+            z = sample_swiss_roll_modified(j, n_classes, i)*5
+            plt.scatter(z[0], z[1])
+
+
+    # plt.legend()
+    plt.show()
 
 
 
@@ -605,8 +640,10 @@ def testing():
 
     # walk_along_multiple_gaussians()
     # walk_along_single_gaussian()
+    walk_along_gaussian_mixture()
+    walk_along_swiss_roll()
 
-    if True:
+    if False:
         batch_size = 10000
         z_dim = 2
         n_classes = 10
@@ -615,7 +652,7 @@ def testing():
         plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
         plt.show()
 
-    if True:
+    if False:
         batch_size = 10000
         z_dim = 2
         n_classes = 10

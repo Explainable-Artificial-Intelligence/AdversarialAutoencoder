@@ -71,6 +71,8 @@ def get_tf_initializer(initializer_name, initializer_params):
     elif initializer_name == "orthogonal_initializer":
         # gain: multiplicative factor to apply to the orthogonal matrix
         return tf.orthogonal_initializer(gain=initializer_params["gain"])
+    else:
+        raise ValueError("Invalid tf initializer.")
 
 
 def get_decaying_learning_rate(decaying_learning_rate_name, decaying_learning_rate_params, global_step,

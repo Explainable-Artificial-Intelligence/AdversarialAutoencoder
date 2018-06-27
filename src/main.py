@@ -136,12 +136,14 @@ def param_search_incorporating_label_information():
 
 def param_search_mass_spec_data():
 
-    do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
+    do_randomsearch(10, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
                     "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
                     "weights_initializer_params_encoder", "weights_initializer_params_decoder",
                     selected_autoencoder="Unsupervised", z_dim=2,
-                    selected_dataset="mass_spec", n_epochs=5001,
+                    selected_dataset="mass_spec", n_epochs=3, summary_image_frequency=500,
                     AdamOptimizer_beta1_autoencoder=0.5)
+
+    return
 
     do_randomsearch(500, "bias_initializer_encoder", "bias_initializer_decoder",  "bias_initializer_params_encoder",
                     "bias_initializer_params_decoder", "weights_initializer_encoder", "weights_initializer_decoder",
@@ -223,6 +225,8 @@ def testing():
         # param_search_incorporating_label_information()
         param_search_mass_spec_data()
 
+        return
+
         # TODO: batch_size of 101 is not working
 
         # do_randomsearch(1, "activation_function_encoder", batch_size=103, n_epochs=2, summary_image_frequency=5,
@@ -268,22 +272,24 @@ def testing():
 
         params = get_default_parameters_mass_spec()
 
-        params["summary_image_frequency"] = 5
+        params["summary_image_frequency"] = 5000
 
-        params["n_epochs"] = 31
+        params["n_epochs"] = 50001
 
-        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "distance",
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "binned",
                                                "include_charge_in_encoding": False,
-                                               "include_molecular_weight_in_encoding": True, "charge": "2",
-                                               "normalize_data": True, "n_peaks_to_keep": 50,
+                                               "include_molecular_weight_in_encoding": False, "charge": "2",
+                                               "normalize_data": False, "n_peaks_to_keep": 50,
                                                "max_intensity_value": 5000}
-
         params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
             [params["mass_spec_data_properties"]["include_charge_in_encoding"],
              params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
+        if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
+            params["input_dim_y"] = 1000
+
         params["input_dim_x"] = 1
         params["n_classes"] = 2
-        params["z_dim"] = 2
+        params["z_dim"] = 10
 
         params["selected_dataset"] = "mass_spec"
 
