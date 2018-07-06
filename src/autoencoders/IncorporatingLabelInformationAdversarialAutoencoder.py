@@ -4,18 +4,18 @@
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
 import json
-
-import tensorflow as tf
 import os
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
 from util.DataLoading import get_input_data
-from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll, \
-    draw_from_dim_reduced_dataset, gaussian_mixture, supervised_gaussian_mixture, supervised_swiss_roll, swiss_roll
+from util.Distributions import gaussian_mixture, supervised_gaussian_mixture, supervised_swiss_roll, swiss_roll, \
+    walk_along_swiss_roll, walk_along_gaussian_mixture
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, \
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
@@ -67,7 +67,10 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         # dictionary holding some properties of the mass spec data; e.g. the organism name, the peak encoding,
         # the charge (if any) etc
-        self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        if parameter_dictionary.get("mass_spec_data_properties"):
+            self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        else:
+            self.mass_spec_data_properties = None
 
         """
         params for network topology
@@ -797,11 +800,10 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         nx, ny = 10, 10
         label_indices = [i for i in range(self.n_classes-1)] * ny
 
-        # TODO: get the points
         if self.distribution_to_sample == "gaussian":
-            points = supervised_gaussian_mixture(nx*ny, 2, label_indices, self.n_classes-1)
+            points = walk_along_gaussian_mixture(nx, self.n_classes-1)
         else:
-            points = supervised_swiss_roll(nx*ny, 2, label_indices, self.n_classes-1)
+            points = walk_along_swiss_roll(nx, self.n_classes - 1)
 
         # create the image grid
         plt.subplot()
@@ -833,8 +835,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
             ax.set_aspect('auto')
 
             # create the label x for the x axis
-            if ax.is_last_row():
-                ax.set_xlabel(label_indices[i], fontsize=9)
+            # if ax.is_last_row():
+            #     ax.set_xlabel(label_indices[i], fontsize=9)
 
         # save the created image grid
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + "_gen_images" + '.png')

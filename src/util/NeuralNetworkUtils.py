@@ -664,7 +664,6 @@ def get_all_layer_vars(aae_class, var_to_get):
     return all_vars
 
 
-
 def get_biases_or_weights_for_layer(aae_class, function_params):
     """
     returns either the weights or the biases for the layer specified in the function params

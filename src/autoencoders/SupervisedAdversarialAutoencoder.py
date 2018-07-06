@@ -4,18 +4,18 @@
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
 import json
-
-import tensorflow as tf
-import os
-import numpy as np
-import matplotlib.pyplot as plt
 import math
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
 from util.DataLoading import get_input_data
-from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll
+from util.Distributions import draw_from_single_gaussian
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, form_results, \
     get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \

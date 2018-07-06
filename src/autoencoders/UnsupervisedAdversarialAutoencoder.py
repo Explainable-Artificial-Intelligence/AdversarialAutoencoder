@@ -4,18 +4,17 @@
     https://github.com/Naresh1318/Adversarial_Autoencoder
 """
 import json
-
-import tensorflow as tf
 import os
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
 from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
 from util.DataLoading import get_input_data
-from util.Distributions import draw_from_multiple_gaussians, draw_from_single_gaussian, draw_from_swiss_roll, \
-    draw_from_dim_reduced_dataset
+from util.Distributions import draw_from_single_gaussian
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, \
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
@@ -982,9 +981,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                     self.parameter_dictionary["dropout_discriminator"]})
 
                         # every x epochs: write a summary for every 50th minibatch
-                        # if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
+                        if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
                         # TODO:
-                        if epoch % self.summary_image_frequency == 0:
+                        # if epoch % self.summary_image_frequency == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output = \

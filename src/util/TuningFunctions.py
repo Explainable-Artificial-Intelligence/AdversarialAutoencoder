@@ -1,15 +1,13 @@
+import datetime
 import json
 
-import datetime
-
-import util.AdversarialAutoencoderParameters as aae_params
 import numpy as np
 
+import util.AdversarialAutoencoderParameters as aae_params
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
 from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
 from swagger_server.utils.Storage import Storage
-
 
 tuning_status = "start"
 

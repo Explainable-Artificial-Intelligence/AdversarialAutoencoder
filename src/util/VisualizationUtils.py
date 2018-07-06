@@ -1261,16 +1261,23 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
             indices_to_keep = np.sort(indices_to_keep)
             return indices_to_keep, spectrum[indices_to_keep]
 
-        la = np.array([keep_top_peaks(spectrum) for spectrum in mass_spec_data])
+        reconstructed_mz_values = np.array([keep_top_peaks(spectrum) for spectrum in mass_spec_data])
 
-        mz_values = la[:, 0, :] * bin_size
-        intensities = la[:, 1, :]
+        mz_values = reconstructed_mz_values[:, 0, :] * bin_size
+        intensities = reconstructed_mz_values[:, 1, :]
         charges = ["NaN"] * mass_spec_data.shape[0]
         molecular_weights = ["NaN"] * mass_spec_data.shape[0]
 
         return mz_values, intensities, charges, molecular_weights
 
+    elif mass_spec_data_properties["peak_encoding"] == "only_mz_values":
+        reconstructed_mz_values = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
+        intensities = reconstructed_mz_values.copy()
+        intensities.fill(1000)
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
 
+        return reconstructed_mz_values, intensities, charges, molecular_weights
 
     is_data_normalized = mass_spec_data_properties["normalize_data"]
 

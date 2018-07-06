@@ -1143,6 +1143,8 @@ def randomize_params_for_tf_initializer(initializer_name):
     elif initializer_name == "orthogonal_initializer":
         # gain: multiplicative factor to apply to the orthogonal matrix
         return {"gain": draw_from_np_distribution(distribution_name="uniform", low=-0.5, high=0.5, return_type="float")}
+    else:
+        raise ValueError("Invalid initializer_name! " + initializer_name + " is invalid")
 
 
 def randomize_params_for_decaying_learning_rate(decaying_learning_rate_name):
@@ -1259,6 +1261,17 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
                 n_neurons_of_hidden_layer_x_discriminator_c = get_default_parameters(selected_autoencoder, selected_dataset)[subnetwork_name]
             elif subnetwork_name == "n_neurons_of_hidden_layer_x_discriminator_g":
                 n_neurons_of_hidden_layer_x_discriminator_g = get_default_parameters(selected_autoencoder, selected_dataset)[subnetwork_name]
+        # we need to update the local variable, so that the variables which are depending on the network architecture
+        # like the bias initialization do not fail
+        elif subnetwork_name in kwargs:
+            if subnetwork_name == "n_neurons_of_hidden_layer_x_autoencoder":
+                n_neurons_of_hidden_layer_x_autoencoder = kwargs[subnetwork_name]
+            elif subnetwork_name == "n_neurons_of_hidden_layer_x_discriminator":
+                n_neurons_of_hidden_layer_x_discriminator = kwargs[subnetwork_name]
+            elif subnetwork_name == "n_neurons_of_hidden_layer_x_discriminator_c":
+                n_neurons_of_hidden_layer_x_discriminator_c = kwargs[subnetwork_name]
+            elif subnetwork_name == "n_neurons_of_hidden_layer_x_discriminator_g":
+                n_neurons_of_hidden_layer_x_discriminator_g = kwargs[subnetwork_name]
 
     n_layers_autoencoder = len(n_neurons_of_hidden_layer_x_autoencoder) + 1
     n_layers_discriminator = len(n_neurons_of_hidden_layer_x_discriminator) + 1
@@ -1302,11 +1315,11 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     weights_initializer_options = ["constant_initializer", "random_normal_initializer", "truncated_normal_initializer",
                                    "random_uniform_initializer", "uniform_unit_scaling_initializer",
                                    "zeros_initializer", "ones_initializer"]
-    weights_initializer_encoder = [random.choice(weights_initializer_options)] * n_layers_autoencoder
-    weights_initializer_decoder = [random.choice(weights_initializer_options)] * n_layers_autoencoder
-    weights_initializer_discriminator = [random.choice(weights_initializer_options)] * n_layers_discriminator
-    weights_initializer_discriminator_c = [random.choice(weights_initializer_options)] * n_layers_discriminator_c
-    weights_initializer_discriminator_g = [random.choice(weights_initializer_options)] * n_layers_discriminator_g
+    weights_initializer_encoder = [random.choice(weights_initializer_options) for i in range(n_layers_autoencoder)]
+    weights_initializer_decoder = [random.choice(weights_initializer_options) for i in range(n_layers_autoencoder)]
+    weights_initializer_discriminator = [random.choice(weights_initializer_options) for i in range(n_layers_autoencoder)]
+    weights_initializer_discriminator_c = [random.choice(weights_initializer_options) for i in range(n_layers_autoencoder)]
+    weights_initializer_discriminator_g = [random.choice(weights_initializer_options) for i in range(n_layers_autoencoder)]
 
     weights_initializer_params_encoder = [randomize_params_for_tf_initializer(initializer) for initializer in weights_initializer_encoder]
     weights_initializer_params_decoder = [randomize_params_for_tf_initializer(initializer) for initializer in weights_initializer_decoder]
@@ -1756,8 +1769,11 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
                 param_dict[var_name] = kwargs[var_name]
 
     if not kwargs and not args:
-        local_vars_to_ignore = ["loss_functions", "param_dict_mnist", "optimizers", "autoencoder_optimizers",
-                                "local_vars_to_ignore", "args", "kwargs"]
+        local_vars_to_ignore = ["loss_functions", "param_dict", "optimizers", "autoencoder_optimizers",
+                                "local_vars_to_ignore", "learning_rate_options", "activation_function_options",
+                                "weights_initializer_options", "bias_initializer_options", "n_layers_autoencoder",
+                                "n_layers_discriminator", "n_layers_discriminator_c", "n_layers_discriminator_g",
+                                "args", "kwargs"]
         for var_name in list(
                 locals()):  # convert to list to avoid RuntimeError: dictionary changed during iteration
             if var_name not in local_vars_to_ignore:

@@ -590,101 +590,59 @@ def supervised_swiss_roll(batchsize, ndim, label_indices, num_labels):
     return z*5
 
 
-def walk_along_gaussian_mixture():
+def walk_along_gaussian_mixture(n_points_per_class, n_classes=10):
+    samples = []
+    step_size = 1 / n_points_per_class
+    for j in range(0, n_classes):
+        for i in np.arange(-1.2, 1.2, step_size):
+            z = sample_gaussian_mixture(i, i/50, j, n_classes)*5
+            samples.append(z)
+
+    return np.array(samples)
+
+
+def walk_along_swiss_roll(n_points_per_class, n_classes=10):
+    samples = []
+    step_size = 1 / n_points_per_class
+    for j in range(0, n_classes):
+        for i in np.arange(0, 1, step_size):
+            z = sample_swiss_roll_modified(j, n_classes, i)*5
+            samples.append(z)
+
+    return np.array(samples)
+
+
+def visualize_walk_along_gaussian_mixture(n_points_per_class, n_classes=10):
     # try default
     batch_size = 10000
     z_dim = 2
-    n_classes = 10
     batch_labels_int = np.random.choice(n_classes, batch_size)
     z_real_dist_labeled = supervised_gaussian_mixture(batch_size, z_dim, batch_labels_int, n_classes)
     plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
 
+    step_size = 1 / n_points_per_class
     for j in range(0, n_classes):
-        for i in np.arange(-1.2, 1.2, 0.1):
+        for i in np.arange(-1.2, 1.2, step_size):
             z = sample_gaussian_mixture(i, i/50, j, n_classes)*5
-            plt.scatter(z[0], z[1], label=str(i) + "," + str(i / 10))
+            plt.scatter(z[0], z[1])
 
-    # plt.legend()
     plt.show()
 
 
-def walk_along_swiss_roll():
+def visualize_walk_along_swiss_roll(n_points_per_class, n_classes=10):
     # try default
     batch_size = 10000
     z_dim = 2
-    n_classes = 10
     batch_labels_int = np.random.choice(n_classes, batch_size)
     z_real_dist_labeled = supervised_swiss_roll(batch_size, z_dim, batch_labels_int, n_classes)
     plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
 
-    # for j in range(0, n_classes):
-    #     for i in np.arange(-1.2, 1.2, 0.1):
-    #         z = sample_swiss_roll(i, i/50, j, n_classes)*5
-    #         plt.scatter(z[0], z[1], label=str(i) + "," + str(i / 10))
-
+    step_size = 1 / n_points_per_class
     for j in range(0, n_classes):
         for i in np.arange(0, 1, 0.1):
             z = sample_swiss_roll_modified(j, n_classes, i)*5
             plt.scatter(z[0], z[1])
 
-
-    # plt.legend()
     plt.show()
 
 
-
-
-def testing():
-    """
-    """
-
-    # walk_along_multiple_gaussians()
-    # walk_along_single_gaussian()
-    walk_along_gaussian_mixture()
-    walk_along_swiss_roll()
-
-    if False:
-        batch_size = 10000
-        z_dim = 2
-        n_classes = 10
-        batch_labels_int = np.random.choice(n_classes, batch_size)
-        z_real_dist_labeled = supervised_gaussian_mixture(batch_size, z_dim, batch_labels_int, n_classes)
-        plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
-        plt.show()
-
-    if False:
-        batch_size = 10000
-        z_dim = 2
-        n_classes = 10
-        batch_labels_int = np.random.choice(n_classes, batch_size)
-        z_real_dist_labeled = supervised_swiss_roll(batch_size, z_dim, batch_labels_int, n_classes)
-        plt.scatter(z_real_dist_labeled[:, 0], z_real_dist_labeled[:, 1])
-        plt.show()
-
-    # test multiple gaussians
-    if False:
-        generated_points = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(56, 2))
-        print(generated_points)
-        print(generated_points.shape)
-        plt.scatter(generated_points[:, 0], generated_points[:, 1])
-        plt.show()
-
-    # test swiss roll
-    if False:
-        generated_points = draw_from_swiss_roll(n_classes=10, spread=1.5, noise=0.0, shape=(1000, 2), shuffle=True)
-        print(generated_points)
-        print(generated_points.shape)
-        plt.scatter(generated_points[:, 0], generated_points[:, 1])
-        plt.show()
-
-    # test single gaussian
-    if False:
-        generated_points = draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(56, 2))
-        print(generated_points)
-        print(generated_points.shape)
-        plt.scatter(generated_points[:, 0], generated_points[:, 1])
-        plt.show()
-
-
-if __name__ == '__main__':
-    testing()
