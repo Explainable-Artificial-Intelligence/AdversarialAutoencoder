@@ -9,7 +9,8 @@ from . import DataLoading
 
 def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, peak_encoding, max_intensity_value,
                               filter_on_charge=None, include_charge_in_encoding=False,
-                              include_molecular_weight_in_encoding=False):
+                              include_molecular_weight_in_encoding=False, use_smoothed_intensities=False,
+                              smoothness_sigma=1):
     """
     preprocesses the mass spec file by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
@@ -36,6 +37,8 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     :param include_charge_in_encoding: whether or not the charge should be appended to the peak_encoding
     :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
     peak_encoding
+    :param use_smoothed_intensities: whether or not the intensities should be smoothed
+    :param smoothness_sigma: parameter for smoothing the intensities; the higher the smoother
     :return:
     """
 
@@ -43,8 +46,12 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     print("Loading data..")
     is_identified_data = False
     if input_filename.endswith(".mgf"):
+        if use_smoothed_intensities and smoothness_sigma:
+            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + ".mgf"
         unprocessed_spectra = DataLoading.load_mgf_file(input_filename)
     else:
+        if use_smoothed_intensities and smoothness_sigma:
+            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + ".msp"
         unprocessed_spectra = DataLoading.load_msp_file(input_filename)
         is_identified_data = True
 
@@ -85,6 +92,10 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
         output_filename += "_charge_" + filter_on_charge
     output_filename += "_n_peaks_" + str(n_peaks_to_keep)
     output_filename += "_max_intensity_" + str(max_intensity_value)
+
+    if use_smoothed_intensities and smoothness_sigma:
+        output_filename += "_smoothed_sigma_" + str(smoothness_sigma)
+
     output_filename += ".txt"
 
     # save the numpy array to the file
@@ -128,6 +139,8 @@ def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter
     # filter to keep only the n highest peaks
     filtered_peaks = [filter_spectrum(a, n_peaks_to_keep) for a in peaks]
     indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
+
+    print(filtered_peaks)
 
     # remove None from the list
     filtered_peaks = [i for i in filtered_peaks if i is not None]
@@ -528,6 +541,46 @@ def preprocess_only_mz_values():
         np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_mz.txt', rel_distances)
     else:
         np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_mz.txt', rel_distances)
+
+
+def preprocess_only_intensities():
+    """
+    preprocess the mass spec data to keep only the distances between the m/z values
+    :return:
+    """
+
+    is_data_unidentified = True
+
+    if is_data_unidentified:
+        spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+    else:
+        spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+
+    peaks = [spectrum["peaks"] for spectrum in spectra]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+
+    # remove None from the list
+    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+    print(filtered_peaks.shape)
+
+    # filter outliers
+    indices_to_keep = np.all(filtered_peaks[:, :, 1] < 5000, axis=1)
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+
+    # we are only interested in the intensities
+    intensities = filtered_peaks[:, :, 1]
+
+    print(intensities.shape)
+    print(np.max(intensities))
+    print(np.min(intensities))
+
+    if is_data_unidentified:
+        np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities.txt', intensities)
+    else:
+        np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities.txt', intensities)
 
 
 def prepare_data_for_r():

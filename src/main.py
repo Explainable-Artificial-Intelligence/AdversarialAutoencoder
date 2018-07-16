@@ -186,25 +186,37 @@ def param_search_mass_spec_data():
 
 def param_search_only_mz_values():
 
-    for i in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
+    # for i in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
+    for i in [2]:
 
         params = get_default_parameters_mass_spec()
 
         params["summary_image_frequency"] = 500
 
-        params["n_epochs"] = 10001
+        params["n_epochs"] = 5001
 
-        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_mz_values",
-                                               "include_charge_in_encoding": False,
+        ["only_mz_values", "only_intensities"]
+
+        # params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+        #                                        "include_charge_in_encoding": False,
+        #                                        "include_molecular_weight_in_encoding": False, "charge": "2",
+        #                                        "normalize_data": False, "n_peaks_to_keep": 50,
+        #                                        "max_intensity_value": 5000}
+
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                                               "include_charge_in_encoding": False, "use_smoothed_intensities": False,
+                                               "smoothness_sigma": 1,
                                                "include_molecular_weight_in_encoding": False, "charge": "2",
                                                "normalize_data": False, "n_peaks_to_keep": 50,
                                                "max_intensity_value": 5000}
+
         params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
             [params["mass_spec_data_properties"]["include_charge_in_encoding"],
              params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
         if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
             params["input_dim_y"] = 1000
-        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values":
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities":
             params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
 
         params["input_dim_x"] = 1
@@ -226,16 +238,23 @@ def param_search_only_mz_values():
         params["batch_normalization_encoder"] = [None] * 5
         params["batch_normalization_decoder"] = [None] * 5
 
-        params["AdamOptimizer_beta1_discriminator"] = 0.5
-        params["AdamOptimizer_beta1_autoencoder"] = 0.5
-        params["AdamOptimizer_beta1_generator"] = 0.5
+        params["AdamOptimizer_beta1_discriminator"] = 0.9
+        params["AdamOptimizer_beta1_autoencoder"] = 0.9
+        params["AdamOptimizer_beta1_generator"] = 0.9
 
         params['decaying_learning_rate_name_autoencoder'] = "piecewise_constant"
         params['decaying_learning_rate_name_discriminator'] = "piecewise_constant"
         params['decaying_learning_rate_name_generator'] = "piecewise_constant"
 
-        params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [250, 1500],
-                                                               "values": [0.01, 0.001, 0.000001]}
+
+        # params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [250, 1500],
+        #                                                        "values": [0.01, 0.001, 0.000001]}
+
+        params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [500, 1500],
+                                                               "values": [0.0001, 1e-05, 1e-06]}
+
+
+
         params["decaying_learning_rate_params_discriminator"] = {"boundaries": [500, 1500, 2500],
                                                                  "values": [0.1, 0.01, 0.001, 0.0001]}
         params["decaying_learning_rate_params_generator"] = {"boundaries": [500, 1500, 2500],
@@ -246,15 +265,13 @@ def param_search_only_mz_values():
         # aae = LearningPriorsAdversarialAutoencoderSameTopology(params)
         # aae = LearningPriorsAdversarialAutoencoder(params)
 
-        for j in range(10):
+        # for j in range(10):
+        for j in range(5):
 
             aae = UnsupervisedAdversarialAutoencoder(params)
 
             aae.train(True)
             aae.reset_graph()
-
-
-
 
 
 def update_basic_network_params(params):
@@ -305,8 +322,18 @@ def testing():
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
 
     if False:
+        # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params.txt", "Supervised")
+        # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params_activation_functions_modified.txt", "Supervised")
+        # aae.train(True)
+        aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Dropbox\\Studium\\Studium\\Master\\4. Semester\\Masterarbeit\\AdversarialAutoencoder\\results\\Unsupervised\\2018-07-10_12_59_57_mass_spec\\log\\params.txt", "Unsupervised")
+        aae.train(True)
+        return
+
+    if True:
         # param_search_incorporating_label_information()
-        param_search_mass_spec_data()
+
+        param_search_only_mz_values()
+        # param_search_mass_spec_data()
 
         return
 
@@ -351,7 +378,7 @@ def testing():
     """
     test yeast mass spec data:
     """
-    if True:
+    if False:
 
         for i in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
 
@@ -362,7 +389,8 @@ def testing():
             params["n_epochs"] = 501
 
             params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_mz_values",
-                                                   "include_charge_in_encoding": False,
+                                                   "include_charge_in_encoding": False, "use_smoothed_intensities": True,
+                                                   "smoothness_sigma": 1,
                                                    "include_molecular_weight_in_encoding": False, "charge": "2",
                                                    "normalize_data": False, "n_peaks_to_keep": 50,
                                                    "max_intensity_value": 5000}

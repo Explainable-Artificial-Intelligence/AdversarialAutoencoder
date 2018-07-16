@@ -370,6 +370,9 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     include_molecular_weight_in_encoding = \
         mass_spec_data_properties["include_molecular_weight_in_encoding"]       # True or False
     charge = mass_spec_data_properties["charge"]                                # e.g. "2" or None
+    use_smoothed_intensities = mass_spec_data_properties.get("use_smoothed_intensities")    # True or False
+    smoothness_sigma = mass_spec_data_properties.get("smoothness_sigma")    # float or None
+
     if include_charge_in_encoding and include_molecular_weight_in_encoding:
         include_other_values = "include_charge_and_weight"
     elif include_charge_in_encoding:
@@ -383,7 +386,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
 
     """
     #######################################################################
-    for binned data
+    temporary for testing purposes
     """
     # TODO: only for testing
     if mass_spec_data_properties["peak_encoding"] == "binned":
@@ -443,6 +446,34 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
 
         return Datasets(train=train, validation=validation, test=test)
 
+    if mass_spec_data_properties["peak_encoding"] == "only_intensities":
+        input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_intensities.txt"
+        identified_spectra = np.loadtxt(input_file_name)
+        identified_spectra_labels = [1] * identified_spectra.shape[0]
+
+        input_file_name = input_file_name.replace("identified", "unidentified")
+        unidentified_spectra = np.loadtxt(input_file_name)
+        unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
+
+        # combine identified and unidentified spectra into one array
+        all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
+        all_spectra_labels = np.concatenate((identified_spectra_labels, unidentified_spectra_labels))
+
+        # separate data in train and test data
+        n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
+
+        train_images = all_spectra[:n_training_points]
+        train_labels = all_spectra_labels[:n_training_points]
+
+        test_images = all_spectra[n_training_points:]
+        test_labels = all_spectra_labels[n_training_points:]
+
+        # create the dataset holding the test, train and validation data
+        test, train, validation = create_dataset(dtype, 2, one_hot, False, None, test_images, test_labels,
+                                                 train_images, train_labels, validation_size, rescale=False)
+
+        return Datasets(train=train, validation=validation, test=test)
+
     """
     #######################################################################
     """
@@ -454,6 +485,8 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         input_file_name += "_charge_" + charge
     input_file_name += "_n_peaks_" + str(n_peaks_to_keep)
     input_file_name += "_max_intensity_" + str(max_intensity_value)
+    if use_smoothed_intensities and smoothness_sigma:
+        input_file_name += "_smoothed_sigma_" + str(smoothness_sigma)
     input_file_name += ".txt"
 
     """
@@ -466,7 +499,9 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                   n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
                                   max_intensity_value=max_intensity_value, filter_on_charge=charge,
                                   include_charge_in_encoding=include_charge_in_encoding,
-                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
+                                                    use_smoothed_intensities=use_smoothed_intensities,
+                                                    smoothness_sigma=smoothness_sigma)
     identified_spectra = np.loadtxt(input_file_name)
     identified_spectra_labels = [1] * identified_spectra.shape[0]
 
@@ -481,7 +516,9 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                   n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
                                   max_intensity_value=max_intensity_value, filter_on_charge=charge,
                                   include_charge_in_encoding=include_charge_in_encoding,
-                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
+                                                    use_smoothed_intensities=use_smoothed_intensities,
+                                                    smoothness_sigma=smoothness_sigma)
     unidentified_spectra = np.loadtxt(input_file_name)
     unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
 
@@ -526,9 +563,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
             {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector],
              "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
              "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
-
-    # TODO: remove hard coded n_training_points
-    n_training_points = 101
 
     train_images = all_spectra[:n_training_points]
     train_labels = all_spectra_labels[:n_training_points]
@@ -1034,7 +1068,7 @@ def load_mgf_file(filename):
                 file_content.append(mass_spec_spectrum)
                 single_entry = []
 
-    return file_content
+    return np.array(file_content)
 
 
 def create_mass_spec_spectrum_identified(single_entry):
@@ -1051,15 +1085,11 @@ def create_mass_spec_spectrum_identified(single_entry):
     charge = title.split("/")[1]
 
     pepmass = next(iterator).split(" ")[1]
-    comment = next(iterator).split(" ")[1]
+    comment = " ".join(next(iterator).split(" ")[1:])
     peaks = []
 
-    # skip the num peaks row, if it exists
-    next_row = next(iterator)
-    if next_row.startswith("Num"):
-        next(iterator)
-    else:
-        peaks.append(next_row.split(" "))
+    # skip the num peaks row
+    next(iterator)
 
     # iterate over the remaining rows holding the peptide masses
     for row in iterator:
@@ -1091,6 +1121,6 @@ def load_msp_file(filename):
                 single_entry = []
             single_entry.append(line.strip())
 
-    return file_content
+    return np.array(file_content)
 
 

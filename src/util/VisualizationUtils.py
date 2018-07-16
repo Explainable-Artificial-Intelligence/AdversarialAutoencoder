@@ -1279,6 +1279,23 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         return reconstructed_mz_values, intensities, charges, molecular_weights
 
+    elif mass_spec_data_properties["peak_encoding"] == "only_intensities":
+        intensities = mass_spec_data
+
+        # we want m/z values from 0 to 1500
+        n_data_points = mass_spec_data.shape[0]
+        n_peaks = mass_spec_data_properties["n_peaks_to_keep"] + 1
+        mz_values = np.arange(n_peaks, 1500, 1500 / n_peaks)      # create the m/z values for one spectrum
+        mz_values = np.tile(mz_values, (n_data_points, 1))          # we need n_data_points m/z value arrays
+
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+
+        return mz_values, intensities, charges, molecular_weights
+
+
+    ###################################################################################################################
+
     is_data_normalized = mass_spec_data_properties["normalize_data"]
 
     if mass_spec_data_properties["include_charge_in_encoding"] \
@@ -1351,10 +1368,26 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
                        str(epoch) + "_mass_specs_spectra_" + ".png"
 
-    plt.stem(mz_values_reconstructed[0, :], intensities_reconstructed[0, :], 'r', label="reconstructed",  markerfmt=' ')
-    plt.stem(mz_values_original[0, :], intensities_original[0, :], 'b', label="original", markerfmt=' ')
+    # add offset to the m/z values, so we can see the difference between original and reconstruction
+    if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values":
 
-    plt.legend()
+        plt.scatter(mz_values_original[0, :], mz_values_reconstructed[0, :])
+        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
+        plt.xlabel("original")
+        plt.ylabel("reconstructed")
+
+    elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities":
+
+        plt.scatter(intensities_original[0, :], intensities_reconstructed[0, :])
+        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
+        plt.xlabel("original")
+        plt.ylabel("reconstructed")
+
+    else:
+        plt.stem(mz_values_reconstructed[0, :], intensities_reconstructed[0, :], 'r', label="reconstructed",  markerfmt=' ')
+        plt.stem(mz_values_original[0, :], intensities_original[0, :], 'b', label="original", markerfmt=' ')
+        plt.legend()
+
     plt.title("Epoch: " + str(epoch))
     plt.savefig(result_file_name)
     plt.close("all")
@@ -1393,10 +1426,7 @@ def create_mgf_file(aae_class, epoch, mass_spec_data, title):
     result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
                        str(epoch) + "_mass_specs_" + title + ".txt"
 
-    # TODO: parameter for n_spectra
-    n_spectra = int(mass_spec_data.shape[1] / 3 - 2)
-    if aae_class.mass_spec_data_properties["peak_encoding"] == "binned":
-        n_spectra = 50
+    n_peaks = aae_class.mass_spec_data_properties["n_peaks_to_keep"]
 
     with open(result_file_name, "w") as text_file:
         for i in range(mass_spec_data.shape[0]):
@@ -1408,7 +1438,7 @@ def create_mgf_file(aae_class, epoch, mass_spec_data, title):
             text_file.write("SEQUENCE=UNIDENTIFIED\n")
 
             # write the m/z values and intensities
-            for j in range(n_spectra):
+            for j in range(n_peaks):
                 text_file.write("{:.2f} {:.2f}\n".format(mz_values[i, j], intensities[i, j]))
 
             # write the footer
