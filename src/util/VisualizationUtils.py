@@ -1372,6 +1372,10 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values":
 
         plt.scatter(mz_values_original[0, :], mz_values_reconstructed[0, :])
+        axis_min = np.min([plt.xlim(), plt.ylim()])
+        axis_max = np.max([plt.xlim(), plt.ylim()])
+        plt.xlim(xmin=axis_min, xmax=axis_max)
+        plt.ylim(ymin=axis_min, ymax=axis_max)
         plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
         plt.xlabel("original")
         plt.ylabel("reconstructed")
@@ -1379,6 +1383,10 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities":
 
         plt.scatter(intensities_original[0, :], intensities_reconstructed[0, :])
+        axis_min = np.min([plt.xlim(), plt.ylim()])
+        axis_max = np.max([plt.xlim(), plt.ylim()])
+        plt.xlim(xmin=axis_min, xmax=axis_max)
+        plt.ylim(ymin=axis_min, ymax=axis_max)
         plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
         plt.xlabel("original")
         plt.ylabel("reconstructed")
