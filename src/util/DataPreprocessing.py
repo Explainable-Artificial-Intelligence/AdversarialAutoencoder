@@ -1,8 +1,12 @@
+from collections import Counter
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 from sklearn.decomposition import PCA
 from tensorflow.python.framework import dtypes
+import seaborn as sns
+
 
 from . import DataLoading
 
@@ -344,36 +348,133 @@ def plot_avg_spectra_for_sequence(mass_spec_data, sequence, n_peaks_to_keep=50):
     """
 
     sequences = [spectrum["sequence"] for spectrum in mass_spec_data]
+    charges = [spectrum["charge"] for spectrum in mass_spec_data]
+
+    print(Counter(sequences))
+
+    return
 
     indices = [i for i, e in enumerate(sequences) if e == sequence]
 
     peaks = [spectrum["peaks"] for spectrum in mass_spec_data]
     peaks = np.array(peaks)[indices]
+    charges = np.array(charges)[indices]
 
     # filter to keep only the n highest peaks
     filtered_peaks = [filter_spectrum(a, n_peaks_to_keep) for a in peaks]
 
     # remove None from the list
+    charge_indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
+    charges = charges[charge_indices_to_keep]
+    print(charges)
     filtered_peaks = [i for i in filtered_peaks if i is not None]
 
-    mz_values = [peak[:, 0] for peak in filtered_peaks]
-    intensities = [peak[:, 1] for peak in filtered_peaks]
+    # get the indices of the respective charge value
+    available_charges = set(charges)
+    charge_indices = {}
+    for available_charge in available_charges:
+        for i, charge in enumerate(charges):
+            if charge == available_charge:
+                if charge_indices.get(available_charge):
+                    charge_indices[available_charge].append(i)
+                else:
+                    charge_indices[available_charge] = [i]
+    print(charge_indices)
 
-    for i, (mz_measurement, intensity_measurement) in enumerate(zip(mz_values, intensities)):
-        plt.stem(mz_measurement, intensity_measurement, label=str(i), markerfmt='o')
+    mz_values = np.array([peak[:, 0] for peak in filtered_peaks])
+    intensities = np.array([peak[:, 1] for peak in filtered_peaks])
 
-    mean_mz_values = np.mean(mz_values, axis=0)
-    mean_intensities = np.mean(intensities, axis=0)
+    """
+    plot the spectra with the same charge      
+    """
+    if True:
 
-    plt.stem(mean_mz_values, mean_intensities, label="average", markerfmt='o', linefmt=":")
+        for item, value in charge_indices.items():
+            if len(value) > 1:
+                print(item)
+                mz_values_charge_specific = mz_values[value]
+                intensities_charge_specific = intensities[value]
 
-    plt.legend()
+                x_labels = np.tile(np.arange(1, mz_values_charge_specific.shape[1] + 1, 1),
+                                   (mz_values_charge_specific.shape[0], 1)).flatten().astype(str)
+                order_x_labels = np.arange(1, mz_values_charge_specific.shape[1] + 1, 1).astype(str)
 
-    plt.ylabel("intensity")
-    plt.xlabel("m/z value")
-    plt.title("Avg. spectra (" + sequence + ") - yeast")
+                # plot swarmplot
+                ax = sns.stripplot(x=x_labels, y=mz_values_charge_specific.flatten(), order=order_x_labels, zorder=0)
+                # plot boxplot
+                sns.boxplot(x=x_labels, y=mz_values_charge_specific.flatten(), order=order_x_labels,
+                            showcaps=False, boxprops={'facecolor': 'None'},
+                            showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
+                plt.title("M/Z values (Sequence: " + sequence + ", Charge: " + str(item) + ")")
+                plt.xlabel("Peak")
+                plt.ylabel("M/Z")
+                plt.show()
 
-    plt.show()
+                # plot swarmplot
+                ax = sns.stripplot(x=x_labels, y=intensities_charge_specific.flatten(), order=order_x_labels, zorder=0)
+                # plot boxplot
+                sns.boxplot(x=x_labels, y=intensities_charge_specific.flatten(), order=order_x_labels,
+                            showcaps=False, boxprops={'facecolor': 'None'},
+                            showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
+                plt.title("Intensities (Sequence: " + sequence + ", Charge: " + str(item) + ")")
+                plt.xlabel("Peak")
+                plt.ylabel("Intensity")
+                plt.show()
+
+        return
+
+    """
+    plot regardless of charge
+    """
+
+    if False:
+        if True:
+            # filter outliers for intensity
+            indices_to_keep = np.all(np.array(intensities) < 4000, axis=1)
+            print(indices_to_keep)
+            mz_values = mz_values[indices_to_keep, :]
+            intensities = intensities[indices_to_keep, :]
+
+        x_labels = np.tile(np.arange(1, mz_values.shape[1]+1, 1), (mz_values.shape[0], 1)).flatten().astype(str)
+        order_x_labels = np.arange(1, mz_values.shape[1]+1, 1).astype(str)
+
+        # plot swarmplot
+        ax = sns.stripplot(x=x_labels, y=mz_values.flatten(), order=order_x_labels, zorder=0)
+        # plot boxplot
+        sns.boxplot(x=x_labels, y=mz_values.flatten(), order=order_x_labels,
+                    showcaps=False, boxprops={'facecolor': 'None'},
+                    showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
+        plt.title("M/Z values (Sequence: " + sequence + ")")
+        plt.xlabel("Peak")
+        plt.ylabel("M/Z")
+        plt.show()
+
+        # plot swarmplot
+        ax = sns.stripplot(x=x_labels, y=intensities.flatten(), order=order_x_labels, zorder=0)
+        # plot boxplot
+        sns.boxplot(x=x_labels, y=intensities.flatten(), order=order_x_labels,
+                    showcaps=False, boxprops={'facecolor': 'None'},
+                    showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
+        plt.title("Intensities (Sequence: " + sequence + ")")
+        plt.xlabel("Peak")
+        plt.ylabel("Intensity")
+        plt.show()
+
+        for i, (mz_measurement, intensity_measurement) in enumerate(zip(mz_values, intensities)):
+            plt.stem(mz_measurement, intensity_measurement, label=str(i), markerfmt='o')
+
+        mean_mz_values = np.mean(mz_values, axis=0)
+        mean_intensities = np.mean(intensities, axis=0)
+
+        plt.stem(mean_mz_values, mean_intensities, label="average", markerfmt='o', linefmt=":")
+
+        plt.legend()
+
+        plt.ylabel("intensity")
+        plt.xlabel("m/z value")
+        plt.title("Avg. spectra (" + sequence + ") - yeast")
+
+        plt.show()
 
 
 def create_binned_encoding(spectra, n_bins, return_type=float):
@@ -549,7 +650,8 @@ def preprocess_only_intensities():
     :return:
     """
 
-    is_data_unidentified = True
+    is_data_unidentified = False
+    use_log = True
 
     if is_data_unidentified:
         spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
@@ -573,14 +675,107 @@ def preprocess_only_intensities():
     # we are only interested in the intensities
     intensities = filtered_peaks[:, :, 1]
 
+    print(np.max(intensities))
+    print(np.min(intensities))
+
+    if use_log:
+        intensities = np.sqrt(intensities)
+
+    # plt.boxplot(intensities)
+    # plt.ylabel("Intensity")
+    # plt.xlabel("Peaks")
+    # plt.show()
+
     print(intensities.shape)
     print(np.max(intensities))
     print(np.min(intensities))
 
     if is_data_unidentified:
-        np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities.txt', intensities)
+        if use_log:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities_sqrt.txt', intensities)
+        else:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities.txt', intensities)
     else:
-        np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities.txt', intensities)
+        if use_log:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities_sqrt.txt', intensities)
+        else:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities.txt', intensities)
+
+
+def preprocess_only_intensities_distance_encoding():
+    """
+    preprocess the mass spec data to keep only the distances between the intensities
+    :return:
+    """
+
+    is_data_unidentified = True
+    use_log = False
+
+    if is_data_unidentified:
+        spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+    else:
+        spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+
+    peaks = [spectrum["peaks"] for spectrum in spectra]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+
+    # remove None from the list
+    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+    print(filtered_peaks.shape)
+
+    # filter outliers
+    indices_to_keep = np.all(filtered_peaks[:, :, 1] < 5000, axis=1)
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+
+    # we are only interested in the intensities
+    intensities = filtered_peaks[:, :, 1]
+
+    print(np.max(intensities))
+    print(np.min(intensities))
+
+    # add a zero to calculate the distances between the data points
+    intensities = np.append(np.zeros((intensities.shape[0], 1)), intensities, axis=1)
+
+    # calculate the relativ distances between the current value and its precursor
+    rel_distances = np.array([[round(x - y, 2) for x, y in zip(intensity_entry[1:], intensity_entry)] for intensity_entry in intensities])
+
+    print(rel_distances[0])
+    print(intensities[0])
+    # test reconstruction
+    reconstructed = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in rel_distances])
+    print(reconstructed.shape)
+    print(reconstructed[0])
+
+    if np.allclose(intensities[0][1:], reconstructed[0], atol=0.001):
+        print("Reconstruction worked!")
+    else:
+        raise ValueError("Reconstruction failed!")
+
+    if use_log:
+        rel_distances = np.sqrt(rel_distances)
+
+    # plt.boxplot(intensities)
+    # plt.ylabel("Intensity")
+    # plt.xlabel("Peaks")
+    # plt.show()
+
+    print(intensities.shape)
+    print(np.max(intensities))
+    print(np.min(intensities))
+
+    if is_data_unidentified:
+        if use_log:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities_sqrt_distance_encoding.txt', rel_distances)
+        else:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_intensities_distance_encoding.txt', rel_distances)
+    else:
+        if use_log:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities_sqrt_distance_encoding.txt', rel_distances)
+        else:
+            np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities_distance_encoding.txt', rel_distances)
 
 
 def prepare_data_for_r():
@@ -667,6 +862,67 @@ def density_scatter_plot():
     plt.show()
 
 
+def preprocess_only_mz_values_with_charge_as_label(is_data_unidentified=True):
+    """
+    preprocess the mass spec data to keep only the distances between the m/z values and the charges as label
+    :return:
+    """
 
+    if is_data_unidentified:
+        spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+    else:
+        spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+
+    peaks = [spectrum["peaks"] for spectrum in spectra]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
+    indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
+    charge_list = np.array([spectrum["charge"] for spectrum in spectra])[indices_to_keep].reshape(-1, 1).astype(int)
+
+    # remove None from the list
+    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+    print(filtered_peaks.shape)
+
+    # filter outliers
+    indices_to_keep = np.all(filtered_peaks[:, :, 0] < 4000, axis=1)
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+    charge_list = charge_list[indices_to_keep]
+
+    # we are only interested in the m/z values
+    mz_values = filtered_peaks[:, :, 0]
+
+    print(filtered_peaks.shape)
+
+    # add a zero to calculate the distances between the data points
+    mz_values = np.append(np.zeros((mz_values.shape[0], 1)), mz_values, axis=1)
+
+    # calculate the relativ distances between the current value and its precursor
+    rel_distances = np.array(
+        [[round(x - y, 2) for x, y in zip(mz_values_entry[1:], mz_values_entry)] for mz_values_entry in mz_values])
+
+    print(rel_distances.shape)
+    print(mz_values.shape)
+
+    print(rel_distances[0])
+    print(mz_values[0])
+    # test reconstruction
+    reconstructed = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in rel_distances])
+    print(reconstructed.shape)
+    print(reconstructed[0])
+
+    print(np.max(mz_values))
+
+    print(charge_list.shape)
+    print(rel_distances.shape)
+    print(np.array([spectrum["charge"] for spectrum in spectra]).reshape(-1, 1).shape)
+
+    rel_distances_and_charge = np.hstack((rel_distances, charge_list))
+
+    if is_data_unidentified:
+        np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_mz_charge_label.txt', rel_distances_and_charge)
+    else:
+        np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_mz_charge_label.txt', rel_distances_and_charge)
 
 

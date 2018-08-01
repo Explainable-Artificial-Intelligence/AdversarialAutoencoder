@@ -19,7 +19,8 @@ from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_
     get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_reconstruction_grid, \
     draw_class_distribution_on_latent_space, visualize_autoencoder_weights_and_biases, \
-    create_gif, create_epoch_summary_image_semi_supervised
+    create_gif, create_epoch_summary_image_semi_supervised, write_mass_spec_to_mgf_file, \
+    visualize_spectra_reconstruction, visualize_mass_spec_loss, reconstruct_spectrum_from_feature_vector
 
 
 class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
@@ -62,7 +63,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # dictionary holding some properties of the mass spec data; e.g. the organism name, the peak encoding,
         # the charge (if any) etc
-        self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        if parameter_dictionary.get("mass_spec_data_properties"):
+            self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
+        else:
+            self.mass_spec_data_properties = None
 
         """
         params for network topology
@@ -435,7 +439,7 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.performance_over_time = {"autoencoder_losses": [], "discriminator_gaussian_losses": [],
                                       "discriminator_categorical_losses": [], "generator_losses": [],
                                       "supervised_encoder_loss": [], "accuracy": [], "accuracy_epochs": [],
-                                      "list_of_epochs": []}
+                                      "list_of_epochs": [], "mz_values_loss": [], "intensities_loss": []}
         self.learning_rates = {"autoencoder_lr": [], "discriminator_g_lr": [], "discriminator_c_lr": [],
                                "generator_lr": [], "supervised_encoder_lr": [], "list_of_epochs": []}
 
@@ -444,6 +448,10 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                    "encoder_cat_dist": [], "batch_labels": [],
                                    "discriminator_gaussian_neg": [], "discriminator_gaussian_pos": [],
                                    "discriminator_cat_neg": [], "discriminator_cat_pos": []}
+
+        # holds the original m/z and intensity values and their reconstruction (for the swagger server)
+        self.spectra_original_and_reconstruction = {"mz_values_original": None, "mz_values_reconstructed": None,
+                                                    "intensities_original": None, "intensities_reconstructed": None}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
         # minibatch summary plots
@@ -505,6 +513,16 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
     def get_result_folder_name(self):
         return self.result_folder_name
+
+    def set_spectra_original_and_reconstruction(self, mz_values_original, mz_values_reconstructed,
+                                                intensities_original, intensities_reconstructed):
+        self.spectra_original_and_reconstruction = {"mz_values_original": mz_values_original,
+                                                    "mz_values_reconstructed": mz_values_reconstructed,
+                                                    "intensities_original": intensities_original,
+                                                    "intensities_reconstructed": intensities_reconstructed}
+
+    def get_spectra_original_and_reconstruction(self):
+        return self.spectra_original_and_reconstruction
 
     def encoder(self, X, reuse=False, is_supervised=False):
         """
@@ -1153,6 +1171,21 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "test_algorithm" + '.png')
 
+        # if we have mass spec data, we need to reconstruct the data first
+        if self.selected_dataset == "mass_spec":
+            mz_values, intensities, charges, molecular_weights = \
+                reconstruct_spectrum_from_feature_vector(img, self.input_dim, self.mass_spec_data_properties)
+            # convert the numpy arrays to lists
+            if isinstance(mz_values, np.ndarray):
+                mz_values = mz_values.tolist()
+            if isinstance(intensities, np.ndarray):
+                intensities = intensities.tolist()
+            if isinstance(charges, np.ndarray):
+                charges = charges.tolist()
+            if isinstance(molecular_weights, np.ndarray):
+                molecular_weights = molecular_weights.tolist()
+            return [mz_values, intensities, charges, molecular_weights]
+
         return img
 
     def train(self, is_train_mode_active=True):
@@ -1209,6 +1242,9 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                     file.write(json_dictionary)
 
                 batch_x_labeled, batch_labels_labeled = data.test.next_batch(self.n_labeled)
+
+                # visualize the weights and biases before training
+                visualize_autoencoder_weights_and_biases(self, epoch="before_training")
 
                 # we want n_epochs iterations
                 for epoch in range(self.n_epochs):
@@ -1467,6 +1503,18 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                           self.n_classes, replace=False)
                         self.random_points_for_image_grid = \
                             np.array(latent_representations_current_epoch)[random_indices]
+
+                        if self.selected_dataset == "mass_spec":
+                            write_mass_spec_to_mgf_file(self, epoch, reconstructed_images, real_images)
+                            mz_values_loss, intensities_loss = visualize_spectra_reconstruction(self, epoch,
+                                                                                                reconstructed_images,
+                                                                                                real_images)
+                            # update the lists holding the losses
+                            self.performance_over_time["mz_values_loss"].append(np.mean(mz_values_loss))
+                            self.performance_over_time["intensities_loss"].append(np.mean(intensities_loss))
+
+                            # visualize the mass spec loss
+                            visualize_mass_spec_loss(self, epoch)
 
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4 * 2, 4.8)

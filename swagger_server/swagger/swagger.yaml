@@ -12,7 +12,7 @@ security:
   - oauth2: [uid]
 paths:
   /Load/loadDataset:
-    get:
+    post:
       tags: [Load]
       summary: "Load a data set"
       description: "Load the MNIST, the SVHN, the cifar10 or a custom dataset"
@@ -21,14 +21,56 @@ paths:
         - name: dataset_name
           in: query
           type: string
-          enum: [MNIST, SVHN, cifar10, custom]
+          required: True
+          enum: [MNIST, SVHN, cifar10, mass_spec, custom]
           description: what dataset to load
           default: "MNIST"
+        - name: "mass_spec_data_properties"
+          in: "body"
+          description: "properties for the mass spec data"
+          schema:
+            type: object
+            properties:
+              organism_name:
+                type: "string"
+                example: "yeast"
+              peak_encoding:
+                type: "string"
+                example: "only_mz_values_charge_label"
+              include_charge_in_encoding:
+                type: "boolean"
+                example: False
+              use_smoothed_intensities:
+                type: "boolean"
+                example: False
+              smoothness_sigma:
+                type: "integer"
+                format: "int32"
+                example: 1
+              include_molecular_weight_in_encoding:
+                type: "boolean"
+                example: False
+              charge:
+                type: "string"
+                example: "2"
+              normalize_data:
+                type: "boolean"
+                example: False
+              n_peaks_to_keep:
+                type: "integer"
+                format: "int32"
+                example: 50
+              max_intensity_value:
+                type: "integer"
+                format: "int32"
+                example: 5000
       responses:
         200:
           description: Return whether load was successfull
           schema:
             type: boolean
+        400:
+          description: "Bad request"
         404:
           description: "File not found"
         415:
@@ -217,7 +259,8 @@ paths:
         - in: "query"
           name: "selected_autoencoder"
           type: string
-          enum: ["Unsupervised", "Supervised", "SemiSupervised"]
+          enum: ["Unsupervised", "Supervised", "SemiSupervised", "IncorporatingLabelInformation",
+          "UnsupervisedClustering", "DimensionalityReduction"]
           description: what autoencoder to use
           default: "Unsupervised"
           format: string
@@ -270,7 +313,7 @@ paths:
             type: object
             required: [autoencoder_losses, discriminator_losses, generator_losses, list_of_epochs,
             discriminator_gaussian_losses, discriminator_categorical_losses, supervised_encoder_loss, accuracy,
-            accuracy_epochs]
+            accuracy_epochs, mz_values_loss, intensities_loss]
             properties:
               autoencoder_losses:
                 type: array
@@ -313,6 +356,16 @@ paths:
                   type: "integer"
                   format: "double"
               accuracy_epochs:
+                type: array
+                items:
+                  type: "integer"
+                  format: "double"
+              mz_values_losses:
+                type: array
+                items:
+                  type: "integer"
+                  format: "double"
+              intensities_losses:
                 type: array
                 items:
                   type: "integer"
@@ -461,6 +514,37 @@ paths:
                 items:
                   type: "number"
               discriminator_cat_pos:
+                type: array
+                items:
+                  type: "number"
+      x-swagger-router-controller: "swagger_server.controllers.train_controller"
+
+  /Train/getSpectraOriginalAndReconstruction:
+    get:
+      tags: [Train]
+      summary: returns the original and reconstructed spectra
+      description: returns the original and reconstructed spectra
+      operationId: get_spectra_original_and_reconstruction
+      responses:
+        200:
+          description: "vars successfully returned"
+          schema:
+            type: object
+            required: [mz_values_original, mz_values_reconstructed, intensities_original, intensities_reconstructed]
+            properties:
+              mz_values_original:
+                type: array
+                items:
+                  type: "number"
+              mz_values_reconstructed:
+                type: array
+                items:
+                  type: "number"
+              intensities_original:
+                type: array
+                items:
+                  type: "number"
+              intensities_reconstructed:
                 type: array
                 items:
                   type: "number"
@@ -862,10 +946,25 @@ definitions:
         items:
           type: "integer"
           format: "int32"
+      mass_spec_data_properties:
+        type: "object"
+        additionalProperties: {}
+        example:
+          organism_name: yeast
+          peak_encoding: only_mz_values_charge_label
+          include_charge_in_encoding: False
+          use_smoothed_intensities: False
+          smoothness_sigma: 1
+          include_molecular_weight_in_encoding: False
+          charge: 2
+          normalize_data: False
+          n_peaks_to_keep: 50
+          max_intensity_value: 5000
+          data_subset: None
       dropout_encoder:
         type: "array"
         example:
-        - 0.2
+        - 0.0
         - 0.0
         - 0.0
         - 0.0
@@ -1803,7 +1902,6 @@ definitions:
         example: "sigmoid_cross_entropy"
 
 
-
   ParameterSetList:
     type: "object"
     properties:
@@ -1930,12 +2028,18 @@ definitions:
           items:
             type: "integer"
             format: "int32"
+      mass_spec_data_properties:
+        type: "array"
+        example:
+        - {'organism_name': 'yeast', 'peak_encoding': 'only_mz_values_charge_label', 'include_charge_in_encoding': False, 'use_smoothed_intensities': False, 'smoothness_sigma': 1, 'include_molecular_weight_in_encoding': False, 'charge': '2', 'normalize_data': False, 'n_peaks_to_keep': 50, 'max_intensity_value': 5000}
+        items:
+          type: "object"
       dropout_encoder:
         type: "array"
         items:
           type: "array"
           example:
-          - 0.2
+          - 0.0
           - 0.0
           - 0.0
           - 0.0

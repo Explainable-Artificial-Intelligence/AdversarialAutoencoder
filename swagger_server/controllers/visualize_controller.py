@@ -1,5 +1,5 @@
 import time
-
+import numpy as np
 
 from swagger_server.utils.Storage import Storage
 from swagger_server.utils.SwaggerUtils import convert_image_array_to_byte_string
@@ -57,7 +57,8 @@ def generate_image_from_single_point(single_point):
     aae.set_requested_operations_by_swagger_results(None)
 
     # we need to convert it, since np arrays are not json serializable
-    result = result.astype("float64").tolist()
+    if not aae.selected_dataset == "mass_spec":
+        result = result.astype("float64").tolist()
 
     return result, 200
 
@@ -134,7 +135,8 @@ def generate_image_from_single_point_and_single_label(single_point, class_label)
     aae.set_requested_operations_by_swagger_results(None)
 
     # we need to convert it, since np arrays are not json serializable
-    result = result.astype("float64").tolist()
+    if not aae.selected_dataset == "mass_spec":
+        result = result.astype("float64").tolist()
 
     return result, 200
 
@@ -330,5 +332,8 @@ def get_biases_or_weights_for_layer(bias_or_weights, layer_name):
     # we need to convert it, since np arrays are not json serializable
     result = [a.astype("float64").tolist() for a in result]
 
-    return result
+    return result, 200
+
+
+
 

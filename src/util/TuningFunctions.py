@@ -4,9 +4,13 @@ import json
 import numpy as np
 
 import util.AdversarialAutoencoderParameters as aae_params
+from autoencoders.DimensionalityReductionAdversarialAutoencoder import DimensionalityReductionAdversarialAutoencoder
+from autoencoders.IncorporatingLabelInformationAdversarialAutoencoder import \
+    IncorporatingLabelInformationAdversarialAutoencoder
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
 from autoencoders.SupervisedAdversarialAutoencoder import SupervisedAdversarialAutoencoder
 from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversarialAutoencoder
+from autoencoders.UnsupervisedClusteringAdversarialAutoencoder import UnsupervisedClusteringAdversarialAutoencoder
 from swagger_server.utils.Storage import Storage
 
 tuning_status = "start"
@@ -39,13 +43,20 @@ def init_aae_with_params_file(params_filename, used_aae):
         used_params["summary_image_frequency"] = 10
 
     # create the AAE and train it with the used parameters
-    adv_autoencoder = None
     if used_aae == "Unsupervised":
         adv_autoencoder = UnsupervisedAdversarialAutoencoder(used_params)
     elif used_aae == "Supervised":
         adv_autoencoder = SupervisedAdversarialAutoencoder(used_params)
     elif used_aae == "SemiSupervised":
         adv_autoencoder = SemiSupervisedAdversarialAutoencoder(used_params)
+    elif used_aae == "UnsupervisedClustering":
+        adv_autoencoder = UnsupervisedClusteringAdversarialAutoencoder(used_params)
+    elif used_aae == "DimensionalityReduction":
+        adv_autoencoder = DimensionalityReductionAdversarialAutoencoder(used_params)
+    elif used_aae == "IncorporatingLabelInformation":
+        adv_autoencoder = IncorporatingLabelInformationAdversarialAutoencoder(used_params)
+    else:
+        raise ValueError(str(used_aae) + " is not a valid autoencoder!")
 
     return adv_autoencoder
 

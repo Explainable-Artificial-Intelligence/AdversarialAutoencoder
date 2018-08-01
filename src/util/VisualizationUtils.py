@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from matplotlib import gridspec
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 
 from swagger_server.utils.Storage import Storage
@@ -1270,7 +1271,8 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         return mz_values, intensities, charges, molecular_weights
 
-    elif mass_spec_data_properties["peak_encoding"] == "only_mz_values":
+    elif mass_spec_data_properties["peak_encoding"] == "only_mz_values" \
+            or mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label":
         reconstructed_mz_values = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
         intensities = reconstructed_mz_values.copy()
         intensities.fill(1000)
@@ -1280,7 +1282,8 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         return reconstructed_mz_values, intensities, charges, molecular_weights
 
     elif mass_spec_data_properties["peak_encoding"] == "only_intensities":
-        intensities = mass_spec_data
+        # TODO: reconstruction
+        intensities = 10 ** mass_spec_data
 
         # we want m/z values from 0 to 1500
         n_data_points = mass_spec_data.shape[0]
@@ -1293,6 +1296,19 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         return mz_values, intensities, charges, molecular_weights
 
+    elif mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
+        intensities = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
+
+        # we want m/z values from 0 to 1500
+        n_data_points = mass_spec_data.shape[0]
+        n_peaks = mass_spec_data_properties["n_peaks_to_keep"] + 1
+        mz_values = np.arange(n_peaks, 1500, 1500 / n_peaks)      # create the m/z values for one spectrum
+        mz_values = np.tile(mz_values, (n_data_points, 1))          # we need n_data_points m/z value arrays
+
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+
+        return mz_values, intensities, charges, molecular_weights
 
     ###################################################################################################################
 
@@ -1346,7 +1362,7 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
     return mz_values, intensities, charges, molecular_weights
 
 
-def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
+def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, original):
     """
     visualizes the original spectrum and the reconstructed spectrum via a stem plot with the m/z values on the x-axis
     and the intensities on the y axis
@@ -1354,7 +1370,8 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     :param epoch: epoch of the training; used for the file title
     :param reconstructed_mass_spec: array of reconstructed spectra; first one is visualized
     :param original: array of original spectra; first one is visualized
-    :return:
+    :return: returns a tuple of the mz_values_loss and the intensities_loss, where the loss is the difference
+    between original and reconstruction
     """
 
     mz_values_reconstructed, intensities_reconstructed, charges_reconstructed, molecular_weights_reconstructed \
@@ -1368,10 +1385,20 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
                        str(epoch) + "_mass_specs_spectra_" + ".png"
 
-    # add offset to the m/z values, so we can see the difference between original and reconstruction
-    if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values":
+    # calculate the average difference between original and reconstruction
+    mz_values_loss = np.abs(mz_values_reconstructed - mz_values_original)
+    intensities_loss = np.abs(intensities_reconstructed - intensities_original)
 
-        plt.scatter(mz_values_original[0, :], mz_values_reconstructed[0, :])
+    # add offset to the m/z values, so we can see the difference between original and reconstruction
+    if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values" or \
+        aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label" or \
+                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
+
+        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
+        # and original
+        for orig_peak, recon_peak in zip(mz_values_original[0, :], mz_values_reconstructed[0, :]):
+            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
+        plt.scatter(mz_values_original[0, :], mz_values_reconstructed[0, :])    # draw the points
         axis_min = np.min([plt.xlim(), plt.ylim()])
         axis_max = np.max([plt.xlim(), plt.ylim()])
         plt.xlim(xmin=axis_min, xmax=axis_max)
@@ -1382,7 +1409,11 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
 
     elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities":
 
-        plt.scatter(intensities_original[0, :], intensities_reconstructed[0, :])
+        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
+        # and original
+        for orig_peak, recon_peak in zip(intensities_original[0, :], intensities_reconstructed[0, :]):
+            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
+        plt.scatter(intensities_original[0, :], intensities_reconstructed[0, :])    # draw the points
         axis_min = np.min([plt.xlim(), plt.ylim()])
         axis_max = np.max([plt.xlim(), plt.ylim()])
         plt.xlim(xmin=axis_min, xmax=axis_max)
@@ -1400,6 +1431,12 @@ def visualize_spectra(aae_class, epoch, reconstructed_mass_spec, original):
     plt.savefig(result_file_name)
     plt.close("all")
 
+    # save the original and reconstruction of the mass spec data for the swagger server
+    aae_class.set_spectra_original_and_reconstruction(mz_values_original, mz_values_reconstructed,
+                                                      intensities_original, intensities_reconstructed)
+
+    return mz_values_loss, intensities_loss
+
 
 def write_mass_spec_to_mgf_file(aae_class, epoch, reconstructed_spectra, original_spectra):
     """
@@ -1413,7 +1450,7 @@ def write_mass_spec_to_mgf_file(aae_class, epoch, reconstructed_spectra, origina
 
     create_mgf_file(aae_class, epoch, reconstructed_spectra, "reconstructed")
 
-    create_mgf_file(aae_class, epoch, original_spectra, "original_spectra")
+    create_mgf_file(aae_class, epoch, original_spectra, "original")
 
 
 def create_mgf_file(aae_class, epoch, mass_spec_data, title):
@@ -1440,20 +1477,150 @@ def create_mgf_file(aae_class, epoch, mass_spec_data, title):
         for i in range(mass_spec_data.shape[0]):
             # write the header
             text_file.write("BEGIN IONS\n")
-            text_file.write("TITLE=Spectra generated with an Adversarial Autoencoder,sequence=UNIDENTIFIED\n")
+            if title == "original":
+                text_file.write("TITLE=Original spectra,sequence=UNIDENTIFIED\n")
+            elif title == "reconstructed":
+                text_file.write("TITLE=Spectra reconstructed with an Adversarial Autoencoder,sequence=UNIDENTIFIED\n")
+            elif title == "generated":
+                text_file.write("TITLE=Spectra generated with an Adversarial Autoencoder,sequence=UNIDENTIFIED\n")
+            else:
+                raise ValueError(title + " is invalid. Valid values are [original, reconstructed, generated]")
             text_file.write("PEPMASS={}\n".format(molecular_weights[i]))
             text_file.write("CHARGE={}+\n".format(charges[i]))
             text_file.write("SEQUENCE=UNIDENTIFIED\n")
 
             # write the m/z values and intensities
             for j in range(n_peaks):
-                text_file.write("{:.2f} {:.2f}\n".format(mz_values[i, j], intensities[i, j]))
+                text_file.write("{:.6f} {:.6f}\n".format(mz_values[i, j], intensities[i, j]))
 
             # write the footer
             text_file.write("END IONS\n")
             text_file.write("\n")
 
 
+def visualize_mass_spec_loss(aae_class, epoch):
+    """
+    visualizes the reconstruction loss for the m/z values and the intensities over time
+    :param aae_class: instance of the autoencoder
+    :param epoch: epoch of the training; used for the output filename
+    :return:
+    """
+
+    # get the epochs and losses
+    epochs = aae_class.performance_over_time["list_of_epochs"]
+    mz_values_loss = aae_class.performance_over_time["mz_values_losses"]
+    intensities_loss = aae_class.performance_over_time["intensities_losses"]
+
+    # we don't want a plot, if there is no data to plot
+    if len(epochs) < 2:
+        return
+
+    # increase the figure size
+    plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
+    plt.subplots(nrows=1, ncols=2)
+
+    # plot the m/z reconstruction loss
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, mz_values_loss, linestyle='-', marker='o')
+    plt.title("M/Z reconstruction loss")
+    plt.ylabel("Avg. loss")
+    plt.xlabel("Epoch")
+
+    # plot the intensities reconstruction loss
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, intensities_loss, linestyle='-', marker='o')
+    plt.title("Intensities reconstruction loss")
+    plt.ylabel("Avg. loss")
+    plt.xlabel("Epoch")
+
+    # save the figure in the results folder
+    plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch) + '_mass_spec_loss.png')
+    plt.close('all')
+
+    # change figsize back to default
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
+
+
+def cluster_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path, epoch):
+
+    plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
+
+    # convert lists to numpy array
+    latent_representations_current_epoch = np.array(latent_representations_current_epoch)
+    labels_current_epoch = np.array(labels_current_epoch)
+
+    # convert one hot vectors to integer labels
+    int_labels = np.argmax(labels_current_epoch, axis=1)
+
+    # get the dimension of the latent space and the number of classes
+    z_dim = latent_representations_current_epoch.shape[1]
+    n_classes = labels_current_epoch.shape[1]
+
+    pca = PCA(n_components=2)
+
+    # perform PCA if the dimension of the latent space is higher than 2
+    if z_dim > 2:
+        pca.fit(latent_representations_current_epoch)
+        latent_representations_current_epoch = pca.transform(latent_representations_current_epoch)
+
+        plt.xlabel("Principal component 1: " + "{:6.4f}".format(pca.explained_variance_ratio_[0]))
+        plt.ylabel("Principal component 2: " + "{:6.4f}".format(pca.explained_variance_ratio_[1]))
+
+    """
+    Plot the latent space
+    """
+
+    # create the subplots
+    plt.subplots(nrows=1, ncols=2)
+    plt.subplot(1, 2, 1)
+
+    # plot the different classes on the latent space
+    for class_label in range(n_classes):
+        # get the points corresponding to the same classes
+        points_for_current_class_label = latent_representations_current_epoch[np.where(int_labels == class_label)]
+        # plot them
+        plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label),
+                    alpha=0.5)
+    plt.title("Latent space")
+    plt.legend()
+
+    """
+    Plot the clustering of the latent space
+    """
+    plt.subplot(1, 2, 2)
+
+    # get the labels from the kmeans algorithm
+    kmeans = KMeans(n_clusters=n_classes, random_state=0).fit(latent_representations_current_epoch)
+    labels = kmeans.predict(latent_representations_current_epoch)
+    clustered_latent_representations = kmeans.transform(latent_representations_current_epoch)
+
+    # plot the different classes on the latent space
+    for class_label in range(n_classes):
+        # get the points corresponding to the same classes
+        points_for_current_class_label = clustered_latent_representations[np.where(labels == class_label)]
+        # plot them
+        plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label),
+                    alpha=0.5)
+    plt.title("Clustered latent space")
+    plt.legend()
+
+    plt.savefig(result_path + str(epoch) + "_latent_space_clustering.png")
+    plt.close('all')
+
+    # change figsize back to default
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
+
+
+def reconstruct_generated_mass_spec_data(aae_class, generated_mass_spec_data, epoch):
+
+    # convert the 3d lists to a 2d numpy array
+    generated_mass_spec_data = np.array([i[0] for i in generated_mass_spec_data])
+
+    mz_values, intensities, charges, molecular_weights \
+        = reconstruct_spectrum_from_feature_vector(generated_mass_spec_data, aae_class.input_dim,
+                                                   aae_class.mass_spec_data_properties)
+
+    create_mgf_file(aae_class, epoch, generated_mass_spec_data, "generated")
 
 
 

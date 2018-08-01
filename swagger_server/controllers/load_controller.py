@@ -3,18 +3,21 @@ from swagger_server.utils.Storage import Storage
 from swagger_server.utils.SwaggerUtils import convert_image_array_to_byte_string
 
 
-def load_data_set(dataset_name):
+def load_data_set(dataset_name, mass_spec_data_properties=None):
     """
     loads a dataset into the storage class
     :param dataset_name: one of ["MNIST", "SVHN", "cifar10", "custom"]
+    :param mass_spec_data_properties: dictionary holding the properties for the mass spec data
     :return:
     """
 
-    if dataset_name not in ["MNIST", "SVHN", "cifar10", "custom"]:
+    if dataset_name not in ["MNIST", "SVHN", "cifar10", "mass_spec", "custom"]:
         return "dataset name not found", 404
 
-    # TODO: filepath for custom dataset
-    dataset = get_input_data(dataset_name, filepath="../../data")
+    if dataset_name == "mass_spec" and mass_spec_data_properties is None:
+        return "Bad request! mass_spec_data_properties needs to be provided when using mass spec data!", 404
+
+    dataset = get_input_data(dataset_name, filepath="../data", mass_spec_data_properties=mass_spec_data_properties)
 
     # store the data in the storage class
     Storage.set_input_data(dataset)

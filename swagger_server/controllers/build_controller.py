@@ -1,6 +1,10 @@
 import connexion
 import sys
 
+from autoencoders.DimensionalityReductionAdversarialAutoencoder import DimensionalityReductionAdversarialAutoencoder
+from autoencoders.IncorporatingLabelInformationAdversarialAutoencoder import \
+    IncorporatingLabelInformationAdversarialAutoencoder
+from autoencoders.UnsupervisedClusteringAdversarialAutoencoder import UnsupervisedClusteringAdversarialAutoencoder
 from swagger_server.utils.Storage import Storage
 
 from autoencoders.SemiSupervisedAdversarialAutoencoder import SemiSupervisedAdversarialAutoencoder
@@ -9,11 +13,11 @@ from autoencoders.UnsupervisedAdversarialAutoencoder import UnsupervisedAdversar
 from util.AdversarialAutoencoderParameters import get_result_path_for_selected_autoencoder
 
 
-def build_aae(aae_parameters, selected_autoencoder):
+def build_aae(selected_autoencoder, aae_parameters):
     """
     builds the adversarial autoencoder with the parameters provided
-    :param aae_parameters: parameters for the adv. autoencoder
     :param selected_autoencoder: one of ["Unsupervised", "Supervised", "SemiSupervised"]
+    :param aae_parameters: parameters for the adv. autoencoder
     :return:
     """
 
@@ -62,6 +66,12 @@ def build_aae(aae_parameters, selected_autoencoder):
                 adv_autoencoder = SupervisedAdversarialAutoencoder(aae_parameters)
             elif selected_autoencoder == "SemiSupervised":
                 adv_autoencoder = SemiSupervisedAdversarialAutoencoder(aae_parameters)
+            elif selected_autoencoder == "IncorporatingLabelInformation":
+                adv_autoencoder = IncorporatingLabelInformationAdversarialAutoencoder(aae_parameters)
+            elif selected_autoencoder == "UnsupervisedClustering":
+                adv_autoencoder = UnsupervisedClusteringAdversarialAutoencoder(aae_parameters)
+            elif selected_autoencoder == "DimensionalityReduction":
+                adv_autoencoder = DimensionalityReductionAdversarialAutoencoder(aae_parameters)
         except KeyError:
             return 'Error: Parameter %s not found' % sys.exc_info()[1], 404
 

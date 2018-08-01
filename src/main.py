@@ -191,11 +191,14 @@ def param_search_only_mz_values():
 
         params = get_default_parameters_mass_spec()
 
-        params["summary_image_frequency"] = 500
+        params["summary_image_frequency"] = 10
+        params["n_epochs"] = 51
 
-        params["n_epochs"] = 5001
+        ["only_mz_values", "only_intensities", "only_mz_values_charge_label", "distance", "location", "binned",
+         "only_intensities_distance"]
 
-        ["only_mz_values", "only_intensities"]
+        # datasubset:
+        ["identified", "unidentified", None]
 
         # params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
         #                                        "include_charge_in_encoding": False,
@@ -203,9 +206,9 @@ def param_search_only_mz_values():
         #                                        "normalize_data": False, "n_peaks_to_keep": 50,
         #                                        "max_intensity_value": 5000}
 
-        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities_distance",
                                                "include_charge_in_encoding": False, "use_smoothed_intensities": False,
-                                               "smoothness_sigma": 1,
+                                               "smoothness_sigma": 1, "data_subset": "identified",
                                                "include_molecular_weight_in_encoding": False, "charge": "2",
                                                "normalize_data": False, "n_peaks_to_keep": 50,
                                                "max_intensity_value": 5000}
@@ -216,18 +219,22 @@ def param_search_only_mz_values():
         if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
             params["input_dim_y"] = 1000
         elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values" or \
-                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities":
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values_charge_label" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
             params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
 
         params["input_dim_x"] = 1
-        params["n_classes"] = 2
+        params["n_classes"] = 4
         params["z_dim"] = i
 
         params["selected_dataset"] = "mass_spec"
 
-        params["only_train_autoencoder"] = True
+        params["only_train_autoencoder"] = False
 
         params["verbose"] = True
+        # params["selected_autoencoder"] = "IncorporatingLabelInformation"
+        # params["results_path"] = get_result_path_for_selected_autoencoder("IncorporatingLabelInformation")
         params["selected_autoencoder"] = "Unsupervised"
         params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
 
@@ -266,9 +273,10 @@ def param_search_only_mz_values():
         # aae = LearningPriorsAdversarialAutoencoder(params)
 
         # for j in range(10):
-        for j in range(5):
+        for j in range(1):
 
             aae = UnsupervisedAdversarialAutoencoder(params)
+            # aae = IncorporatingLabelInformationAdversarialAutoencoder(params)
 
             aae.train(True)
             aae.reset_graph()
@@ -326,6 +334,13 @@ def testing():
         # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params_activation_functions_modified.txt", "Supervised")
         # aae.train(True)
         aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Dropbox\\Studium\\Studium\\Master\\4. Semester\\Masterarbeit\\AdversarialAutoencoder\\results\\Unsupervised\\2018-07-10_12_59_57_mass_spec\\log\\params.txt", "Unsupervised")
+        aae.train(True)
+        return
+
+    if False:
+
+        aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Dropbox\\Studium\\Studium\\Master\\4. Semester\\Masterarbeit\\AdversarialAutoencoder\\results\\Unsupervised\\2018-06-01_15_05_55_MNIST\\log\\params.txt", "Unsupervised")
+        aae.n_epochs = 21
         aae.train(True)
         return
 

@@ -71,11 +71,20 @@ def get_performance_over_time():
     accuracy = []                               # only semi-supervised
     accuracy_epochs = []                        # only semi-supervised
 
+    autoencoder_losses = performance_over_time["autoencoder_losses"]
+    autoencoder_losses = [float(number) for number in autoencoder_losses]
+
+    list_of_epochs = performance_over_time["list_of_epochs"]
+    list_of_epochs = [float(number) for number in list_of_epochs]
+
+    mz_values_losses = performance_over_time["mz_values_losses"]
+    mz_values_losses = [float(number) for number in mz_values_losses]
+
+    intensities_losses = performance_over_time["intensities_losses"]
+    intensities_losses = [float(number) for number in intensities_losses]
+
     # distinguish between semi-supervised or (un-)supervised autoencoder
     if Storage.get_selected_autoencoder() == "SemiSupervised":
-
-        autoencoder_losses = performance_over_time["autoencoder_losses"]
-        autoencoder_losses = [float(number) for number in autoencoder_losses]
 
         discriminator_gaussian_losses = performance_over_time["discriminator_gaussian_losses"]
         discriminator_gaussian_losses = [float(number) for number in discriminator_gaussian_losses]
@@ -95,14 +104,8 @@ def get_performance_over_time():
         accuracy_epochs = performance_over_time["accuracy_epochs"]
         accuracy_epochs = [float(number) for number in accuracy_epochs]
 
-        list_of_epochs = performance_over_time["list_of_epochs"]
-        list_of_epochs = [float(number) for number in list_of_epochs]
-
     # we have an unsupervised or a supervised autoencoder
     else:
-
-        autoencoder_losses = performance_over_time["autoencoder_losses"]
-        autoencoder_losses = [float(number) for number in autoencoder_losses]
 
         discriminator_losses = performance_over_time["discriminator_losses"]
         discriminator_losses = [float(number) for number in discriminator_losses]
@@ -110,16 +113,14 @@ def get_performance_over_time():
         generator_losses = performance_over_time["generator_losses"]
         generator_losses = [float(number) for number in generator_losses]
 
-        list_of_epochs = performance_over_time["list_of_epochs"]
-        list_of_epochs = [float(number) for number in list_of_epochs]
-
     # since swagger doesn't allow multiple return values, we have to pack them in a dictionary and return it
     performance_dict = {"autoencoder_losses:": autoencoder_losses, "discriminator_losses:": discriminator_losses,
                         "generator_losses:": generator_losses, "list_of_epochs:": list_of_epochs,
                         "discriminator_gaussian_losses": discriminator_gaussian_losses,
                         "discriminator_categorical_losses": discriminator_categorical_losses,
                         "supervised_encoder_loss": supervised_encoder_loss, "accuracy": accuracy,
-                        "accuracy_epochs": accuracy_epochs}
+                        "accuracy_epochs": accuracy_epochs, "mz_values_losses": mz_values_losses,
+                        "intensities_losses": intensities_losses}
 
     return performance_dict, 200
 
@@ -295,7 +296,6 @@ def get_epoch_summary_vars():
                                    "discriminator_cat_neg": discriminator_cat_neg,
                                    "discriminator_cat_pos": discriminator_cat_pos}
 
-    # TODO
     return minibatch_summary_vars_dict, 200
 
 
@@ -315,3 +315,25 @@ def reset_tensorflow_graph():
     aae.reset_graph()
 
     return "Graph successfully reset", 200
+
+
+def get_spectra_original_and_reconstruction():
+
+    # get the autoencoder
+    aae = Storage.get_aae()
+
+    # check if we have an autoencoder
+    if not aae:
+        return "Error: no autoencoder found", 404
+
+    # get the vars for the minibatch summary
+    spectra_original_and_reconstruction = aae.get_spectra_original_and_reconstruction()
+
+    # convert the numpy arrays in the dictionary to lists (np array is not json serializable..)
+    for key in spectra_original_and_reconstruction:
+        if spectra_original_and_reconstruction[key] is not None:
+            print(spectra_original_and_reconstruction[key])
+            print(key)
+            spectra_original_and_reconstruction[key] = spectra_original_and_reconstruction[key].tolist()
+
+    return spectra_original_and_reconstruction, 200

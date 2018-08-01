@@ -19,7 +19,8 @@ from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_
     form_results, get_learning_rate_for_optimizer, get_biases_or_weights_for_layer
 from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_array, create_epoch_summary_image, \
     create_reconstruction_grid, draw_class_distribution_on_latent_space, visualize_autoencoder_weights_and_biases, \
-    create_gif, write_mass_spec_to_mgf_file, visualize_spectra
+    create_gif, write_mass_spec_to_mgf_file, visualize_spectra_reconstruction, visualize_mass_spec_loss, \
+    cluster_latent_space, reconstruct_generated_mass_spec_data, reconstruct_spectrum_from_feature_vector
 
 
 class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
@@ -303,13 +304,17 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         self.final_performance = None
         self.performance_over_time = {"autoencoder_losses": [], "discriminator_losses": [], "generator_losses": [],
-                                      "list_of_epochs": []}
+                                      "list_of_epochs": [], "mz_values_losses": [], "intensities_losses": []}
         self.learning_rates = {"autoencoder_lr": [], "discriminator_lr": [], "generator_lr": [], "list_of_epochs": []}
 
         # variables for the minibatch summary image
         self.epoch_summary_vars = {"real_dist": [], "latent_representation": [], "discriminator_neg": [],
                                    "discriminator_pos": [], "batch_x": [], "reconstructed_images": [],
                                    "epoch": None, "batch_labels": []}
+
+        # holds the original m/z and intensity values and their reconstruction (for the swagger server)
+        self.spectra_original_and_reconstruction = {"mz_values_original": None, "mz_values_reconstructed": None,
+                                                    "intensities_original": None, "intensities_reconstructed": None}
 
         # only for tuning; if set to true, the previous tuning results (losses and learning rates) are included in the
         # minibatch summary plots
@@ -370,6 +375,16 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
     def get_result_folder_name(self):
         return self.result_folder_name
+
+    def set_spectra_original_and_reconstruction(self, mz_values_original, mz_values_reconstructed,
+                                                intensities_original, intensities_reconstructed):
+        self.spectra_original_and_reconstruction = {"mz_values_original": mz_values_original,
+                                                    "mz_values_reconstructed": mz_values_reconstructed,
+                                                    "intensities_original": intensities_original,
+                                                    "intensities_reconstructed": intensities_reconstructed}
+
+    def get_spectra_original_and_reconstruction(self):
+        return self.spectra_original_and_reconstruction
 
     def encoder(self, X, reuse=False):
         """
@@ -733,12 +748,13 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         summary_op = tf.summary.merge_all()
         return summary_op
 
-    def generate_image_grid(self, sess, op, epoch, points, left_cell=None, save_image_grid=True):
+    def generate_image_grid(self, sess, op, epoch, points=None, left_cell=None, save_image_grid=True):
         """
         Generates and saves a grid of images by passing a set of numbers to the decoder and getting its output.
         :param sess: Tensorflow Session required to get the decoder output
         :param op: Operation that needs to be called inorder to get the decoder output
         :param epoch: current epoch of the training; image grid is saved as <epoch>.png
+        :param points: optional; array of points on the latent space which should be used to generate the images
         :param left_cell: left cell of the grid spec with two adjacent horizontal cells holding the image grid
         and the class distribution on the latent space; if left_cell is None, then only the image grid is supposed
         to be plotted and not the "combinated" image (image grid + class distr. on latent space).
@@ -746,25 +762,21 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         :return:
         """
 
-        random_points = None
-
         if self.z_dim > 2:
             # randomly sample some points from the z dim space
             image_grid_x_length = 10
             image_grid_y_length = 10
             n_points_to_sample = image_grid_x_length * image_grid_y_length
 
-            # randomly sample some points from the z dim space
-            random_points = np.random.uniform(-10, 10, [n_points_to_sample, self.z_dim])
+            if not points:
+                # randomly sample some points from the z dim space
+                points = np.random.uniform(-10, 10, [n_points_to_sample, self.z_dim])
 
         else:
             # creates evenly spaced values within [-10, 10] with a spacing of 1.5
             x_points = np.arange(10, -10, -1.5).astype(np.float32)
             y_points = np.arange(-10, 10, 1.5).astype(np.float32)
-            # x_points = np.arange(60, -60, -12).astype(np.float32)
-            # y_points = np.arange(-60, 60, 12).astype(np.float32)
 
-        # TODO: parameter
         nx, ny = 10, 10
         # create the image grid
         if left_cell:
@@ -792,9 +804,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # run the decoder
             x = sess.run(op, feed_dict={self.decoder_input: z, self.is_training: False})
             x = np.array(x).reshape(self.input_dim)
-
-            # TODO: check when normalize is necessary
-            # x = (x - np.min(x)) / (np.max(x) - np.min(x))
 
             ax = plt.subplot(g)
 
@@ -851,6 +860,21 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + "test_algorithm" + '.png')
 
+        # if we have mass spec data, we need to reconstruct the data first
+        if self.selected_dataset == "mass_spec":
+            mz_values, intensities, charges, molecular_weights = \
+                reconstruct_spectrum_from_feature_vector(img, self.input_dim, self.mass_spec_data_properties)
+            # convert the numpy arrays to lists
+            if isinstance(mz_values, np.ndarray):
+                mz_values = mz_values.tolist()
+            if isinstance(intensities, np.ndarray):
+                intensities = intensities.tolist()
+            if isinstance(charges, np.ndarray):
+                charges = charges.tolist()
+            if isinstance(molecular_weights, np.ndarray):
+                molecular_weights = molecular_weights.tolist()
+            return [mz_values, intensities, charges, molecular_weights]
+
         return img
 
     def train(self, is_train_mode_active=True):
@@ -903,6 +927,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 with open(log_path + '/params.txt', 'w') as file:
                     file.write(json_dictionary)
 
+                # visualize the weights and biases before training
+                visualize_autoencoder_weights_and_biases(self, epoch="before_training")
+
                 # we want n_epochs iterations
                 for epoch in range(self.n_epochs):
 
@@ -929,11 +956,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         # z_real_dist = draw_from_multiple_gaussians(n_classes=10, sigma=1, shape=(self.batch_size, self.z_dim))
                         z_real_dist = \
                             draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
-                        # TODO:
                         # z_real_dist = draw_from_dim_reduced_dataset(self.batch_size, self.selected_dataset, self.z_dim)
 
                         # get the batch from the training data
-                        # TODO:
                         batch_x, batch_labels = data.train.next_batch(self.batch_size)
                         # batch_x, batch_labels = data.train.get_class_specific_batch(self.batch_size, 1)
                         # batch_x, batch_labels = \
@@ -945,7 +970,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         reconstruction error of the inputs
                         """
                         # train the autoencoder by minimizing the reconstruction error between X_unlabeled and X_target_unlabeled
-                        # sess.run(self.autoencoder_optimizer, feed_dict={self.X_unlabeled: batch_x, self.X_target_unlabeled: batch_x})
                         sess.run(self.autoencoder_trainer,
                                  feed_dict={self.X: batch_x, self.X_target: batch_x,
                                             self.is_training: True,
@@ -982,8 +1006,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         # every x epochs: write a summary for every 50th minibatch
                         if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
-                        # TODO:
-                        # if epoch % self.summary_image_frequency == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output = \
@@ -1075,7 +1097,15 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                         if self.selected_dataset == "mass_spec":
                             write_mass_spec_to_mgf_file(self, epoch, reconstructed_images, real_images)
-                            visualize_spectra(self, epoch, reconstructed_images, real_images)
+                            mz_values_loss, intensities_loss = visualize_spectra_reconstruction(self, epoch,
+                                                                                                reconstructed_images,
+                                                                                                real_images)
+                            # update the lists holding the losses
+                            self.performance_over_time["mz_values_losses"].append(np.mean(mz_values_loss))
+                            self.performance_over_time["intensities_losses"].append(np.mean(intensities_loss))
+
+                            # visualize the mass spec loss
+                            visualize_mass_spec_loss(self, epoch)
 
                         # increase figure size
                         plt.rcParams["figure.figsize"] = (6.4 * 2, 4.8)
@@ -1083,14 +1113,22 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         left_cell = outer_grid[0, 0]  # the left SubplotSpec within outer_grid
 
                         # generate the image grid for the latent space
-                        self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
+                        generated_images = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
                                                  left_cell=left_cell, points=latent_representations_current_epoch)
+
+                        if self.selected_dataset == "mass_spec":
+                            reconstruct_generated_mass_spec_data(self, generated_mass_spec_data=generated_images,
+                                                                 epoch=epoch)
 
                         # draw the class distribution on the latent space
                         result_path = self.results_path + self.result_folder_name + '/Tensorboard/'
                         draw_class_distribution_on_latent_space(latent_representations_current_epoch,
                                                                 labels_current_epoch, result_path, epoch,
                                                                 None, combined_plot=True)
+
+                        # cluster the latent space
+                        cluster_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path,
+                                             epoch)
 
                         """
                         Weights + biases visualization
@@ -1115,7 +1153,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 self.process_requested_swagger_operations(sess)
 
-                self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
+                self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last", points=None)
 
             # TODO: end training has probably only to be called with train=True
             if epochs_completed > 0:
@@ -1147,7 +1185,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                     # call the respective function with the respective parameters
                     if function_name == "generate_image_grid":
                         result = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=None,
-                                                          left_cell=None, save_image_grid=False)
+                                                          left_cell=None, save_image_grid=False, points=None)
                         self.set_requested_operations_by_swagger_results(result)
                     elif function_name == "generate_image_from_single_point":
                         result = self.generate_image_from_single_point(sess, function_params)
