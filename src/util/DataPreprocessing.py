@@ -1,27 +1,24 @@
-from collections import Counter
-
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 from scipy.stats import gaussian_kde
-from sklearn.decomposition import PCA
-from tensorflow.python.framework import dtypes
-import seaborn as sns
-
+import os
+import itertools
 
 from . import DataLoading
 
 
 def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, peak_encoding, max_intensity_value,
-                              filter_on_charge=None, include_charge_in_encoding=False,
+                              max_mz_value=5000, filter_on_charge=None, include_charge_in_encoding=False,
                               include_molecular_weight_in_encoding=False, use_smoothed_intensities=False,
-                              smoothness_sigma=1):
+                              smoothness_sigma=1, smoothing_n_gaussians=15):
     """
     preprocesses the mass spec file by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
     as input for the network
     :param input_filename: filename of the mass spec data
     :param organism_name: e.g. "yeast"; used for output filename
-    :param n_peaks_to_keep: how many peaks the spectra should contain
+    :param n_peaks_to_keep: how many peaks one spectrum should contain
     :param filter_on_charge: which charge should be kept (e.g. "2" to keep only spectra with a charge of 2)
     :param peak_encoding: "location" or "distance": encoding of the peaks
         - "location":
@@ -37,12 +34,14 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
             (2) intensity of the respective bin
         - "only_mz_values":
             (1) mz distance relative to successor
-    :param max_intensity_value: at which value a peak should be considered as an outlier
+    :param max_intensity_value: at which intensity value a peak should be considered as an outlier
+    :param max_mz_value: at which m/z value a peak should be considered as an outlier
     :param include_charge_in_encoding: whether or not the charge should be appended to the peak_encoding
     :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
     peak_encoding
     :param use_smoothed_intensities: whether or not the intensities should be smoothed
     :param smoothness_sigma: parameter for smoothing the intensities; the higher the smoother
+    :param smoothing_n_gaussians: how many gaussians should be used for smoothing the intensities
     :return:
     """
 
@@ -50,12 +49,23 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     print("Loading data..")
     is_identified_data = False
     if input_filename.endswith(".mgf"):
-        if use_smoothed_intensities and smoothness_sigma:
-            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + ".mgf"
+        if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
+            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) \
+                             + "_smoothing_n_gaussians_" + str(smoothing_n_gaussians) + ".mgf"
+            print(input_filename)
+            if not os.path.isfile(input_filename):  # check if file exists; create if it doesn't
+                preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
+                                                output_filename=input_filename, sigma=smoothness_sigma)
+
         unprocessed_spectra = DataLoading.load_mgf_file(input_filename)
     else:
-        if use_smoothed_intensities and smoothness_sigma:
-            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + ".msp"
+        if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
+            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + \
+                             "_smoothing_n_gaussians_" + str(smoothing_n_gaussians) + ".msp"
+            print(input_filename)
+            if not os.path.isfile(input_filename):  # check if file exists; create if it doesn't
+                preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
+                                                output_filename=input_filename, sigma=smoothness_sigma)
         unprocessed_spectra = DataLoading.load_msp_file(input_filename)
         is_identified_data = True
 
@@ -64,18 +74,20 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     peak_features = get_peaks_encoding(unprocessed_spectra, peak_encoding=peak_encoding,
                                        n_peaks_to_keep=n_peaks_to_keep, filter_on_charge=filter_on_charge,
                                        include_charge_in_encoding=include_charge_in_encoding,
-                                       include_molecular_weight_in_encoding=include_molecular_weight_in_encoding)
+                                       include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
+                                       max_intensity_value=max_intensity_value, max_mz_value=max_mz_value)
 
-    # filter the outliers
+    # filter the outliers (if we have location or distance encoding)
     print("Filtering the outliers..")
     n_data_points = len(peak_features)
-    feature_dim = n_peaks_to_keep * 3
-    # filter for intensity
-    peak_features = peak_features[np.all(peak_features[:, :feature_dim][:, ::3] < np.sqrt(max_intensity_value), axis=1)]
-    # filter for negative values
-    peak_features = peak_features[np.all(peak_features >= 0, axis=1)]
-    print(str(n_data_points - len(peak_features)) + " outliers out of " + str(n_data_points) + " data points have "
-                                                                                               "been removed.")
+    if peak_encoding == "location" or peak_encoding == "distance":
+        feature_dim = n_peaks_to_keep * 3
+        # filter for intensity
+        peak_features = peak_features[np.all(peak_features[:, :feature_dim][:, ::3] < np.sqrt(max_intensity_value), axis=1)]
+        # filter for negative values
+        peak_features = peak_features[np.all(peak_features >= 0, axis=1)]
+        print(str(n_data_points - len(peak_features)) + " outliers out of " + str(n_data_points) + " data points have "
+                                                                                                   "been removed.")
 
     # save the pre-processed data to some file
     data_identified = "identified" if is_identified_data else "unidentified"
@@ -97,8 +109,9 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     output_filename += "_n_peaks_" + str(n_peaks_to_keep)
     output_filename += "_max_intensity_" + str(max_intensity_value)
 
-    if use_smoothed_intensities and smoothness_sigma:
-        output_filename += "_smoothed_sigma_" + str(smoothness_sigma)
+    if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
+        output_filename += "_smoothed_sigma_" + str(smoothness_sigma) + "_smoothing_n_gaussians_" \
+                           + str(smoothing_n_gaussians)
 
     output_filename += ".txt"
 
@@ -109,7 +122,8 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
 
 
 def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter_on_charge=None,
-                       include_charge_in_encoding=True, include_molecular_weight_in_encoding=True):
+                       include_charge_in_encoding=True, include_molecular_weight_in_encoding=True,
+                       max_intensity_value=5000, max_mz_value=5000):
     """
     preprocesses the mass spec data by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
@@ -134,6 +148,8 @@ def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter
     :param include_charge_in_encoding: whether or not the charge should be appended to the peak_encoding
     :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
     peak_encoding
+    :param max_intensity_value: at which intensity value a peak should be considered as an outlier
+    :param max_mz_value: at which m/z value a peak should be considered as an outlier
     :return: list of lists with the feature representation of the spectra
     """
 
@@ -143,21 +159,29 @@ def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter
     # filter to keep only the n highest peaks
     filtered_peaks = [filter_spectrum(a, n_peaks_to_keep) for a in peaks]
     indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
-
-    print(filtered_peaks)
+    mass_spec_data = mass_spec_data[indices_to_keep]
 
     # remove None from the list
-    filtered_peaks = [i for i in filtered_peaks if i is not None]
+    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+    # filter outliers
+    indices_to_keep = np.all(filtered_peaks[:, :, 0] < max_mz_value, axis=1)        # m/z values
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+    mass_spec_data = mass_spec_data[indices_to_keep]
+
+    indices_to_keep = np.all(filtered_peaks[:, :, 1] < max_intensity_value, axis=1)        # intensities
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+    mass_spec_data = mass_spec_data[indices_to_keep]
 
     # create the features for the peaks ((1) square root of its height (2) its location (mz distance from 0) and
     # (3) its location relative to the precursor (mz distance relative to precursor))
     peak_features = np.array([create_features_for_peak(peak, peak_encoding) for peak in filtered_peaks])
 
     # get the charge
-    charge_list = np.array([spectrum["charge"] for spectrum in mass_spec_data])[indices_to_keep].reshape(-1, 1)
+    charge_list = np.array([spectrum["charge"] for spectrum in mass_spec_data]).reshape(-1, 1)
 
     # get the molecular weight
-    molecular_weight_list = np.array([spectrum["pepmass"] for spectrum in mass_spec_data])[indices_to_keep].reshape(-1, 1)
+    molecular_weight_list = np.array([spectrum["pepmass"] for spectrum in mass_spec_data]).reshape(-1, 1)
 
     # we are only interested in spectra with charge "filter_on_charge"
     if filter_on_charge:
@@ -218,6 +242,9 @@ def create_features_for_peak(peak, peak_encoding):
     elif peak_encoding == "distance":
         second_feature_vector = rel_distances.copy()
         second_feature_vector.insert(len(second_feature_vector), 0)  # last element has distance 0 to its successor
+    elif peak_encoding == "raw":
+        intensities = peak[:, 1]
+        return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
     else:
         raise ValueError(str(peak_encoding) + " is an invalid value for this parameter. Try 'location' or 'distance'.")
 
@@ -236,11 +263,11 @@ def filter_spectrum(peaks_in_spectrum, n_peaks_to_keep):
     :return: filtered lists
     """
 
-    # convert list to np.array
-    peaks_in_spectrum = np.array(peaks_in_spectrum)
-
     if len(peaks_in_spectrum) < n_peaks_to_keep:
         return None
+
+    # convert list to np.array
+    peaks_in_spectrum = np.array(peaks_in_spectrum)
 
     # get the intensities
     intensities = peaks_in_spectrum[:, 1]
@@ -336,145 +363,6 @@ def plot_spectras_boxplot():
     plt.show()
 
     return
-
-
-def plot_avg_spectra_for_sequence(mass_spec_data, sequence, n_peaks_to_keep=50):
-    """
-    plots the average spectrum for a certain sequence
-    :param mass_spec_data: array of dictionaries holding the mass spec data
-    :param sequence: string; sequence of spectra to plot
-    :param n_peaks_to_keep: number of peaks to keep
-    :return:
-    """
-
-    sequences = [spectrum["sequence"] for spectrum in mass_spec_data]
-    charges = [spectrum["charge"] for spectrum in mass_spec_data]
-
-    print(Counter(sequences))
-
-    return
-
-    indices = [i for i, e in enumerate(sequences) if e == sequence]
-
-    peaks = [spectrum["peaks"] for spectrum in mass_spec_data]
-    peaks = np.array(peaks)[indices]
-    charges = np.array(charges)[indices]
-
-    # filter to keep only the n highest peaks
-    filtered_peaks = [filter_spectrum(a, n_peaks_to_keep) for a in peaks]
-
-    # remove None from the list
-    charge_indices_to_keep = [i for i, e in enumerate(filtered_peaks) if e is not None]
-    charges = charges[charge_indices_to_keep]
-    print(charges)
-    filtered_peaks = [i for i in filtered_peaks if i is not None]
-
-    # get the indices of the respective charge value
-    available_charges = set(charges)
-    charge_indices = {}
-    for available_charge in available_charges:
-        for i, charge in enumerate(charges):
-            if charge == available_charge:
-                if charge_indices.get(available_charge):
-                    charge_indices[available_charge].append(i)
-                else:
-                    charge_indices[available_charge] = [i]
-    print(charge_indices)
-
-    mz_values = np.array([peak[:, 0] for peak in filtered_peaks])
-    intensities = np.array([peak[:, 1] for peak in filtered_peaks])
-
-    """
-    plot the spectra with the same charge      
-    """
-    if True:
-
-        for item, value in charge_indices.items():
-            if len(value) > 1:
-                print(item)
-                mz_values_charge_specific = mz_values[value]
-                intensities_charge_specific = intensities[value]
-
-                x_labels = np.tile(np.arange(1, mz_values_charge_specific.shape[1] + 1, 1),
-                                   (mz_values_charge_specific.shape[0], 1)).flatten().astype(str)
-                order_x_labels = np.arange(1, mz_values_charge_specific.shape[1] + 1, 1).astype(str)
-
-                # plot swarmplot
-                ax = sns.stripplot(x=x_labels, y=mz_values_charge_specific.flatten(), order=order_x_labels, zorder=0)
-                # plot boxplot
-                sns.boxplot(x=x_labels, y=mz_values_charge_specific.flatten(), order=order_x_labels,
-                            showcaps=False, boxprops={'facecolor': 'None'},
-                            showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
-                plt.title("M/Z values (Sequence: " + sequence + ", Charge: " + str(item) + ")")
-                plt.xlabel("Peak")
-                plt.ylabel("M/Z")
-                plt.show()
-
-                # plot swarmplot
-                ax = sns.stripplot(x=x_labels, y=intensities_charge_specific.flatten(), order=order_x_labels, zorder=0)
-                # plot boxplot
-                sns.boxplot(x=x_labels, y=intensities_charge_specific.flatten(), order=order_x_labels,
-                            showcaps=False, boxprops={'facecolor': 'None'},
-                            showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
-                plt.title("Intensities (Sequence: " + sequence + ", Charge: " + str(item) + ")")
-                plt.xlabel("Peak")
-                plt.ylabel("Intensity")
-                plt.show()
-
-        return
-
-    """
-    plot regardless of charge
-    """
-
-    if False:
-        if True:
-            # filter outliers for intensity
-            indices_to_keep = np.all(np.array(intensities) < 4000, axis=1)
-            print(indices_to_keep)
-            mz_values = mz_values[indices_to_keep, :]
-            intensities = intensities[indices_to_keep, :]
-
-        x_labels = np.tile(np.arange(1, mz_values.shape[1]+1, 1), (mz_values.shape[0], 1)).flatten().astype(str)
-        order_x_labels = np.arange(1, mz_values.shape[1]+1, 1).astype(str)
-
-        # plot swarmplot
-        ax = sns.stripplot(x=x_labels, y=mz_values.flatten(), order=order_x_labels, zorder=0)
-        # plot boxplot
-        sns.boxplot(x=x_labels, y=mz_values.flatten(), order=order_x_labels,
-                    showcaps=False, boxprops={'facecolor': 'None'},
-                    showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
-        plt.title("M/Z values (Sequence: " + sequence + ")")
-        plt.xlabel("Peak")
-        plt.ylabel("M/Z")
-        plt.show()
-
-        # plot swarmplot
-        ax = sns.stripplot(x=x_labels, y=intensities.flatten(), order=order_x_labels, zorder=0)
-        # plot boxplot
-        sns.boxplot(x=x_labels, y=intensities.flatten(), order=order_x_labels,
-                    showcaps=False, boxprops={'facecolor': 'None'},
-                    showfliers=False, whiskerprops={'linewidth': 0}, ax=ax)
-        plt.title("Intensities (Sequence: " + sequence + ")")
-        plt.xlabel("Peak")
-        plt.ylabel("Intensity")
-        plt.show()
-
-        for i, (mz_measurement, intensity_measurement) in enumerate(zip(mz_values, intensities)):
-            plt.stem(mz_measurement, intensity_measurement, label=str(i), markerfmt='o')
-
-        mean_mz_values = np.mean(mz_values, axis=0)
-        mean_intensities = np.mean(intensities, axis=0)
-
-        plt.stem(mean_mz_values, mean_intensities, label="average", markerfmt='o', linefmt=":")
-
-        plt.legend()
-
-        plt.ylabel("intensity")
-        plt.xlabel("m/z value")
-        plt.title("Avg. spectra (" + sequence + ") - yeast")
-
-        plt.show()
 
 
 def create_binned_encoding(spectra, n_bins, return_type=float):
@@ -778,53 +666,6 @@ def preprocess_only_intensities_distance_encoding():
             np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_intensities_distance_encoding.txt', rel_distances)
 
 
-def prepare_data_for_r():
-
-    filter_outliers = False
-    is_data_unidentified = False
-
-    if is_data_unidentified:
-        spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
-    else:
-        spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
-
-    peaks = [spectrum["peaks"] for spectrum in spectra]
-
-    # filter to keep only the n highest peaks
-    filtered_peaks = [filter_spectrum(a, 50) for a in peaks]
-
-    # remove None from the list
-    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
-
-    if filter_outliers:
-        # filter outliers
-        indices_to_keep = np.all(filtered_peaks[:, :, 1] < 3500, axis=1)
-        filtered_peaks = filtered_peaks[indices_to_keep, :, :]
-
-    print(filtered_peaks.shape)
-    print(filtered_peaks[0])
-
-    # first 50 values should encode the m/z values, the other 50 values should encode the intensity
-    # change order to 'C', if the m/z values and intensities should alternate
-    filtered_peaks = filtered_peaks.reshape((-1, 100), order='F')
-
-    print(filtered_peaks[0])
-    print(filtered_peaks.shape)
-
-    if filter_outliers:
-        if is_data_unidentified:
-            np.savetxt('../../data/mass_spec_data/yeast/data_for_r/yeast_unidentified_50_peaks_filtered_outliers.txt', filtered_peaks)
-        else:
-            np.savetxt('../../data/mass_spec_data/yeast/data_for_r/yeast_identified_50_peaks_filtered_outliers.txt', filtered_peaks)
-    else:
-        if is_data_unidentified:
-            np.savetxt('../../data/mass_spec_data/yeast/data_for_r/yeast_unidentified_50_peaks.txt', filtered_peaks)
-        else:
-            np.savetxt('../../data/mass_spec_data/yeast/data_for_r/yeast_identified_50_peaks.txt', filtered_peaks)
-
-    return
-
-
 def density_scatter_plot():
     unidentified_spectra = DataLoading.load_mgf_file(
         "../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
@@ -924,5 +765,138 @@ def preprocess_only_mz_values_with_charge_as_label(is_data_unidentified=True):
         np.savetxt('../../data/mass_spec_data/yeast/yeast_unidentified_only_mz_charge_label.txt', rel_distances_and_charge)
     else:
         np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_mz_charge_label.txt', rel_distances_and_charge)
+
+
+def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, max_intensity_value, output_filename,
+                                    sigma=1):
+    """
+    smoothes the intensities by using a number of gaussian evenly distributed along the m/z values [0, max_mz_value]
+    using the scipy function gaussian_filter with the respective sigma
+    :param n_peaks_to_keep: how many peaks one spectrum should contain
+    :param n_gaussians: how many gaussians should be used for smoothing the intensities
+    :param max_mz_value: at which value a peak should be considered as an outlier and thus be ignored
+    :param max_intensity_value: at which value a peak should be considered as an outlier and thus be ignored
+    :param output_filename: filename to write
+    :param sigma: scalar or sequence of scalars;
+    Standard deviation for Gaussian kernel. The standard deviations of the Gaussian filter are given for each axis as
+    a sequence, or as a single number, in which case it is equal for all axes.
+    :return:
+    """
+
+    print("Smoothing the intensities..")
+
+    is_data_identified = "unidentified" not in output_filename
+    if is_data_identified:
+        spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+    else:
+        spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+
+    peaks = [spectrum["peaks"] for spectrum in spectra]
+
+    # filter to keep only the n highest peaks
+    filtered_peaks = np.array([filter_spectrum(a, n_peaks_to_keep=n_peaks_to_keep) for a in peaks])
+    # get the indices where data is not None
+    valid_indices = [j for j, i in enumerate(filtered_peaks) if i is not None]
+    spectra = spectra[valid_indices]
+
+    # remove None from the list
+    filtered_peaks = np.array([i for i in filtered_peaks if i is not None]).astype(float)
+
+    # filter outliers
+    indices_to_keep = np.all(filtered_peaks[:, :, 0] < max_mz_value, axis=1)        # m/z values
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+    spectra = spectra[indices_to_keep]
+
+    indices_to_keep = np.all(filtered_peaks[:, :, 1] < max_intensity_value, axis=1)        # intensities
+    filtered_peaks = filtered_peaks[indices_to_keep, :, :]
+    spectra = spectra[indices_to_keep]
+
+    intensities = np.array(filtered_peaks[:, :, 1])
+    mz_values = np.array(filtered_peaks[:, :, 0])
+
+    """
+    smooth the intensities
+    """
+
+    mz_distance_per_gaussian = max_mz_value / n_gaussians       # distance between two gaussians
+
+    # assign each peak to one gaussian
+    smoothed_intensities = np.zeros(mz_values.shape)
+    list_gaussian_mz_values = []
+    list_gaussian_intensities = []
+    list_gaussian_smoothed_intensities = []
+
+    for i in range(n_gaussians):
+
+        # get the boolean indices for the m/z values within the current gaussian
+        lesser_array = i * mz_distance_per_gaussian < mz_values
+        greater_array = mz_values < (i+1) * mz_distance_per_gaussian
+        boolean_indices = lesser_array & greater_array
+
+        # get the m/z values for the current gaussian
+        mz_values_for_gaussian = mz_values[boolean_indices]
+        intensities_for_gaussian = intensities[boolean_indices]
+
+        # smooth the intensities
+        smoothed_intensities_for_gaussian = gaussian_filter(intensities_for_gaussian, sigma=sigma)
+
+        # store them at their respective position in the smoothed intensities array
+        smoothed_intensities[boolean_indices] = smoothed_intensities_for_gaussian
+
+        list_gaussian_mz_values.append(mz_values_for_gaussian)
+        list_gaussian_intensities.append(intensities_for_gaussian)
+        list_gaussian_smoothed_intensities.append(smoothed_intensities_for_gaussian)
+
+    smoothed_intensities = np.around(smoothed_intensities, decimals=3)
+
+    """
+    write the smoothed intensities to some file
+    """
+    if is_data_identified:
+        write_smoothed_intensities_to_msp_file(smoothed_intensities, spectra, filename=output_filename)
+    else:
+        write_smoothed_intensities_to_mgf_file(smoothed_intensities, spectra, filename=output_filename)
+
+
+def write_smoothed_intensities_to_msp_file(smoothed_intensities, spectra, filename):
+    """
+    writes the smoothed intensities back to the respective .msp file
+    :param smoothed_intensities: [n_datapoints, n_peaks] array holding the smoothed intensities
+    :param spectra: [n_datapoints, n_peaks] array of dictionaries holding the title, charge, pepmass and m/z values
+    :param filename: filename of the file to write
+    :return:
+    """
+    num_peaks = smoothed_intensities.shape[1]
+    with open(filename, 'w') as output_file:
+        for spectrum, spectrum_smoothed_intensities in zip(spectra, smoothed_intensities):
+            output_file.write("Name: " + spectrum["title"] + "\n")
+            output_file.write("MW: " + spectrum["pepmass"] + "\n")
+            output_file.write("Comment: " + spectrum["comment"] + "\n")
+            output_file.write("Num peaks: " + str(num_peaks) + "\n")
+            for peak, peak_smoothed_intensity in zip(spectrum["peaks"], spectrum_smoothed_intensities):
+                output_file.write(str(peak[0]) + " " + str(peak_smoothed_intensity) + "\n")
+            output_file.write("\n")
+
+
+def write_smoothed_intensities_to_mgf_file(smoothed_intensities, spectra, filename):
+    """
+    writes the smoothed intensities back to the respective .mgf file
+    :param smoothed_intensities: [n_datapoints, n_peaks] array holding the smoothed intensities
+    :param spectra: [n_datapoints, n_peaks] array of dictionaries holding the title, charge, pepmass and m/z values
+    :param filename: filename of the file to write
+    :return:
+    """
+    with open(filename, 'w') as output_file:
+        for spectrum, spectrum_smoothed_intensities in zip(spectra, smoothed_intensities):
+            output_file.write("BEGIN IONS\n")
+            output_file.write("TITLE=" + spectrum["title"] + ",sequence=" + spectrum["sequence"] + "\n")
+            output_file.write("PEPMASS=" + spectrum["pepmass"] + "\n")
+            output_file.write("CHARGE=" + spectrum["charge"] + "+\n")
+            output_file.write("SEQUENCE=" + spectrum["sequence"] + "\n")
+            for peak, peak_smoothed_intensity in zip(spectrum["peaks"], spectrum_smoothed_intensities):
+                output_file.write(str(peak[0]) + " " + str(peak_smoothed_intensity) + "\n")
+            output_file.write("END IONS\n\n")
+
+
 
 

@@ -255,7 +255,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         """
         Init the optimizers
         """
-
         optimizer_autoencoder = parameter_dictionary["optimizer_autoencoder"]
         optimizer_discriminator = parameter_dictionary["optimizer_discriminator"]
         optimizer_generator = parameter_dictionary["optimizer_generator"]
@@ -774,8 +773,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         else:
             # creates evenly spaced values within [-10, 10] with a spacing of 1.5
-            x_points = np.arange(10, -10, -1.5).astype(np.float32)
-            y_points = np.arange(-10, 10, 1.5).astype(np.float32)
+            x_points = np.arange(10, -10, -2).astype(np.float32)
+            y_points = np.arange(-10, 10, 2).astype(np.float32)
 
         nx, ny = 10, 10
         # create the image grid
@@ -908,7 +907,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         epochs_completed = 0
 
         step = 0
-        # with tf.Session() as sess:
         with self.session as sess:
 
             # init the tf variables
@@ -1005,6 +1003,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                                     self.parameter_dictionary["dropout_discriminator"]})
 
                         # every x epochs: write a summary for every 50th minibatch
+                        # if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
                         if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
@@ -1155,7 +1154,7 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
                 self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last", points=None)
 
-            # TODO: end training has probably only to be called with train=True
+            # after training..
             if epochs_completed > 0:
                 # end the training
                 self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,

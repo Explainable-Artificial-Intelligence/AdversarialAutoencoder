@@ -223,7 +223,7 @@ def add_gaussian_noise_to_array(np_array, std_dev=0.1):
     return np.abs(np_array + noise)
 
 
-def get_input_data(selected_dataset, filepath="../data", color_scale="gray_scale", data_normalized=False,
+def get_input_data(selected_dataset, filepath="../../data", color_scale="gray_scale", data_normalized=False,
                    add_noise=False, mass_spec_data_properties=None):
     """
     returns the input data set based on self.selected_dataset
@@ -370,6 +370,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     charge = mass_spec_data_properties["charge"]                                # e.g. "2" or None
     use_smoothed_intensities = mass_spec_data_properties.get("use_smoothed_intensities")    # True or False
     smoothness_sigma = mass_spec_data_properties.get("smoothness_sigma")    # float or None
+    smoothing_n_gaussians = mass_spec_data_properties.get("smoothing_n_gaussians")    # int or None
     data_subset = mass_spec_data_properties.get("data_subset")             # None, "identified", "unidentified"
 
     if include_charge_in_encoding and include_molecular_weight_in_encoding:
@@ -472,7 +473,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         return Datasets(train=train, validation=validation, test=test)
 
     if mass_spec_data_properties["peak_encoding"] == "only_intensities":
-        input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_intensities_log10.txt"
+        input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_intensities.txt"
         identified_spectra = np.loadtxt(input_file_name)
         identified_spectra_labels = [1] * identified_spectra.shape[0]
 
@@ -499,6 +500,17 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
 
         # separate data in train and test data
         n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
+
+        if mass_spec_data_properties["normalize_data"]:
+
+            # use gaussian normalization
+            mean = np.mean(all_spectra, axis=0)
+            std_dev = np.std(all_spectra, axis=0)
+            all_spectra = (all_spectra - mean) / std_dev
+
+            # save the respective minima and peak to peak distances in the storage class (so we can revert the
+            # normalization later on)
+            Storage.set_mass_spec_data_normalization_properties({"mean": mean, "std_dev": std_dev})
 
         train_images = all_spectra[:n_training_points]
         train_labels = all_spectra_labels[:n_training_points]
@@ -608,23 +620,25 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         input_file_name += "_charge_" + charge
     input_file_name += "_n_peaks_" + str(n_peaks_to_keep)
     input_file_name += "_max_intensity_" + str(max_intensity_value)
-    if use_smoothed_intensities and smoothness_sigma:
-        input_file_name += "_smoothed_sigma_" + str(smoothness_sigma)
+    if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
+        input_file_name += "_smoothed_sigma_" + str(smoothness_sigma) + "_smoothing_n_gaussians_" \
+                           + str(smoothing_n_gaussians)
     input_file_name += ".txt"
 
     """
     read the identified spectra
     """
+    print("Checking for file: ", input_file_name)
     if not os.path.isfile(input_file_name):     # check if file exists
         print("Pre-processed data not found! Data is now being pre-processed..")
         DataPreprocessing.preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
                                   + "_identified.msp", organism_name,
-                                  n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
-                                  max_intensity_value=max_intensity_value, filter_on_charge=charge,
-                                  include_charge_in_encoding=include_charge_in_encoding,
-                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
+                                                    n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
+                                                    max_intensity_value=max_intensity_value, filter_on_charge=charge,
+                                                    include_charge_in_encoding=include_charge_in_encoding,
+                                                    include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
                                                     use_smoothed_intensities=use_smoothed_intensities,
-                                                    smoothness_sigma=smoothness_sigma)
+                                                    smoothness_sigma=smoothness_sigma, smoothing_n_gaussians=smoothing_n_gaussians)
     identified_spectra = np.loadtxt(input_file_name)
     identified_spectra_labels = [1] * identified_spectra.shape[0]
 
@@ -632,16 +646,17 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     read the unidentified spectra
     """
     input_file_name = input_file_name.replace("identified", "unidentified")
+    print("Checking for file: ", input_file_name)
     if not os.path.isfile(input_file_name):     # check if file exists
         print("Pre-processed data not found! Data is now being pre-processed..")
         DataPreprocessing.preprocess_mass_spec_file(filepath + "/mass_spec_data/" + organism_name + "/" + organism_name
                                   + "_unidentified.mgf", organism_name,
-                                  n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
-                                  max_intensity_value=max_intensity_value, filter_on_charge=charge,
-                                  include_charge_in_encoding=include_charge_in_encoding,
-                                  include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
+                                                    n_peaks_to_keep=n_peaks_to_keep, peak_encoding=peak_encoding,
+                                                    max_intensity_value=max_intensity_value, filter_on_charge=charge,
+                                                    include_charge_in_encoding=include_charge_in_encoding,
+                                                    include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
                                                     use_smoothed_intensities=use_smoothed_intensities,
-                                                    smoothness_sigma=smoothness_sigma)
+                                                    smoothness_sigma=smoothness_sigma, smoothing_n_gaussians=smoothing_n_gaussians)
     unidentified_spectra = np.loadtxt(input_file_name)
     unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
 
@@ -675,25 +690,42 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
             return (feature_vector - np.min(feature_vector)) / np.ptp(feature_vector), np.min(feature_vector), \
                    np.ptp(feature_vector)
 
-        # every third value encodes the first feature; so we need to normalize only them (and ignore the special
-        # features); furthermore we need the minimum and the peak to peak distance for reverting the normalization later
-        all_spectra[:, :feature_dim - n_special_features][:, ::3], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
-            all_spectra[:, :feature_dim - n_special_features][:, ::3])
-        # normalize second feature vector
-        all_spectra[:, :feature_dim - n_special_features][:,
-        1::3], min_second_feature_vector, ptp_second_feature_vector = normalize_feature_vector(
-            all_spectra[:, :feature_dim - n_special_features][:, 1::3])
-        # normalize third feature vector
-        all_spectra[:, :feature_dim - n_special_features][:,
-        2::3], min_third_feature_vector, ptp_third_feature_vector = normalize_feature_vector(
-            all_spectra[:, :feature_dim - n_special_features][:, 2::3])
+        if peak_encoding == "distance" or peak_encoding == "location":
+            # every third value encodes the first feature; so we need to normalize only them (and ignore the special
+            # features); furthermore we need the minimum and the peak to peak distance for reverting the normalization later
+            all_spectra[:, :feature_dim - n_special_features][:, ::3], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features][:, ::3])
+            # normalize second feature vector
+            all_spectra[:, :feature_dim - n_special_features][:,
+            1::3], min_second_feature_vector, ptp_second_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features][:, 1::3])
+            # normalize third feature vector
+            all_spectra[:, :feature_dim - n_special_features][:,
+            2::3], min_third_feature_vector, ptp_third_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features][:, 2::3])
 
-        # save the respective minima and peak to peak distances in the storage class (so we can revert the
-        # normalization later on)
-        Storage.set_mass_spec_data_normalization_properties(
-            {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector],
-             "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
-             "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
+            # save the respective minima and peak to peak distances in the storage class (so we can revert the
+            # normalization later on)
+            Storage.set_mass_spec_data_normalization_properties(
+                {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector],
+                 "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
+                 "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
+
+        elif peak_encoding == "raw":
+            # normalize m/z values
+            all_spectra[:, :feature_dim - n_special_features][:, ::2], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features][:, ::2])
+
+            # normalize intensities
+            all_spectra[:, :feature_dim - n_special_features][:, 1::2], min_second_feature_vector, ptp_second_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features][:, 1::2])
+
+            # save the respective minima and peak to peak distances in the storage class (so we can revert the
+            # normalization later on)
+            Storage.set_mass_spec_data_normalization_properties(
+                {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector],
+                 "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector]})
+
 
     train_images = all_spectra[:n_training_points]
     train_labels = all_spectra_labels[:n_training_points]

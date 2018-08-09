@@ -25,6 +25,11 @@ def set_tuning_status(tuning_status_to_set):
     tuning_status = tuning_status_to_set
 
 
+def get_params_from_params_file(params_filename):
+    # get the used parameters from the params.txt file
+    return json.load(open(params_filename))
+
+
 def init_aae_with_params_file(params_filename, used_aae):
     """
     returns a adversarial autoencoder initiated with the provided parameter file

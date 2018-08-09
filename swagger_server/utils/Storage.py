@@ -11,7 +11,6 @@ class Storage(object):
     selected_dataset = None
 
     # number of channels based on the data set
-    # TODO: deal with svhn and gray scale
     n_channels = None
 
     #

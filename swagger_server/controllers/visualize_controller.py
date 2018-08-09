@@ -111,9 +111,9 @@ def generate_image_from_single_point_and_single_label(single_point, class_label)
     operation = {"generate_image_from_single_point_and_single_label": (single_point, one_hot_label)}
     aae.add_to_requested_operations_by_swagger(operation)
 
-    # training is still in progress
+    # training has already stopped ..
     if aae.get_train_status() == "stop":
-        #
+        # .. so we restart the aae
         aae.train(False)
 
     total_waiting_time = 0
@@ -171,9 +171,11 @@ def generate_image_grid():
     operation = {"generate_image_grid": ""}
     aae.add_to_requested_operations_by_swagger(operation)
 
-    # training is still in progress
+    print(aae.get_train_status())
+
+    # training has already stopped ..
     if aae.get_train_status() == "stop":
-        #
+        # .. so we restart the aae
         aae.train(False)
 
     total_waiting_time = 0
@@ -246,9 +248,9 @@ def classify_single_image(single_image):
     operation = {"classify_single_image": single_image}
     aae.add_to_requested_operations_by_swagger(operation)
 
-    # training has stopped
+    # training has already stopped ..
     if aae.get_train_status() == "stop":
-        # restart aae and predict the label
+        # .. so we restart the aae
         aae.train(False)
 
     total_waiting_time = 0

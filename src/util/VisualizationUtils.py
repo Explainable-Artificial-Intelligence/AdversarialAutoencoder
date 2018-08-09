@@ -1252,7 +1252,6 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
     :return:
     """
 
-    # TODO: only temporary:
     if mass_spec_data_properties["peak_encoding"] == "binned":
         bin_size = 2500 / feature_dim
 
@@ -1282,8 +1281,13 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         return reconstructed_mz_values, intensities, charges, molecular_weights
 
     elif mass_spec_data_properties["peak_encoding"] == "only_intensities":
-        # TODO: reconstruction
-        intensities = 10 ** mass_spec_data
+        intensities = mass_spec_data
+
+        # in case the data is normalized, get the original values back
+        if mass_spec_data_properties["normalize_data"]:
+            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
+            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
+            intensities = intensities * std_dev + mean
 
         # we want m/z values from 0 to 1500
         n_data_points = mass_spec_data.shape[0]
@@ -1332,32 +1336,54 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         charges = ["NaN"] * mass_spec_data.shape[0]
         molecular_weights = ["NaN"] * mass_spec_data.shape[0]
 
-    # square root of its height
-    intensities = mz_intensity_values[:, ::3]
-    if is_data_normalized:
-        # revert normalization
-        min_first_feature_vector, ptp_first_feature_vector = Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
-        intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
-    # get the original intensities back
-    intensities = intensities ** 2
+    if mass_spec_data_properties["peak_encoding"] == "distance" or \
+                    mass_spec_data_properties["peak_encoding"] == "location":
 
-    if mass_spec_data_properties["peak_encoding"] == "distance":
-        # its location (mz distance relative to successor)
-        mz_values = mz_intensity_values[:, 2::3]
-        mz_values = np.array([[sum(entry[:i+1]) for i, x in enumerate(entry)] for entry in mz_values])
+        # square root of its height
+        intensities = mz_intensity_values[:, ::3]
         if is_data_normalized:
             # revert normalization
-            min_feature_vector, ptp_feature_vector = \
-                Storage.get_mass_spec_data_normalization_properties()["third_feature_vector"]
-            mz_values = mz_values * ptp_feature_vector + min_feature_vector
-    else:
-        # its location (mz distance from 0)
-        mz_values = mz_intensity_values[:, 1::3]
+            min_first_feature_vector, ptp_first_feature_vector = Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
+        # get the original intensities back
+        intensities = intensities ** 2
+
+        if mass_spec_data_properties["peak_encoding"] == "distance":
+            # its location (mz distance relative to successor)
+            mz_values = mz_intensity_values[:, 2::3]
+            mz_values = np.array([[sum(entry[:i+1]) for i, x in enumerate(entry)] for entry in mz_values])
+            if is_data_normalized:
+                # revert normalization
+                min_feature_vector, ptp_feature_vector = \
+                    Storage.get_mass_spec_data_normalization_properties()["third_feature_vector"]
+                mz_values = mz_values * ptp_feature_vector + min_feature_vector
+        elif mass_spec_data_properties["peak_encoding"] == "location":
+            # its location (mz distance from 0)
+            mz_values = mz_intensity_values[:, 1::3]
+            if is_data_normalized:
+                # revert normalization
+                min_feature_vector, ptp_feature_vector = \
+                    Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
+                mz_values = mz_values * ptp_feature_vector + min_feature_vector
+
+    elif mass_spec_data_properties["peak_encoding"] == "raw":
+        mz_values = mz_intensity_values[:, ::2]
+        intensities = mz_intensity_values[:, 1::2]
+
         if is_data_normalized:
-            # revert normalization
-            min_feature_vector, ptp_feature_vector = \
+            # revert normalization for m/z values
+            min_first_feature_vector, ptp_first_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            mz_values = mz_values * ptp_first_feature_vector + min_first_feature_vector
+
+            # revert intensities
+            min_second_feature_vector, ptp_second_feature_vector = \
                 Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
-            mz_values = mz_values * ptp_feature_vector + min_feature_vector
+            intensities = intensities * ptp_second_feature_vector + min_second_feature_vector
+
+    else:
+        raise ValueError(mass_spec_data_properties["peak_encoding"] + " is invalid! Try 'distance', 'location' or "
+                                                                      "'raw' instead")
 
     return mz_values, intensities, charges, molecular_weights
 
@@ -1383,7 +1409,7 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
 
     # create the path where the weight images should be stored
     result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
-                       str(epoch) + "_mass_specs_spectra_" + ".png"
+                       str(epoch) + "_mass_specs_spectra" + ".png"
 
     # calculate the average difference between original and reconstruction
     mz_values_loss = np.abs(mz_values_reconstructed - mz_values_original)
@@ -1391,8 +1417,7 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
 
     # add offset to the m/z values, so we can see the difference between original and reconstruction
     if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values" or \
-        aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label" or \
-                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
+                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label":
 
         # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
         # and original
@@ -1407,7 +1432,8 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
         plt.xlabel("original")
         plt.ylabel("reconstructed")
 
-    elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities":
+    elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities" or \
+                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
 
         # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
         # and original
@@ -1542,6 +1568,14 @@ def visualize_mass_spec_loss(aae_class, epoch):
 
 
 def cluster_latent_space(latent_representations_current_epoch, labels_current_epoch, result_path, epoch):
+    """
+    clusters the latent space
+    :param latent_representations_current_epoch: list of the latent representations of the current epoch
+    :param labels_current_epoch: list of the labels of the current epoch
+    :param result_path: path to save the figures to
+    :param epoch: current epoch; for the filename
+    :return:
+    """
 
     plt.rcParams["figure.figsize"] = (6.4*2, 4.8)
 
@@ -1563,9 +1597,6 @@ def cluster_latent_space(latent_representations_current_epoch, labels_current_ep
         pca.fit(latent_representations_current_epoch)
         latent_representations_current_epoch = pca.transform(latent_representations_current_epoch)
 
-        plt.xlabel("Principal component 1: " + "{:6.4f}".format(pca.explained_variance_ratio_[0]))
-        plt.ylabel("Principal component 2: " + "{:6.4f}".format(pca.explained_variance_ratio_[1]))
-
     """
     Plot the latent space
     """
@@ -1582,6 +1613,9 @@ def cluster_latent_space(latent_representations_current_epoch, labels_current_ep
         plt.scatter(points_for_current_class_label[:, 0], points_for_current_class_label[:, 1], label=str(class_label),
                     alpha=0.5)
     plt.title("Latent space")
+    if z_dim > 2:
+        plt.xlabel("Principal component 1: " + "{:6.4f}".format(pca.explained_variance_ratio_[0]))
+        plt.ylabel("Principal component 2: " + "{:6.4f}".format(pca.explained_variance_ratio_[1]))
     plt.legend()
 
     """
@@ -1615,10 +1649,6 @@ def reconstruct_generated_mass_spec_data(aae_class, generated_mass_spec_data, ep
 
     # convert the 3d lists to a 2d numpy array
     generated_mass_spec_data = np.array([i[0] for i in generated_mass_spec_data])
-
-    mz_values, intensities, charges, molecular_weights \
-        = reconstruct_spectrum_from_feature_vector(generated_mass_spec_data, aae_class.input_dim,
-                                                   aae_class.mass_spec_data_properties)
 
     create_mgf_file(aae_class, epoch, generated_mass_spec_data, "generated")
 

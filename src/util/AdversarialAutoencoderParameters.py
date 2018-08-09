@@ -12,17 +12,17 @@ def get_result_path_for_selected_autoencoder(selected_autoencoder):
     :return: string, where to save the result files for training the autoencoder
     """
     if selected_autoencoder == "Unsupervised":
-        return '../results/Unsupervised'
+        return '../../results/Unsupervised'
     elif selected_autoencoder == "Supervised":
-        return '../results/Supervised'
+        return '../../results/Supervised'
     elif selected_autoencoder == "SemiSupervised":
-        return '../results/SemiSupervised'
+        return '../../results/SemiSupervised'
     elif selected_autoencoder == "UnsupervisedClustering":
-        return '../results/UnsupervisedClustering'
+        return '../../results/UnsupervisedClustering'
     elif selected_autoencoder == "DimensionalityReduction":
-        return '../results/DimensionalityReduction'
+        return '../../results/DimensionalityReduction'
     elif selected_autoencoder == "IncorporatingLabelInformation":
-        return '../results/IncorporatingLabelInformation'
+        return '../../results/IncorporatingLabelInformation'
     else:
         print(selected_autoencoder + " has no result path associated with it!")
         raise NotImplementedError
@@ -36,22 +36,21 @@ def get_default_parameters_mnist():
     return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2, 'n_classes': 10,
             'color_scale': "gray_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
             'n_labeled': 1000,  # for semi-supervised
+            'selected_dataset': "MNIST",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
             'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
 
-            'dropout_encoder': [0.2, 0.0, 0.0, 0.0, 0.0],
+            'dropout_encoder': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator': [0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator_c': [0.0, 0.0, 0.0],
             'dropout_discriminator_g': [0.0, 0.0, 0.0],
 
-            'batch_normalization_encoder': ["post_activation", "post_activation", "post_activation", "post_activation",
-                                            "post_activation"],
-            'batch_normalization_decoder': ["post_activation", "post_activation", "post_activation", "post_activation",
-                                            "post_activation"],
+            'batch_normalization_encoder': [None, None, None, None, None],
+            'batch_normalization_decoder': [None, None, None, None, None],
             'batch_normalization_discriminator': [None, None, None, None, None],
             # for semi-supervised:
             'batch_normalization_discriminator_c': ["post_activation", "post_activation", "post_activation"],
@@ -258,6 +257,7 @@ def get_default_parameters_svhn():
     return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2, 'n_classes': 10,
             'color_scale': "rgb_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
             'n_labeled': 1000,  # for semi-supervised
+            'selected_dataset': "SVHN",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
             'n_neurons_of_hidden_layer_x_autoencoder': [3000, 1500, 750, 375],
             'n_neurons_of_hidden_layer_x_discriminator': [3000, 1500, 750, 375],
@@ -480,14 +480,15 @@ def get_default_parameters_cifar10():
     """
     return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 32, 'input_dim_y': 32, 'z_dim': 2, 'n_classes': 10,
             'color_scale': "rgb_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
-            'n_labeled': 1000,  # for semi-supervised
+            'n_labeled': 1000,  # for semi-supervised,
+            'selected_dataset': "cifar10",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
             'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],
             'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
 
-            'dropout_encoder': [0.2, 0.0, 0.0],
+            'dropout_encoder': [0.0, 0.0, 0.0],
             'dropout_decoder': [0.0, 0.0, 0.0],
             'dropout_discriminator': [0.0, 0.0, 0.0],
             'dropout_discriminator_c': [0.0, 0.0, 0.0],
@@ -691,7 +692,7 @@ def get_default_parameters_mass_spec():
     """
     return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 1, 'input_dim_y': 150, 'z_dim': 2, 'n_classes': 2,
             'color_scale': "gray_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
-            'n_labeled': 1000,  'only_train_autoencoder': True,
+            'n_labeled': 1000,  'only_train_autoencoder': True, 'selected_dataset': "mass_spec",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
 
             'mass_spec_data_properties': {"organism_name": "yeast", "peak_encoding": "distance",
@@ -935,7 +936,6 @@ def get_default_parameters(selected_autoencoder, selected_dataset):
     else:
         raise ValueError("Dataset " + selected_dataset + " not found.")
 
-    param_dict["selected_dataset"] = selected_dataset
     param_dict["results_path"] = get_result_path_for_selected_autoencoder(selected_autoencoder)
     return param_dict
 
@@ -1472,7 +1472,9 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     MomentumOptimizer_use_nesterov_generator = random.choice([True, False])
 
     # AdamOptimizer
-    #   - learning rate; default: 0.001
+    #   - learning rate; default: 0.001; The proportion that weights are updated (e.g. 0.001). Larger values (e.g. 0.3)
+    #       results in faster initial learning before the rate is updated. Smaller values (e.g. 1.0E-5) slow learning
+    #       right down during training
     #   - beta1: A float value or a constant float tensor. The exponential decay rate for the 1st moment estimates.
     #   default: 0.9
     #   - beta2: A float value or a constant float tensor. The exponential decay rate for the 2nd moment estimates.

@@ -279,6 +279,37 @@ paths:
           description: "File parsing error"
       x-swagger-router-controller: "swagger_server.controllers.build_controller"
 
+  /Build/loadTrainedAAE:
+    post:
+      tags: [Build]
+      summary: loads an already trained autoencoder
+      description: loads the trained autoencoder stored in the provided filepath
+      operationId: load_trained_aae
+      parameters:
+        - in: "query"
+          name: "selected_autoencoder"
+          type: string
+          enum: ["Unsupervised", "Supervised", "SemiSupervised", "IncorporatingLabelInformation",
+          "UnsupervisedClustering", "DimensionalityReduction"]
+          description: "what autoencoder to use; IMPORTANT: make sure you select the correct autoencoder!"
+          default: "Unsupervised"
+          format: string
+        - in: "query"
+          name: "filepath"
+          type: string
+          description: "filepath to the params file of the trained autoencoder"
+          required: true
+      responses:
+        200:
+          description: "AAE successfully built"
+        400:
+          description: "Bad request. Input parameters are in"
+        404:
+          description: "Not found"
+        415:
+          description: "File parsing error"
+      x-swagger-router-controller: "swagger_server.controllers.build_controller"
+
   /Train/controlTraining:
     post:
       tags: [Train]
