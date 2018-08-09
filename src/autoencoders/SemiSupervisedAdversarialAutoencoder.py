@@ -1513,6 +1513,11 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                             self.performance_over_time["mz_values_loss"].append(np.mean(mz_values_loss))
                             self.performance_over_time["intensities_loss"].append(np.mean(intensities_loss))
 
+                            with open(log_path + '/log_mass_spec_reconstruction.txt', 'a') as log:
+                                log.write("Epoch: {}\n".format(epoch))
+                                log.write("M/Z values Loss: {}\n".format(np.mean(mz_values_loss)))
+                                log.write("Intensities Loss: {}\n".format(np.mean(intensities_loss)))
+
                             # visualize the mass spec loss
                             visualize_mass_spec_loss(self, epoch)
 
