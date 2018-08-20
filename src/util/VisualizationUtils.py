@@ -1252,7 +1252,29 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
     :return:
     """
 
-    if mass_spec_data_properties["peak_encoding"] == "binned":
+    is_data_normalized = mass_spec_data_properties["normalize_data"]
+    peak_encoding = mass_spec_data_properties["peak_encoding"]
+
+    # get the charge and molecular weight; remove them from the mass_spec_data array
+    if mass_spec_data_properties["include_charge_in_encoding"] \
+            and mass_spec_data_properties["include_molecular_weight_in_encoding"]:
+        charges = mass_spec_data[:, feature_dim - 2]
+        molecular_weights = mass_spec_data[:, feature_dim - 1]
+        mass_spec_data = mass_spec_data[:, :feature_dim - 2]
+    elif mass_spec_data_properties["include_charge_in_encoding"]:
+        charges = mass_spec_data[:, feature_dim - 1]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+        mass_spec_data = mass_spec_data[:, :feature_dim - 1]
+    elif mass_spec_data_properties["include_molecular_weight_in_encoding"]:
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = mass_spec_data[:, feature_dim - 1]
+        mass_spec_data = mass_spec_data[:, :feature_dim - 1]
+    else:
+        charges = ["NaN"] * mass_spec_data.shape[0]
+        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+
+    # TODO: binned
+    if peak_encoding == "binned":
         bin_size = 2500 / feature_dim
 
         def keep_top_peaks(spectrum, n_peaks_to_keep=50):
@@ -1268,23 +1290,43 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         charges = ["NaN"] * mass_spec_data.shape[0]
         molecular_weights = ["NaN"] * mass_spec_data.shape[0]
 
-        return mz_values, intensities, charges, molecular_weights
+    elif peak_encoding == "only_mz" or peak_encoding == "only_mz_charge_label" or peak_encoding == "only_mz_distance":
+        if peak_encoding == "only_mz_distance":
+            mz_values = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
+        else:
+            mz_values = mass_spec_data
 
-    elif mass_spec_data_properties["peak_encoding"] == "only_mz_values" \
-            or mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label":
-        reconstructed_mz_values = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
-        intensities = reconstructed_mz_values.copy()
+        # in case the data is normalized, get the original values back
+        if is_data_normalized:
+            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
+            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
+            mz_values = mz_values * std_dev + mean
+
+        intensities = mz_values.copy()
         intensities.fill(1000)
-        charges = ["NaN"] * mass_spec_data.shape[0]
-        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
 
-        return reconstructed_mz_values, intensities, charges, molecular_weights
-
-    elif mass_spec_data_properties["peak_encoding"] == "only_intensities":
+    elif peak_encoding == "only_intensities":
         intensities = mass_spec_data
 
         # in case the data is normalized, get the original values back
-        if mass_spec_data_properties["normalize_data"]:
+        if is_data_normalized:
+            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
+            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
+            intensities = intensities * std_dev + mean
+
+        intensities = intensities ** 2
+
+        # we want m/z values from 0 to 1500
+        n_data_points = mass_spec_data.shape[0]
+        n_peaks = mass_spec_data_properties["n_peaks_to_keep"] + 1
+        mz_values = np.arange(n_peaks, 1500, 1500 / n_peaks)      # create the m/z values for one spectrum
+        mz_values = np.tile(mz_values, (n_data_points, 1))          # we need n_data_points m/z value arrays
+
+    elif peak_encoding == "only_intensities_distance":
+        intensities = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
+
+        # in case the data is normalized, get the original values back
+        if is_data_normalized:
             mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
             std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
             intensities = intensities * std_dev + mean
@@ -1295,52 +1337,10 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         mz_values = np.arange(n_peaks, 1500, 1500 / n_peaks)      # create the m/z values for one spectrum
         mz_values = np.tile(mz_values, (n_data_points, 1))          # we need n_data_points m/z value arrays
 
-        charges = ["NaN"] * mass_spec_data.shape[0]
-        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
-
-        return mz_values, intensities, charges, molecular_weights
-
-    elif mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
-        intensities = np.array([[sum(entry[:i + 1]) for i, x in enumerate(entry)] for entry in mass_spec_data])
-
-        # we want m/z values from 0 to 1500
-        n_data_points = mass_spec_data.shape[0]
-        n_peaks = mass_spec_data_properties["n_peaks_to_keep"] + 1
-        mz_values = np.arange(n_peaks, 1500, 1500 / n_peaks)      # create the m/z values for one spectrum
-        mz_values = np.tile(mz_values, (n_data_points, 1))          # we need n_data_points m/z value arrays
-
-        charges = ["NaN"] * mass_spec_data.shape[0]
-        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
-
-        return mz_values, intensities, charges, molecular_weights
-
-    ###################################################################################################################
-
-    is_data_normalized = mass_spec_data_properties["normalize_data"]
-
-    if mass_spec_data_properties["include_charge_in_encoding"] \
-            and mass_spec_data_properties["include_molecular_weight_in_encoding"]:
-        mz_intensity_values = mass_spec_data[:, :feature_dim - 2]
-        charges = mass_spec_data[:, feature_dim - 2]
-        molecular_weights = mass_spec_data[:, feature_dim - 1]
-    elif mass_spec_data_properties["include_charge_in_encoding"]:
-        mz_intensity_values = mass_spec_data[:, :feature_dim - 1]
-        charges = mass_spec_data[:, feature_dim - 1]
-        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
-    elif mass_spec_data_properties["include_molecular_weight_in_encoding"]:
-        mz_intensity_values = mass_spec_data[:, :feature_dim - 1]
-        charges = ["NaN"] * mass_spec_data.shape[0]
-        molecular_weights = mass_spec_data[:, feature_dim - 1]
-    else:
-        mz_intensity_values = mass_spec_data[:, :feature_dim]
-        charges = ["NaN"] * mass_spec_data.shape[0]
-        molecular_weights = ["NaN"] * mass_spec_data.shape[0]
-
-    if mass_spec_data_properties["peak_encoding"] == "distance" or \
-                    mass_spec_data_properties["peak_encoding"] == "location":
+    elif peak_encoding == "distance":
 
         # square root of its height
-        intensities = mz_intensity_values[:, ::3]
+        intensities = mass_spec_data[:, ::3]
         if is_data_normalized:
             # revert normalization
             min_first_feature_vector, ptp_first_feature_vector = Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
@@ -1348,27 +1348,37 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         # get the original intensities back
         intensities = intensities ** 2
 
-        if mass_spec_data_properties["peak_encoding"] == "distance":
-            # its location (mz distance relative to successor)
-            mz_values = mz_intensity_values[:, 2::3]
-            mz_values = np.array([[sum(entry[:i+1]) for i, x in enumerate(entry)] for entry in mz_values])
-            if is_data_normalized:
-                # revert normalization
-                min_feature_vector, ptp_feature_vector = \
-                    Storage.get_mass_spec_data_normalization_properties()["third_feature_vector"]
-                mz_values = mz_values * ptp_feature_vector + min_feature_vector
-        elif mass_spec_data_properties["peak_encoding"] == "location":
-            # its location (mz distance from 0)
-            mz_values = mz_intensity_values[:, 1::3]
-            if is_data_normalized:
-                # revert normalization
-                min_feature_vector, ptp_feature_vector = \
-                    Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
-                mz_values = mz_values * ptp_feature_vector + min_feature_vector
+        # its location (mz distance relative to successor)
+        mz_values = mass_spec_data[:, 2::3]
+        mz_values = np.array([[sum(entry[:i+1]) for i, x in enumerate(entry)] for entry in mz_values])
+        if is_data_normalized:
+            # revert normalization
+            min_feature_vector, ptp_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["third_feature_vector"]
+            mz_values = mz_values * ptp_feature_vector + min_feature_vector
+
+    elif peak_encoding == "location":
+
+        # square root of its height
+        intensities = mass_spec_data[:, ::3]
+        if is_data_normalized:
+            # revert normalization
+            min_first_feature_vector, ptp_first_feature_vector = Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
+        # get the original intensities back
+        intensities = intensities ** 2
+
+        # its location (mz distance from 0)
+        mz_values = mass_spec_data[:, 1::3]
+        if is_data_normalized:
+            # revert normalization
+            min_feature_vector, ptp_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
+            mz_values = mz_values * ptp_feature_vector + min_feature_vector
 
     elif mass_spec_data_properties["peak_encoding"] == "raw":
-        mz_values = mz_intensity_values[:, ::2]
-        intensities = mz_intensity_values[:, 1::2]
+        mz_values = mass_spec_data[:, ::2]
+        intensities = mass_spec_data[:, 1::2]
 
         if is_data_normalized:
             # revert normalization for m/z values
@@ -1390,8 +1400,7 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
 def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, original):
     """
-    visualizes the original spectrum and the reconstructed spectrum via a stem plot with the m/z values on the x-axis
-    and the intensities on the y axis
+    visualizes the 9 original spectra and their reconstruction on a 3x3 grid
     :param aae_class: instance of the autoencoder
     :param epoch: epoch of the training; used for the file title
     :param reconstructed_mass_spec: array of reconstructed spectra; first one is visualized
@@ -1415,53 +1424,84 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
     mz_values_loss = np.abs(mz_values_reconstructed - mz_values_original)
     intensities_loss = np.abs(intensities_reconstructed - intensities_original)
 
-    # add offset to the m/z values, so we can see the difference between original and reconstruction
-    if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values" or \
-                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_values_charge_label":
+    # increase figure size
+    plt.rcParams["figure.figsize"] = (6.4*2, 4.8*2)
 
-        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
-        # and original
-        for orig_peak, recon_peak in zip(mz_values_original[0, :], mz_values_reconstructed[0, :]):
-            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
-        plt.scatter(mz_values_original[0, :], mz_values_reconstructed[0, :])    # draw the points
-        axis_min = np.min([plt.xlim(), plt.ylim()])
-        axis_max = np.max([plt.xlim(), plt.ylim()])
-        plt.xlim(xmin=axis_min, xmax=axis_max)
-        plt.ylim(ymin=axis_min, ymax=axis_max)
-        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
-        plt.xlabel("original")
-        plt.ylabel("reconstructed")
+    plt.subplot()
+    gs = gridspec.GridSpec(3, 3, hspace=0.1, wspace=0.1)
 
-    elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities" or \
-                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
+    # iterate over the image grid and visualize spectrum i
+    for i, g in enumerate(gs):
+        ax = plt.subplot(g)
+        # ax.set_xticks([])
+        # ax.set_yticks([])
+        ax.set_aspect('auto')
+        visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_original, intensities_reconstructed,
+                                                         mz_values_original, mz_values_reconstructed, i, epoch)
 
-        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
-        # and original
-        for orig_peak, recon_peak in zip(intensities_original[0, :], intensities_reconstructed[0, :]):
-            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
-        plt.scatter(intensities_original[0, :], intensities_reconstructed[0, :])    # draw the points
-        axis_min = np.min([plt.xlim(), plt.ylim()])
-        axis_max = np.max([plt.xlim(), plt.ylim()])
-        plt.xlim(xmin=axis_min, xmax=axis_max)
-        plt.ylim(ymin=axis_min, ymax=axis_max)
-        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")       # draw a diagonal for easier comparison
-        plt.xlabel("original")
-        plt.ylabel("reconstructed")
-
-    else:
-        plt.stem(mz_values_reconstructed[0, :], intensities_reconstructed[0, :], 'r', label="reconstructed",  markerfmt=' ')
-        plt.stem(mz_values_original[0, :], intensities_original[0, :], 'b', label="original", markerfmt=' ')
-        plt.legend()
-
-    plt.title("Epoch: " + str(epoch))
     plt.savefig(result_file_name)
     plt.close("all")
+
+    # change figsize back to default
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
     # save the original and reconstruction of the mass spec data for the swagger server
     aae_class.set_spectra_original_and_reconstruction(mz_values_original, mz_values_reconstructed,
                                                       intensities_original, intensities_reconstructed)
 
     return mz_values_loss, intensities_loss
+
+
+def visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_original, intensities_reconstructed,
+                                                     mz_values_original, mz_values_reconstructed, spectrum_index,
+                                                     epoch):
+    # add offset to the m/z values, so we can see the difference between original and reconstruction
+    if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz" or \
+                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_charge_label":
+
+        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
+        # and original
+        for orig_peak, recon_peak in zip(mz_values_original[spectrum_index, :], mz_values_reconstructed[spectrum_index, :]):
+            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
+        plt.scatter(mz_values_original[spectrum_index, :], mz_values_reconstructed[spectrum_index, :])  # draw the points
+        axis_min = np.min([plt.xlim(), plt.ylim()])
+        axis_max = np.max([plt.xlim(), plt.ylim()])
+        plt.xlim(xmin=axis_min, xmax=axis_max)
+        plt.ylim(ymin=axis_min, ymax=axis_max)
+        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")  # draw a diagonal for easier comparison
+        # plt.xlabel("original")
+        # plt.ylabel("reconstructed")
+
+    elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities" or \
+                    aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
+
+        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
+        # and original
+        for orig_peak, recon_peak in zip(intensities_original[spectrum_index, :], intensities_reconstructed[spectrum_index, :]):
+            plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
+        plt.scatter(intensities_original[spectrum_index, :], intensities_reconstructed[spectrum_index, :])  # draw the points
+        axis_min = np.min([plt.xlim(), plt.ylim()])
+        axis_max = np.max([plt.xlim(), plt.ylim()])
+        plt.xlim(xmin=axis_min, xmax=axis_max)
+        plt.ylim(ymin=axis_min, ymax=axis_max)
+        plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")  # draw a diagonal for easier comparison
+        # plt.xlabel("original")
+        # plt.ylabel("reconstructed")
+
+    else:
+        plt.stem(mz_values_reconstructed[spectrum_index, :], intensities_reconstructed[spectrum_index, :], 'r', label="reconstructed",
+                 markerfmt=' ')
+        plt.stem(mz_values_original[spectrum_index, :], intensities_original[spectrum_index, :], 'b', label="original", markerfmt=' ')
+        # plt.xlabel("m/z")
+        # plt.ylabel("intensity")
+        plt.legend()
+
+    if spectrum_index == 1:
+        plt.title("Epoch: " + str(epoch))
+    if spectrum_index == 3:
+        plt.ylabel("reconstruction")
+    if spectrum_index == 7:
+        plt.xlabel("original")
 
 
 def write_mass_spec_to_mgf_file(aae_class, epoch, reconstructed_spectra, original_spectra):

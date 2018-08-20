@@ -3,20 +3,23 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 from scipy.stats import gaussian_kde
 import os
-import itertools
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from . import DataLoading
 
 
-def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, peak_encoding, max_intensity_value,
+def preprocess_mass_spec_file(input_filename, output_filename, organism_name, n_peaks_to_keep, peak_encoding,
+                              max_intensity_value=5000,
                               max_mz_value=5000, filter_on_charge=None, include_charge_in_encoding=False,
                               include_molecular_weight_in_encoding=False, use_smoothed_intensities=False,
-                              smoothness_sigma=1, smoothing_n_gaussians=15):
+                              smoothing_method="lowess", smoothness_sigma=1, smoothness_frac=0.3,
+                              smoothing_n_gaussians=15):
     """
     preprocesses the mass spec file by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
     as input for the network
     :param input_filename: filename of the mass spec data
+    :param output_filename: filename the preprocessed data should be written to
     :param organism_name: e.g. "yeast"; used for output filename
     :param n_peaks_to_keep: how many peaks one spectrum should contain
     :param filter_on_charge: which charge should be kept (e.g. "2" to keep only spectra with a charge of 2)
@@ -32,7 +35,7 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
         - "binned":
             (1) m/z values binned in k bins
             (2) intensity of the respective bin
-        - "only_mz_values":
+        - "only_mz":
             (1) mz distance relative to successor
     :param max_intensity_value: at which intensity value a peak should be considered as an outlier
     :param max_mz_value: at which m/z value a peak should be considered as an outlier
@@ -40,34 +43,28 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
     :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
     peak_encoding
     :param use_smoothed_intensities: whether or not the intensities should be smoothed
-    :param smoothness_sigma: parameter for smoothing the intensities; the higher the smoother
+    :param smoothing_method: ["lowess", "gaussian_filter"] which smoothness method to use
+    :param smoothness_sigma: parameter for smoothing the intensities using the gaussian filter; the higher the smoother
+    :param smoothness_frac: parameter for smoothing the intensities using the lowess; the higher the smoother
     :param smoothing_n_gaussians: how many gaussians should be used for smoothing the intensities
     :return:
     """
 
     # load the input data
     print("Loading data..")
-    is_identified_data = False
-    if input_filename.endswith(".mgf"):
-        if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
-            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) \
-                             + "_smoothing_n_gaussians_" + str(smoothing_n_gaussians) + ".mgf"
-            print(input_filename)
-            if not os.path.isfile(input_filename):  # check if file exists; create if it doesn't
-                preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
-                                                output_filename=input_filename, sigma=smoothness_sigma)
 
-        unprocessed_spectra = DataLoading.load_mgf_file(input_filename)
+    # preprocess the smoothed intensities
+    if use_smoothed_intensities:
+        # check if they have been already preprocessed previously
+        if not os.path.isfile(output_filename):
+            preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
+                                            output_filename=output_filename, sigma=smoothness_sigma,
+                                            smoothing_method=smoothing_method, frac=smoothness_frac)
+
+    if input_filename.endswith(".mgf"):
+        unprocessed_spectra = DataLoading.load_mgf_file(input_filename.replace(".txt", ".mgf"))
     else:
-        if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
-            input_filename = input_filename.rsplit(".", 1)[0] + "_smoothed_sigma_" + str(smoothness_sigma) + \
-                             "_smoothing_n_gaussians_" + str(smoothing_n_gaussians) + ".msp"
-            print(input_filename)
-            if not os.path.isfile(input_filename):  # check if file exists; create if it doesn't
-                preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
-                                                output_filename=input_filename, sigma=smoothness_sigma)
-        unprocessed_spectra = DataLoading.load_msp_file(input_filename)
-        is_identified_data = True
+        unprocessed_spectra = DataLoading.load_msp_file(input_filename.replace(".txt", ".msp"))
 
     # get the encoding for the peaks
     print("Encoding the data..")
@@ -88,32 +85,6 @@ def preprocess_mass_spec_file(input_filename, organism_name, n_peaks_to_keep, pe
         peak_features = peak_features[np.all(peak_features >= 0, axis=1)]
         print(str(n_data_points - len(peak_features)) + " outliers out of " + str(n_data_points) + " data points have "
                                                                                                    "been removed.")
-
-    # save the pre-processed data to some file
-    data_identified = "identified" if is_identified_data else "unidentified"
-    if include_charge_in_encoding and include_molecular_weight_in_encoding:
-        include_other_values = "include_charge_and_weight"
-    elif include_charge_in_encoding:
-        include_other_values = "include_charge"
-    elif include_molecular_weight_in_encoding:
-        include_other_values = "include_weight"
-    else:
-        include_other_values = None
-
-    # create the output file name: e.g. "yeast_identified_distance_charge_2"
-    index_of_last_path_delimiter = input_filename.rfind("/")
-    output_filename = input_filename[:index_of_last_path_delimiter+1] if index_of_last_path_delimiter > -1 else ""
-    output_filename += "_".join(filter(None, [organism_name, data_identified, peak_encoding, include_other_values]))
-    if filter_on_charge:
-        output_filename += "_charge_" + filter_on_charge
-    output_filename += "_n_peaks_" + str(n_peaks_to_keep)
-    output_filename += "_max_intensity_" + str(max_intensity_value)
-
-    if use_smoothed_intensities and smoothness_sigma and smoothing_n_gaussians:
-        output_filename += "_smoothed_sigma_" + str(smoothness_sigma) + "_smoothing_n_gaussians_" \
-                           + str(smoothing_n_gaussians)
-
-    output_filename += ".txt"
 
     # save the numpy array to the file
     np.savetxt(output_filename, peak_features)
@@ -141,7 +112,7 @@ def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter
         - "binned":
             (1) m/z values binned in k bins
             (2) intensity of the respective bin
-        - "only_mz_values":
+        - "only_mz":
             (1) mz distance relative to successor
     :param n_peaks_to_keep: how many peaks the spectra should contain
     :param filter_on_charge: which charge should be kept (e.g. "2" to keep only spectra with a charge of 2)
@@ -190,10 +161,11 @@ def get_peaks_encoding(mass_spec_data, peak_encoding, n_peaks_to_keep=30, filter
         charge_list = charge_list[indices]
         molecular_weight_list = molecular_weight_list[indices]
 
-    if include_charge_in_encoding and include_molecular_weight_in_encoding:
+    if include_charge_in_encoding and include_molecular_weight_in_encoding \
+            or peak_encoding == "only_mz_charge_label" and include_molecular_weight_in_encoding:
         # combine the peaks, the charges and the molecular weight in one numpy array
         pre_processed_mass_spec_data = np.hstack((peak_features, charge_list, molecular_weight_list)).astype(float)
-    elif include_charge_in_encoding:
+    elif include_charge_in_encoding or peak_encoding == "only_mz_charge_label":
         # combine the peaks and the charges in one numpy array
         pre_processed_mass_spec_data = np.hstack((peak_features, charge_list)).astype(float)
     elif include_molecular_weight_in_encoding:
@@ -245,6 +217,10 @@ def create_features_for_peak(peak, peak_encoding):
     elif peak_encoding == "raw":
         intensities = peak[:, 1]
         return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
+    elif peak_encoding == "only_mz" or peak_encoding == "only_mz_charge_label":
+        return mz_values
+    elif peak_encoding == "only_intensities":
+        return np.sqrt(peak[:, 1])
     else:
         raise ValueError(str(peak_encoding) + " is an invalid value for this parameter. Try 'location' or 'distance'.")
 
@@ -476,7 +452,7 @@ def test_restore_binned_data():
     plt.show()
 
 
-def preprocess_only_mz_values():
+def preprocess_only_mz():
     """
     preprocess the mass spec data to keep only the distances between the m/z values
     :return:
@@ -703,7 +679,7 @@ def density_scatter_plot():
     plt.show()
 
 
-def preprocess_only_mz_values_with_charge_as_label(is_data_unidentified=True):
+def preprocess_only_mz_with_charge_as_label(is_data_unidentified=True):
     """
     preprocess the mass spec data to keep only the distances between the m/z values and the charges as label
     :return:
@@ -768,7 +744,7 @@ def preprocess_only_mz_values_with_charge_as_label(is_data_unidentified=True):
 
 
 def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, max_intensity_value, output_filename,
-                                    sigma=1):
+                                    smoothing_method, sigma=1, frac=0.3):
     """
     smoothes the intensities by using a number of gaussian evenly distributed along the m/z values [0, max_mz_value]
     using the scipy function gaussian_filter with the respective sigma
@@ -777,9 +753,11 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
     :param max_mz_value: at which value a peak should be considered as an outlier and thus be ignored
     :param max_intensity_value: at which value a peak should be considered as an outlier and thus be ignored
     :param output_filename: filename to write
-    :param sigma: scalar or sequence of scalars;
-    Standard deviation for Gaussian kernel. The standard deviations of the Gaussian filter are given for each axis as
-    a sequence, or as a single number, in which case it is equal for all axes.
+    :param smoothing_method: ["gaussian_filter", "lowess"]; which method should be used for smoothing
+    :param sigma: scalar or sequence of scalars; Standard deviation for Gaussian kernel. The standard deviations of
+    the Gaussian filter are given for each axis as a sequence, or as a single number, in which case it is equal for
+    all axes.
+    :param frac: Between 0 and 1. smoothness factor for lowess smoothing
     :return:
     """
 
@@ -788,8 +766,10 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
     is_data_identified = "unidentified" not in output_filename
     if is_data_identified:
         spectra = DataLoading.load_msp_file("../../data/mass_spec_data/yeast/yeast_identified.msp")
+        output_filename = output_filename.replace(".txt", ".msp")
     else:
         spectra = DataLoading.load_mgf_file("../../data/mass_spec_data/yeast/yeast_unidentified.mgf")
+        output_filename = output_filename.replace(".txt", ".mgf")
 
     peaks = [spectrum["peaks"] for spectrum in spectra]
 
@@ -817,35 +797,56 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
     """
     smooth the intensities
     """
+    if smoothing_method == "gaussian_filter":
 
-    mz_distance_per_gaussian = max_mz_value / n_gaussians       # distance between two gaussians
+        mz_distance_per_gaussian = max_mz_value / n_gaussians       # distance between two gaussians
 
-    # assign each peak to one gaussian
-    smoothed_intensities = np.zeros(mz_values.shape)
-    list_gaussian_mz_values = []
-    list_gaussian_intensities = []
-    list_gaussian_smoothed_intensities = []
+        # assign each peak to one gaussian
+        smoothed_intensities = np.zeros(mz_values.shape)
+        list_gaussian_mz_values = []
+        list_gaussian_intensities = []
+        list_gaussian_smoothed_intensities = []
 
-    for i in range(n_gaussians):
+        for i in range(n_gaussians):
 
-        # get the boolean indices for the m/z values within the current gaussian
-        lesser_array = i * mz_distance_per_gaussian < mz_values
-        greater_array = mz_values < (i+1) * mz_distance_per_gaussian
-        boolean_indices = lesser_array & greater_array
+            # get the boolean indices for the m/z values within the current gaussian
+            lesser_array = i * mz_distance_per_gaussian < mz_values
+            greater_array = mz_values < (i+1) * mz_distance_per_gaussian
+            boolean_indices = lesser_array & greater_array
 
-        # get the m/z values for the current gaussian
-        mz_values_for_gaussian = mz_values[boolean_indices]
-        intensities_for_gaussian = intensities[boolean_indices]
+            # get the m/z values for the current gaussian
+            mz_values_for_gaussian = mz_values[boolean_indices]
+            intensities_for_gaussian = intensities[boolean_indices]
 
-        # smooth the intensities
-        smoothed_intensities_for_gaussian = gaussian_filter(intensities_for_gaussian, sigma=sigma)
+            # smooth the intensities
+            smoothed_intensities_for_gaussian = gaussian_filter(intensities_for_gaussian, sigma=sigma)
 
-        # store them at their respective position in the smoothed intensities array
-        smoothed_intensities[boolean_indices] = smoothed_intensities_for_gaussian
+            # store them at their respective position in the smoothed intensities array
+            smoothed_intensities[boolean_indices] = smoothed_intensities_for_gaussian
 
-        list_gaussian_mz_values.append(mz_values_for_gaussian)
-        list_gaussian_intensities.append(intensities_for_gaussian)
-        list_gaussian_smoothed_intensities.append(smoothed_intensities_for_gaussian)
+            list_gaussian_mz_values.append(mz_values_for_gaussian)
+            list_gaussian_intensities.append(intensities_for_gaussian)
+            list_gaussian_smoothed_intensities.append(smoothed_intensities_for_gaussian)
+
+    elif smoothing_method == "lowess":
+        # smooth using lowess
+        smoothed_intensities = np.array([lowess(intensities[i], mz_values[i], is_sorted=True,
+                                                frac=frac, it=0) for i in range(mz_values.shape[0])])
+        # get the intensities
+        smoothed_intensities = smoothed_intensities[:, :, 1]
+
+    else:
+        raise ValueError("Smoothing method " + smoothing_method + " is invalid")
+
+    # remove nan
+    not_nan_indices = np.all(np.logical_not(np.isnan(smoothed_intensities)), axis=1)
+    smoothed_intensities = smoothed_intensities[not_nan_indices]
+    spectra = spectra[not_nan_indices]
+
+    # remove negative data points
+    indices_to_keep = np.all(0 < smoothed_intensities, axis=1)
+    spectra = spectra[indices_to_keep]
+    smoothed_intensities = smoothed_intensities[indices_to_keep]
 
     smoothed_intensities = np.around(smoothed_intensities, decimals=3)
 
@@ -896,7 +897,4 @@ def write_smoothed_intensities_to_mgf_file(smoothed_intensities, spectra, filena
             for peak, peak_smoothed_intensity in zip(spectrum["peaks"], spectrum_smoothed_intensities):
                 output_file.write(str(peak[0]) + " " + str(peak_smoothed_intensity) + "\n")
             output_file.write("END IONS\n\n")
-
-
-
 

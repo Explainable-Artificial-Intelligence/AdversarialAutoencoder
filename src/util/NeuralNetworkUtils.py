@@ -545,21 +545,6 @@ def form_results(aae_class):
     return tensorboard_path, saved_model_path, log_path
 
 
-def get_min_and_max_per_dim_on_latent_space(z_dim):
-
-    # TODO: no more hard coded
-    data = np.load('../data/dimension_reduced_data/SVHN/pca/SVHN_pca_z_dim_8' + '.npy')
-
-    latent_space_min_max_per_dim = []
-
-    print(data.shape)
-
-    for dim in range(z_dim):
-        latent_space_min_max_per_dim.append({"min": np.amin(data[:, dim]), "max": np.amax(data[:, dim])})
-
-    return latent_space_min_max_per_dim
-
-
 def get_layer_names(aae_class):
     """
     returns all layer names for the given autoencoder as dictionary with the subnetwork (encoder, decoder,

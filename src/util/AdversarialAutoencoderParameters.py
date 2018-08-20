@@ -695,11 +695,16 @@ def get_default_parameters_mass_spec():
             'n_labeled': 1000,  'only_train_autoencoder': True, 'selected_dataset': "mass_spec",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
 
-            'mass_spec_data_properties': {"organism_name": "yeast", "peak_encoding": "distance",
-                                           "include_charge_in_encoding": False,
-                                           "include_molecular_weight_in_encoding": False, "charge": "2",
-                                           "normalize_data": True, "n_peaks_to_keep": 50,
-                                           "max_intensity_value": 5000},
+            'mass_spec_data_properties': {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                                          "use_smoothed_intensities": True, "data_subset": None,
+                                          "n_peaks_to_keep": 50, "max_intensity_value": 2000,
+                                          "max_mz_value": 2000, "charge": None, "normalize_data": False,
+                                          "include_molecular_weight_in_encoding": False,
+                                          "include_charge_in_encoding": False,
+                                          "smoothness_params": {"smoothing_method": "lowess",
+                                                                "smoothness_frac": 0.3,
+                                                                "smoothness_sigma": 1,
+                                                                "smoothing_n_gaussians": 15}},
 
             'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125

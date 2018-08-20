@@ -1,3 +1,4 @@
+import json
 import os
 import numpy as np
 
@@ -184,44 +185,132 @@ def param_search_mass_spec_data():
                     AdamOptimizer_beta1_autoencoder=0.5)
 
 
+def try_mass_spec_parameter_combinations():
+
+    params = get_default_parameters_mass_spec()
+    params["summary_image_frequency"] = 5
+    params["n_epochs"] = 11
+
+    # peak_encoding
+    available_peak_encodings = ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "raw"]
+
+    # datasubset:
+    available_datasubsets = ["identified", "unidentified", None]
+
+    # smoothing_method
+    available_smoothing_methods = ["lowess", "gaussian_filter"]
+
+    normalize_data = [True, False]
+    charge = [None, "2", "3", "4"]          # "1" has too few datapoints
+    include_molecular_weight_in_encoding = [True, False]
+    include_charge_in_encoding = [True, False]
+
+    for i in range(1):
+
+        # params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": np.random.choice(available_peak_encodings),
+        #                                        "use_smoothed_intensities": True, "data_subset": np.random.choice(available_datasubsets),
+        #                                        "n_peaks_to_keep": 50, "max_intensity_value": 2000,
+        #                                        "max_mz_value": 2000, "charge": np.random.choice(charge), "normalize_data": np.random.choice(normalize_data),
+        #                                        "include_molecular_weight_in_encoding": np.random.choice(include_molecular_weight_in_encoding),
+        #                                        "include_charge_in_encoding": np.random.choice(include_charge_in_encoding),
+        #                                        "smoothness_params": {"smoothing_method": np.random.choice(available_smoothing_methods),
+        #                                                              "smoothness_frac": 0.3,
+        #                                                              "smoothness_sigma": 1,
+        #                                                              "smoothing_n_gaussians": 15}}
+
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                                               "use_smoothed_intensities": True, "data_subset": None,
+                                               "n_peaks_to_keep": 50, "max_intensity_value": 5000,
+                                               "max_mz_value": 5000, "charge": None, "normalize_data": True,
+                                               "include_molecular_weight_in_encoding": False,
+                                               "include_charge_in_encoding": False,
+                                               "smoothness_params": {"smoothing_method": "lowess",
+                                                                     "smoothness_frac": 0.3,
+                                                                     "smoothness_sigma": 1,
+                                                                     "smoothing_n_gaussians": 15}}
+
+        # TODO: does not work (labels cant be converted to one hot labels for some reason..)
+        # params["mass_spec_data_properties"] = {'organism_name': 'yeast', 'peak_encoding': 'only_mz_charge_label', 'use_smoothed_intensities': True, 'data_subset': 'identified', 'n_peaks_to_keep': 50, 'max_intensity_value': 2000, 'max_mz_value': 2000, 'charge': '2', 'normalize_data': False, 'include_molecular_weight_in_encoding': False, 'include_charge_in_encoding': True, 'smoothness_params': {'smoothing_method': 'gaussian_filter', 'smoothness_frac': 0.3, 'smoothness_sigma': 1, 'smoothing_n_gaussians': 15}}
+
+
+        print("parameter combination:")
+        print(params["mass_spec_data_properties"])
+
+        params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
+            [params["mass_spec_data_properties"]["include_charge_in_encoding"],
+             params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
+        if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
+            params["input_dim_y"] = 1000
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_charge_label" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
+            params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "raw":
+            params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 2 + sum(
+                [params["mass_spec_data_properties"]["include_charge_in_encoding"],
+                 params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
+
+        params["input_dim_x"] = 1
+        params["n_classes"] = 2
+        params["z_dim"] = 5
+
+        params["selected_dataset"] = "mass_spec"
+
+        params["only_train_autoencoder"] = True
+
+        params["verbose"] = True
+        params["selected_autoencoder"] = "Unsupervised"
+        params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
+
+        aae = UnsupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        aae.reset_graph()
+
+
 def param_search_smoothing_intensities():
 
     #
     # for z_dim in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
-    for z_dim in [2, 5, 10, 15, 50]:
+    for z_dim in [2, 15, 50]:
         for n_neurons_of_hidden_layer_x_autoencoder in [[1000, 1000], [1000, 1000, 1000], [1000, 1000, 1000, 1000],
                                                     [2000, 2000], [2000, 2000, 2000], [2000, 2000, 2000, 2000],
-                                                    [5000, 5000], [5000, 5000, 5000], [5000, 5000, 5000, 5000]]:
-            for smoothing_n_gaussians in [5, 10, 25, 35]:
+                                                    [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
+            for frac in [5, 10, 25, 35]:
 
                 params = get_default_parameters_mass_spec()
-                params["summary_image_frequency"] = 5
-                params["n_epochs"] = 6
+                params["summary_image_frequency"] = 50
+                params["n_epochs"] = 1001
 
                 # peak_encoding
-                ["only_mz_values", "only_intensities", "only_mz_values_charge_label", "distance", "location", "binned",
+                ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
                  "only_intensities_distance", "raw"]
 
                 # datasubset:
                 ["identified", "unidentified", None]
 
-                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw",
+                # smoothing_method
+                ["lowess", "gaussian_filter"]
+
+                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                                                       "use_smoothed_intensities": True, "data_subset": None,
+                                                       "n_peaks_to_keep": 50, "max_intensity_value": 5000,
+                                                       "max_mz_value": 5000, "charge": None, "normalize_data": True,
+                                                       "include_molecular_weight_in_encoding": False,
                                                        "include_charge_in_encoding": False,
-                                                       "use_smoothed_intensities": True,
-                                                       "smoothness_sigma": 1, "smoothing_n_gaussians": smoothing_n_gaussians,
-                                                       "data_subset": None,
-                                                       "include_molecular_weight_in_encoding": False, "charge": None,
-                                                       "normalize_data": True, "n_peaks_to_keep": 50,
-                                                       "max_intensity_value": 2000, "max_mz_value": 2000}
+                                                       "smoothness_params": {"smoothing_method": "lowess",
+                                                                             "smoothness_frac": frac,
+                                                                             "smoothness_sigma": 1,
+                                                                             "smoothing_n_gaussians": 15}}
 
                 params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
                     [params["mass_spec_data_properties"]["include_charge_in_encoding"],
                      params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
                 if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
                     params["input_dim_y"] = 1000
-                elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values" or \
+                elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz" or \
                                 params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities" or \
-                                params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values_charge_label" or \
+                                params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_charge_label" or \
                                 params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
                     params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
                 elif params["mass_spec_data_properties"]["peak_encoding"] == "raw":
@@ -274,7 +363,7 @@ def param_search_smoothing_intensities():
                     aae.reset_graph()
 
 
-def param_search_only_mz_values():
+def param_search_only_mz():
 
     # for i in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
     for i in [2]:
@@ -285,7 +374,7 @@ def param_search_only_mz_values():
         params["n_epochs"] = 101
 
         # peak_encoding
-        ["only_mz_values", "only_intensities", "only_mz_values_charge_label", "distance", "location", "binned",
+        ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
          "only_intensities_distance", "raw"]
 
         # datasubset:
@@ -297,22 +386,28 @@ def param_search_only_mz_values():
         #                                        "normalize_data": False, "n_peaks_to_keep": 50,
         #                                        "max_intensity_value": 5000}
 
-        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw",
-                                               "include_charge_in_encoding": False, "use_smoothed_intensities": True,
-                                               "smoothness_sigma": 1, "smoothing_n_gaussians": 10,
-                                               "data_subset": None,
-                                               "include_molecular_weight_in_encoding": False, "charge": None,
-                                               "normalize_data": False, "n_peaks_to_keep": 50,
-                                               "max_intensity_value": 5000, "max_mz_value": 5000}
+        # smoothing_method
+        ["lowess", "gaussian_filter"]
+
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                                               "use_smoothed_intensities": True, "data_subset": None,
+                                               "n_peaks_to_keep": 50, "max_intensity_value": 2000,
+                                               "max_mz_value": 2000, "charge": None, "normalize_data": False,
+                                               "include_molecular_weight_in_encoding": False,
+                                               "include_charge_in_encoding": False,
+                                               "smoothness_params": {"smoothing_method": "lowess",
+                                                                     "smoothness_frac": 0.3,
+                                                                     "smoothness_sigma": 1,
+                                                                     "smoothing_n_gaussians": 15}}
 
         params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
             [params["mass_spec_data_properties"]["include_charge_in_encoding"],
              params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
         if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
             params["input_dim_y"] = 1000
-        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values" or \
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz" or \
                         params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities" or \
-                        params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values_charge_label" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_charge_label" or \
                         params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
             params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
         elif params["mass_spec_data_properties"]["peak_encoding"] == "raw":
@@ -449,11 +544,27 @@ def testing():
         aae.train(False)
         return
 
+    if False:
+        params = get_params_from_params_file("D:/Results/mass_spec_data/only_intensities/smoothing_desktop/2018-08-13_16_56_02_mass_spec/log/params.txt")
+        params["n_epochs"] = 1001
+        params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [6500, 9500],
+                                                               "values": [0.0001, 1e-05, 1e-06]}
+        params["mass_spec_data_properties"]["normalize_data"] = True
+
+        aae = UnsupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        return
+
+    if False:
+        try_mass_spec_parameter_combinations()
+        return
+
+
     if True:
         # param_search_incorporating_label_information()
 
         param_search_smoothing_intensities()
-        # param_search_only_mz_values()
+        # param_search_only_mz()
         # param_search_mass_spec_data()
 
         return
@@ -509,7 +620,7 @@ def testing():
 
             params["n_epochs"] = 501
 
-            params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_mz_values",
+            params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_mz",
                                                    "include_charge_in_encoding": False, "use_smoothed_intensities": True,
                                                    "smoothness_sigma": 1,
                                                    "include_molecular_weight_in_encoding": False, "charge": "2",
@@ -520,7 +631,7 @@ def testing():
                  params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
             if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
                 params["input_dim_y"] = 1000
-            elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_values":
+            elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz":
                 params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
 
             params["input_dim_x"] = 1
