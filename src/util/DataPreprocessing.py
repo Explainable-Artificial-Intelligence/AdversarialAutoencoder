@@ -217,6 +217,9 @@ def create_features_for_peak(peak, peak_encoding):
     elif peak_encoding == "raw":
         intensities = peak[:, 1]
         return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
+    elif peak_encoding == "raw_intensities_sqrt":
+        intensities = np.sqrt(peak[:, 1])
+        return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
     elif peak_encoding == "only_mz" or peak_encoding == "only_mz_charge_label":
         return mz_values
     elif peak_encoding == "only_intensities":

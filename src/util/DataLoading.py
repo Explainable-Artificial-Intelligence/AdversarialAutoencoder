@@ -757,7 +757,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                  "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
                  "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
 
-        elif peak_encoding == "raw":
+        elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt":
             # normalize m/z values
             all_spectra[:, :feature_dim - n_special_features][:, ::2], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
                 all_spectra[:, :feature_dim - n_special_features][:, ::2])

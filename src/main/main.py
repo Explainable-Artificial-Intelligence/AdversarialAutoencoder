@@ -272,11 +272,13 @@ def param_search_smoothing_intensities():
 
     #
     # for z_dim in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
-    for z_dim in [2, 15, 50]:
-        for n_neurons_of_hidden_layer_x_autoencoder in [[1000, 1000], [1000, 1000, 1000], [1000, 1000, 1000, 1000],
-                                                    [2000, 2000], [2000, 2000, 2000], [2000, 2000, 2000, 2000],
+    for z_dim in [15, 50, 2]:
+        for n_neurons_of_hidden_layer_x_autoencoder in [[2000, 2000, 2000, 2000], [1000, 1000], [1000, 1000, 1000],
+                                                        [1000, 1000, 1000, 1000], [2000, 2000], [2000, 2000, 2000],
                                                     [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
-            for frac in [5, 10, 25, 35]:
+            for frac in [0.3]:
+
+
 
                 params = get_default_parameters_mass_spec()
                 params["summary_image_frequency"] = 50
@@ -284,7 +286,7 @@ def param_search_smoothing_intensities():
 
                 # peak_encoding
                 ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
-                 "only_intensities_distance", "raw"]
+                 "only_intensities_distance", "raw", "raw_intensities_sqrt"]
 
                 # datasubset:
                 ["identified", "unidentified", None]
@@ -292,7 +294,7 @@ def param_search_smoothing_intensities():
                 # smoothing_method
                 ["lowess", "gaussian_filter"]
 
-                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "only_intensities",
+                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw_intensities_sqrt",
                                                        "use_smoothed_intensities": True, "data_subset": None,
                                                        "n_peaks_to_keep": 50, "max_intensity_value": 5000,
                                                        "max_mz_value": 5000, "charge": None, "normalize_data": True,
@@ -313,7 +315,8 @@ def param_search_smoothing_intensities():
                                 params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_charge_label" or \
                                 params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
                     params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
-                elif params["mass_spec_data_properties"]["peak_encoding"] == "raw":
+                elif params["mass_spec_data_properties"]["peak_encoding"] == "raw" or \
+                                params["mass_spec_data_properties"]["peak_encoding"] == "raw_intensities_sqrt":
                     params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 2 + sum(
                         [params["mass_spec_data_properties"]["include_charge_in_encoding"],
                          params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
@@ -361,6 +364,8 @@ def param_search_smoothing_intensities():
 
                     aae.train(True)
                     aae.reset_graph()
+
+                    return
 
 
 def param_search_only_mz():

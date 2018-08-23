@@ -1376,7 +1376,7 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
                 Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
             mz_values = mz_values * ptp_feature_vector + min_feature_vector
 
-    elif mass_spec_data_properties["peak_encoding"] == "raw":
+    elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt":
         mz_values = mass_spec_data[:, ::2]
         intensities = mass_spec_data[:, 1::2]
 
@@ -1391,8 +1391,11 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
                 Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
             intensities = intensities * ptp_second_feature_vector + min_second_feature_vector
 
+            if peak_encoding == "raw_intensities_sqrt":
+                intensities = intensities ** 2
+
     else:
-        raise ValueError(mass_spec_data_properties["peak_encoding"] + " is invalid! Try 'distance', 'location' or "
+        raise ValueError(peak_encoding + " is invalid! Try 'distance', 'location' or "
                                                                       "'raw' instead")
 
     return mz_values, intensities, charges, molecular_weights
