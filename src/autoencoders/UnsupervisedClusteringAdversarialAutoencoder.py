@@ -13,6 +13,7 @@ from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
+from util.AdversarialAutoencoderParameters import get_result_path_for_selected_autoencoder
 from util.DataLoading import get_input_data
 from util.Distributions import draw_from_single_gaussian
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, form_results, \
@@ -209,6 +210,8 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
 
         # path for the results
         self.results_path = parameter_dictionary["results_path"]
+        if self.results_path is None:       # use default when no path is provided
+            self.results_path = get_result_path_for_selected_autoencoder("UnsupervisedClustering")
 
         """
         placeholder variables

@@ -4,6 +4,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.stats import gaussian_kde
 import os
 from statsmodels.nonparametric.smoothers_lowess import lowess
+import rpy2.robjects as ro
 
 from . import DataLoading
 
@@ -13,7 +14,7 @@ def preprocess_mass_spec_file(input_filename, output_filename, organism_name, n_
                               max_mz_value=5000, filter_on_charge=None, include_charge_in_encoding=False,
                               include_molecular_weight_in_encoding=False, use_smoothed_intensities=False,
                               smoothing_method="lowess", smoothness_sigma=1, smoothness_frac=0.3,
-                              smoothing_n_gaussians=15):
+                              smoothing_n_gaussians=15, smoothness_spar=0.3):
     """
     preprocesses the mass spec file by fixing the number of peaks for each spectra to n_peaks_to_keep
     (n_peaks_to_keep peaks with the highest intensity are kept; rest is ignored); and creates the feature representation
@@ -43,10 +44,11 @@ def preprocess_mass_spec_file(input_filename, output_filename, organism_name, n_
     :param include_molecular_weight_in_encoding: whether or not the molecular weight should be appended to the
     peak_encoding
     :param use_smoothed_intensities: whether or not the intensities should be smoothed
-    :param smoothing_method: ["lowess", "gaussian_filter"] which smoothness method to use
+    :param smoothing_method: ["lowess", "gaussian_filter", "spline"] which smoothness method to use
     :param smoothness_sigma: parameter for smoothing the intensities using the gaussian filter; the higher the smoother
-    :param smoothness_frac: parameter for smoothing the intensities using the lowess; the higher the smoother
+    :param smoothness_frac: parameter for smoothing the intensities using lowess; the higher the smoother
     :param smoothing_n_gaussians: how many gaussians should be used for smoothing the intensities
+    :param smoothness_spar: parameter for smoothing the intensities using spline; the higher the smoother
     :return:
     """
 
@@ -59,7 +61,8 @@ def preprocess_mass_spec_file(input_filename, output_filename, organism_name, n_
         if not os.path.isfile(output_filename):
             preprocess_smoothed_intensities(n_peaks_to_keep, smoothing_n_gaussians, max_mz_value, max_intensity_value,
                                             output_filename=output_filename, sigma=smoothness_sigma,
-                                            smoothing_method=smoothing_method, frac=smoothness_frac)
+                                            smoothing_method=smoothing_method, frac=smoothness_frac,
+                                            spar=smoothness_spar)
 
     if input_filename.endswith(".mgf"):
         unprocessed_spectra = DataLoading.load_mgf_file(input_filename.replace(".txt", ".mgf"))
@@ -218,6 +221,10 @@ def create_features_for_peak(peak, peak_encoding):
         intensities = peak[:, 1]
         return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
     elif peak_encoding == "raw_intensities_sqrt":
+        intensities = np.sqrt(peak[:, 1])
+        return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
+    elif peak_encoding == "raw_sqrt":
+        mz_values = np.sqrt(peak[:, 0])
         intensities = np.sqrt(peak[:, 1])
         return np.hstack((mz_values, intensities)).reshape(-1, 2, order='F').reshape(-1)
     elif peak_encoding == "only_mz" or peak_encoding == "only_mz_charge_label":
@@ -746,8 +753,23 @@ def preprocess_only_mz_with_charge_as_label(is_data_unidentified=True):
         np.savetxt('../../data/mass_spec_data/yeast/yeast_identified_only_mz_charge_label.txt', rel_distances_and_charge)
 
 
+def smooth_spectrum_with_splines(mz_values, intensities, spar):
+
+    # convert the lists into r vectors
+    mz_values_r_vector = ro.FloatVector(mz_values)
+    intensities_r_vector = ro.FloatVector(intensities)
+
+    # smooth the intensities
+    splines_smoothing_function = ro.r["smooth.spline"]
+    smoothed_intensities_splines = splines_smoothing_function(mz_values_r_vector, intensities_r_vector, spar=spar,
+                                                      **{"all.knots": True}).rx2('y')
+    smoothed_intensities_splines = np.asarray(smoothed_intensities_splines)
+
+    return smoothed_intensities_splines
+
+
 def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, max_intensity_value, output_filename,
-                                    smoothing_method, sigma=1, frac=0.3):
+                                    smoothing_method, sigma=1, frac=0.3, spar=0.3):
     """
     smoothes the intensities by using a number of gaussian evenly distributed along the m/z values [0, max_mz_value]
     using the scipy function gaussian_filter with the respective sigma
@@ -756,11 +778,12 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
     :param max_mz_value: at which value a peak should be considered as an outlier and thus be ignored
     :param max_intensity_value: at which value a peak should be considered as an outlier and thus be ignored
     :param output_filename: filename to write
-    :param smoothing_method: ["gaussian_filter", "lowess"]; which method should be used for smoothing
+    :param smoothing_method: ["gaussian_filter", "lowess", "spline"]; which method should be used for smoothing
     :param sigma: scalar or sequence of scalars; Standard deviation for Gaussian kernel. The standard deviations of
     the Gaussian filter are given for each axis as a sequence, or as a single number, in which case it is equal for
     all axes.
     :param frac: Between 0 and 1. smoothness factor for lowess smoothing
+    :param spar: Between 0 and 1. smoothness factor for spline smoothing
     :return:
     """
 
@@ -837,6 +860,11 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
                                                 frac=frac, it=0) for i in range(mz_values.shape[0])])
         # get the intensities
         smoothed_intensities = smoothed_intensities[:, :, 1]
+
+    elif smoothing_method == "spline":
+        # smooth using splines
+        smoothed_intensities = np.array([smooth_spectrum_with_splines(mz_values[i], intensities[i], spar=spar)
+                                         for i in range(mz_values.shape[0])])
 
     else:
         raise ValueError("Smoothing method " + smoothing_method + " is invalid")

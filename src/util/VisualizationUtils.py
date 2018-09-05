@@ -1376,7 +1376,7 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
                 Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
             mz_values = mz_values * ptp_feature_vector + min_feature_vector
 
-    elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt":
+    elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt" or peak_encoding == "raw_sqrt":
         mz_values = mass_spec_data[:, ::2]
         intensities = mass_spec_data[:, 1::2]
 
@@ -1393,10 +1393,12 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
             if peak_encoding == "raw_intensities_sqrt":
                 intensities = intensities ** 2
+            elif peak_encoding == "raw_sqrt":
+                mz_values = mz_values ** 2
+                intensities = intensities ** 2
 
     else:
-        raise ValueError(peak_encoding + " is invalid! Try 'distance', 'location' or "
-                                                                      "'raw' instead")
+        raise ValueError(peak_encoding + " is invalid!")
 
     return mz_values, intensities, charges, molecular_weights
 
@@ -1420,33 +1422,32 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
         = reconstruct_spectrum_from_feature_vector(original, aae_class.input_dim, aae_class.mass_spec_data_properties)
 
     # create the path where the weight images should be stored
-    result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + \
-                       str(epoch) + "_mass_specs_spectra" + ".png"
+    result_file_name = aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/' + str(epoch) \
+                       + "_mass_specs_spectra" + ".png"
 
     # calculate the average difference between original and reconstruction
     mz_values_loss = np.abs(mz_values_reconstructed - mz_values_original)
     intensities_loss = np.abs(intensities_reconstructed - intensities_original)
 
-    # increase figure size
-    plt.rcParams["figure.figsize"] = (6.4*2, 4.8*2)
+    if epoch is not None:
+        # increase figure size
+        plt.rcParams["figure.figsize"] = (6.4*2, 4.8*2)
 
-    plt.subplot()
-    gs = gridspec.GridSpec(3, 3, hspace=0.1, wspace=0.1)
+        plt.subplot()
+        gs = gridspec.GridSpec(3, 3, hspace=0.1, wspace=0.1)
 
-    # iterate over the image grid and visualize spectrum i
-    for i, g in enumerate(gs):
-        ax = plt.subplot(g)
-        # ax.set_xticks([])
-        # ax.set_yticks([])
-        ax.set_aspect('auto')
-        visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_original, intensities_reconstructed,
-                                                         mz_values_original, mz_values_reconstructed, i, epoch)
+        # iterate over the image grid and visualize spectrum i
+        for i, g in enumerate(gs):
+            ax = plt.subplot(g)
+            ax.set_aspect('auto')
+            visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_original, intensities_reconstructed,
+                                                             mz_values_original, mz_values_reconstructed, i, epoch)
 
-    plt.savefig(result_file_name)
-    plt.close("all")
+        plt.savefig(result_file_name)
+        plt.close("all")
 
-    # change figsize back to default
-    plt.rcParams["figure.figsize"] = (6.4, 4.8)
+        # change figsize back to default
+        plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
     # save the original and reconstruction of the mass spec data for the swagger server
     aae_class.set_spectra_original_and_reconstruction(mz_values_original, mz_values_reconstructed,
@@ -1458,12 +1459,23 @@ def visualize_spectra_reconstruction(aae_class, epoch, reconstructed_mass_spec, 
 def visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_original, intensities_reconstructed,
                                                      mz_values_original, mz_values_reconstructed, spectrum_index,
                                                      epoch):
-    # add offset to the m/z values, so we can see the difference between original and reconstruction
+    """
+    plots the original and reconstruction for the subplot with index 'spectrum_index'
+    :param aae_class: instance of the autoencoder
+    :param intensities_original: array of the original intensities
+    :param intensities_reconstructed: array of the reconstructed intensities
+    :param mz_values_original: array of the original m/z
+    :param mz_values_reconstructed: array of the reconstructed m/z
+    :param spectrum_index: index of the spectrum to plot; also the index of the subplot
+    :param epoch: current epoch (for the figure title)
+    :return:
+    """
+
     if aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz" or \
                     aae_class.mass_spec_data_properties["peak_encoding"] == "only_mz_charge_label":
 
-        # draw a line for each peak from the diagonal to the point to emphasize the difference between reconstruction
-        # and original
+        # draw a vertical line for each peak from the diagonal to the point to emphasize the difference between
+        # reconstruction and original
         for orig_peak, recon_peak in zip(mz_values_original[spectrum_index, :], mz_values_reconstructed[spectrum_index, :]):
             plt.plot((orig_peak, orig_peak), (orig_peak, recon_peak), linestyle=':', color='b', alpha=0.5)
         plt.scatter(mz_values_original[spectrum_index, :], mz_values_reconstructed[spectrum_index, :])  # draw the points
@@ -1472,8 +1484,6 @@ def visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_orig
         plt.xlim(xmin=axis_min, xmax=axis_max)
         plt.ylim(ymin=axis_min, ymax=axis_max)
         plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")  # draw a diagonal for easier comparison
-        # plt.xlabel("original")
-        # plt.ylabel("reconstructed")
 
     elif aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities" or \
                     aae_class.mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
@@ -1488,17 +1498,16 @@ def visualize_spectra_reconstruction_single_spectrum(aae_class, intensities_orig
         plt.xlim(xmin=axis_min, xmax=axis_max)
         plt.ylim(ymin=axis_min, ymax=axis_max)
         plt.plot(plt.xlim(), plt.ylim(), ls="--", c=".3")  # draw a diagonal for easier comparison
-        # plt.xlabel("original")
-        # plt.ylabel("reconstructed")
 
     else:
-        plt.stem(mz_values_reconstructed[spectrum_index, :], intensities_reconstructed[spectrum_index, :], 'r', label="reconstructed",
+        plt.stem(mz_values_reconstructed[spectrum_index, :], intensities_reconstructed[spectrum_index, :], 'r',
+                 label="reconstructed", markerfmt=' ')
+        plt.stem(mz_values_original[spectrum_index, :], intensities_original[spectrum_index, :], 'b', label="original",
                  markerfmt=' ')
-        plt.stem(mz_values_original[spectrum_index, :], intensities_original[spectrum_index, :], 'b', label="original", markerfmt=' ')
-        # plt.xlabel("m/z")
-        # plt.ylabel("intensity")
         plt.legend()
 
+    # since this function is called multiple times for each subplot we need to set the title, ylabel and xlabel at the
+    # correct subplot
     if spectrum_index == 1:
         plt.title("Epoch: " + str(epoch))
     if spectrum_index == 3:

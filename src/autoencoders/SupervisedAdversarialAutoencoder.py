@@ -14,6 +14,7 @@ from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
+from util.AdversarialAutoencoderParameters import get_result_path_for_selected_autoencoder
 from util.DataLoading import get_input_data
 from util.Distributions import draw_from_single_gaussian
 from util.NeuralNetworkUtils import get_loss_function, get_optimizer, get_layer_names, create_dense_layer, form_results, \
@@ -71,6 +72,13 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.mass_spec_data_properties = parameter_dictionary["mass_spec_data_properties"]
         else:
             self.mass_spec_data_properties = None
+
+        # load the data
+        if not Storage.get_all_input_data():
+            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
+                                  add_noise=False,
+                                  mass_spec_data_properties=self.mass_spec_data_properties)
+            Storage.set_input_data(data)
 
         """
         params for network topology
@@ -181,6 +189,8 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # path for the results
         self.results_path = parameter_dictionary["results_path"]
+        if self.results_path is None:       # use default when no path is provided
+            self.results_path = get_result_path_for_selected_autoencoder("Supervised")
 
         """
         placeholder variables 
@@ -876,16 +886,17 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.session = tf.Session()
 
         saved_model_path = None
+        log_path = None
 
         latent_representations_current_epoch = []
         labels_current_epoch = []
 
-        # Get the data from the storage class, we have data stored
-        if Storage.get_all_input_data():
-            data = Storage.get_all_input_data()
-        else:
-            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
-                                  mass_spec_data_properties=self.mass_spec_data_properties)
+        # Get the data from the storage class, if we have data stored
+        # if Storage.get_all_input_data():
+        data = Storage.get_all_input_data()
+        # else:
+        #     data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
+        #                           mass_spec_data_properties=self.mass_spec_data_properties)
 
         autoencoder_loss_final, discriminator_loss_final, generator_loss_final = 0, 0, 0
         autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
@@ -1005,7 +1016,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                                 feed_dict={self.X: batch_x, self.X_target: batch_x,
                                            self.real_distribution: z_real_dist, self.y: batch_labels,
                                            self.decoder_input_multiple: dec_inputs,
-                                           self.is_training: True})
+                                           self.is_training: False})
                             if self.write_tensorboard:
                                 writer.add_summary(summary, global_step=step)
 
@@ -1164,8 +1175,7 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
             if epochs_completed > 0:
                 # end the training
-                self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,
-                                  saved_model_path, self.saver, sess, step)
+                self.end_training(saved_model_path, log_path, self.saver, sess, step)
 
     def process_requested_swagger_operations(self, sess):
         """
@@ -1205,15 +1215,12 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             # reset the list
             self.requested_operations_by_swagger = []
 
-    def end_training(self, autoencoder_loss_final, discriminator_loss_final, generator_loss_final, saved_model_path,
-                     saver, sess, step):
+    def end_training(self, saved_model_path, log_path, saver, sess, step):
         """
         ends the training by saving the model if a model path is provided, saving the final losses and closing the
         tf session
-        :param autoencoder_loss_final: final loss of the autoencoder
-        :param discriminator_loss_final: final loss of the discriminator
-        :param generator_loss_final: final loss of the generator
         :param saved_model_path: path where the saved model should be stored
+        :param log_path: path where the log should be written to
         :param saver: tf.train.Saver() to save the model
         :param sess: session to save and to close
         :param step: global step
@@ -1223,12 +1230,85 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         if saved_model_path and self.save_final_model:
             saver.save(sess, save_path=saved_model_path, global_step=step)
 
+        # validate on test data
+        test_data = Storage.get_input_data("test")
+        n_batches = int(test_data.num_examples / self.batch_size)
+
+        # lists holding the loss per batch
+        autoencoder_loss_batch_list = []
+        discriminator_loss_batch_list = []
+        generator_loss_batch_list = []
+        mz_values_loss_batch_list = []
+        intensities_loss_batch_list = []
+
+        # iterate over the batches and calculate the loss
+        for b in range(n_batches):
+            batch_x, batch_labels = test_data.next_batch(self.batch_size)
+
+            z_real_dist = \
+                draw_from_single_gaussian(mean=0.0, std_dev=1.0, shape=(self.batch_size, self.z_dim)) * 5
+
+            # prepare the decoder inputs
+            n_images_per_class = int(math.ceil(self.batch_size / self.n_classes))
+            class_labels_one_hot = np.identity(self.n_classes)
+            dec_inputs = []
+            for k in range(n_images_per_class):
+                for class_label in class_labels_one_hot:
+                    random_inputs = np.random.randn(1, self.z_dim) * 5.
+                    random_inputs = np.reshape(random_inputs, (1, self.z_dim))
+                    class_label = np.reshape(class_label, (1, self.n_classes))
+                    dec_inputs.append(np.concatenate((random_inputs, class_label), 1))
+            dec_inputs = dec_inputs[:self.batch_size]
+            dec_inputs = np.array(dec_inputs).reshape(self.batch_size, self.z_dim + self.n_classes)
+
+            autoencoder_loss, discriminator_loss, generator_loss, decoder_output = \
+                sess.run(
+                    [self.autoencoder_loss, self.discriminator_loss, self.generator_loss, self.decoder_output],
+                    feed_dict={self.X: batch_x, self.X_target: batch_x,
+                               self.is_training: False,
+                               self.real_distribution: z_real_dist, self.y: batch_labels,
+                               self.decoder_input_multiple: dec_inputs})
+
+            real_images = batch_x
+            reconstructed_images = decoder_output
+
+            # store loss in list
+            autoencoder_loss_batch_list.append(autoencoder_loss)
+            discriminator_loss_batch_list.append(discriminator_loss)
+            generator_loss_batch_list.append(generator_loss)
+
+            if self.selected_dataset == "mass_spec":
+                mz_values_loss, intensities_loss \
+                    = visualize_spectra_reconstruction(self, epoch=None, reconstructed_mass_spec=reconstructed_images,
+                                                       original=real_images)
+                # store loss in list
+                mz_values_loss_batch_list.append(mz_values_loss)
+                intensities_loss_batch_list.append(intensities_loss)
+
+        # calculate the avg loss
+        autoencoder_loss_final = np.mean(autoencoder_loss_batch_list)
+        discriminator_loss_final = np.mean(discriminator_loss_batch_list)
+        generator_loss_final = np.mean(generator_loss_batch_list)
+        if self.selected_dataset == "mass_spec":
+            mz_values_final_loss = np.mean(mz_values_loss_batch_list)
+            intensities_final_loss = np.mean(intensities_loss_batch_list)
+
         # print the final losses
         if self.verbose:
             print("Autoencoder Loss: {}".format(autoencoder_loss_final))
             print("Discriminator Loss: {}".format(discriminator_loss_final))
             print("Generator Loss: {}".format(generator_loss_final))
-            print("#############    FINISHED TRAINING   #############")
+            if self.selected_dataset == "mass_spec":
+                print("M/z Loss: {}".format(mz_values_final_loss))
+                print("Intensities Loss: {}".format(intensities_final_loss))
+            print("#############    FINISHED TRAINING    #############")
+
+        if log_path is not None:
+            with open(log_path + '/log.txt', 'a') as log:
+                log.write("Epoch: Final\n")
+                log.write("Autoencoder Loss: {}\n".format(autoencoder_loss_final))
+                log.write("Discriminator Loss: {}\n".format(discriminator_loss_final))
+                log.write("Generator Loss: {}\n".format(generator_loss_final))
 
         # set the final performance
         self.final_performance = {"autoencoder_loss_final": autoencoder_loss_final,

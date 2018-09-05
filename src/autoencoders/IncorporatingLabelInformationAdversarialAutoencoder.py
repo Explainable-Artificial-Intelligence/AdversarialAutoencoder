@@ -13,6 +13,7 @@ from matplotlib import gridspec
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from swagger_server.utils.Storage import Storage
+from util.AdversarialAutoencoderParameters import get_result_path_for_selected_autoencoder
 from util.DataLoading import get_input_data
 from util.Distributions import gaussian_mixture, supervised_gaussian_mixture, supervised_swiss_roll, swiss_roll, \
     walk_along_swiss_roll, walk_along_gaussian_mixture
@@ -180,6 +181,8 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
         # path for the results
         self.results_path = parameter_dictionary["results_path"]
+        if self.results_path is None:       # use default when no path is provided
+            self.results_path = get_result_path_for_selected_autoencoder("IncorporatingLabelInformation")
 
         """
         placeholder variables 
@@ -1152,7 +1155,6 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
                         # every x epochs: write a summary for every 50th minibatch
                         if epoch % self.summary_image_frequency == 0 and b % 50 == 0:
 
-                            # TODO:
                             autoencoder_loss, discriminator_loss, generator_loss, summary, real_dist, \
                             latent_representation, discriminator_neg, discriminator_pos, decoder_output,\
                                 decoder_output_labeled = \
@@ -1317,9 +1319,9 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
                 self.process_requested_swagger_operations(sess)
 
+                # TODO: points is needed
                 self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch="last")
 
-            # TODO: end training has probably only to be called with train=True
             if epochs_completed > 0:
                 # end the training
                 self.end_training(autoencoder_loss_final, discriminator_loss_final, generator_loss_final,

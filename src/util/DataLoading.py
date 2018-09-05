@@ -375,6 +375,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     smoothing_n_gaussians = smoothness_params.get("smoothing_n_gaussians")    # int or None
     smoothing_method = smoothness_params.get("smoothing_method")        # "lowess" or "gaussian_filter"
     smoothness_frac = smoothness_params.get("smoothness_frac")          # None or float
+    smoothness_spar = smoothness_params.get("smoothness_spar")          # None or float
 
     data_subset = mass_spec_data_properties.get("data_subset")             # None, "identified", "unidentified"
 
@@ -634,6 +635,8 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                + str(smoothing_n_gaussians)
         elif smoothing_method == "lowess":
             input_file_name += "_lowess_frac_" + str(smoothness_frac).replace(".", "_")
+        elif smoothing_method == "spline":
+            input_file_name += "_spline_spar_" + str(smoothness_spar).replace(".", "_")
     input_file_name += ".txt"
 
     # maximum path length is 256; sometimes the filename can be longer, so in order to prevent crashes, we need to add
@@ -656,8 +659,10 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                                     include_charge_in_encoding=include_charge_in_encoding,
                                                     include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
                                                     use_smoothed_intensities=use_smoothed_intensities,
-                                                    smoothness_sigma=smoothness_sigma,
-                                                    smoothing_n_gaussians=smoothing_n_gaussians)
+                                                    smoothing_method=smoothing_method,
+                                                    smoothness_sigma=smoothness_sigma, smoothness_frac=smoothness_frac,
+                                                    smoothing_n_gaussians=smoothing_n_gaussians,
+                                                    smoothness_spar=smoothness_spar)
     else:
         print("File found!")
     identified_spectra = np.loadtxt(input_file_name)
@@ -690,8 +695,11 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                                     include_charge_in_encoding=include_charge_in_encoding,
                                                     include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
                                                     use_smoothed_intensities=use_smoothed_intensities,
-                                                    smoothness_sigma=smoothness_sigma,
-                                                    smoothing_n_gaussians=smoothing_n_gaussians)
+                                                    smoothing_method=smoothing_method,
+                                                    smoothness_sigma=smoothness_sigma, smoothness_frac=smoothness_frac,
+                                                    smoothing_n_gaussians=smoothing_n_gaussians,
+                                                    smoothness_spar=smoothness_spar)
+
     else:
         print("File found!")
     unidentified_spectra = np.loadtxt(input_file_name)
@@ -757,7 +765,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                  "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector],
                  "third_feature_vector": [min_third_feature_vector, ptp_third_feature_vector]})
 
-        elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt":
+        elif peak_encoding == "raw" or peak_encoding == "raw_intensities_sqrt" or peak_encoding == "raw_sqrt":
             # normalize m/z values
             all_spectra[:, :feature_dim - n_special_features][:, ::2], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
                 all_spectra[:, :feature_dim - n_special_features][:, ::2])

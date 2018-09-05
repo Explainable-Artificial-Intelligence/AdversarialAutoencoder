@@ -272,36 +272,38 @@ def param_search_smoothing_intensities():
 
     #
     # for z_dim in [2, 5, 10, 15, 35, 65, 90, 120, 150, 200]:
-    for z_dim in [15, 50, 2]:
-        for n_neurons_of_hidden_layer_x_autoencoder in [[2000, 2000, 2000, 2000], [1000, 1000], [1000, 1000, 1000],
-                                                        [1000, 1000, 1000, 1000], [2000, 2000], [2000, 2000, 2000],
-                                                    [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
-            for frac in [0.3]:
-
-
+    # for z_dim in [15, 50, 2]:
+    for z_dim in [50]:
+        for n_neurons_of_hidden_layer_x_autoencoder in [[2000, 2000, 2000]]:
+    #     for n_neurons_of_hidden_layer_x_autoencoder in [[2000, 2000, 2000, 2000], [1000, 1000], [1000, 1000, 1000],
+    #                                                     [1000, 1000, 1000, 1000], [2000, 2000], [2000, 2000, 2000],
+    #                                                 [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
+            # for frac in [0.001, 0.1, 0.3, 0.5]:
+            for frac in [0.1]:
 
                 params = get_default_parameters_mass_spec()
                 params["summary_image_frequency"] = 50
-                params["n_epochs"] = 1001
+                params["n_epochs"] = 10001
 
                 # peak_encoding
                 ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
-                 "only_intensities_distance", "raw", "raw_intensities_sqrt"]
+                 "only_intensities_distance", "raw", "raw_intensities_sqrt", "raw_sqrt"]
 
                 # datasubset:
                 ["identified", "unidentified", None]
 
                 # smoothing_method
-                ["lowess", "gaussian_filter"]
+                ["lowess", "gaussian_filter", "spline"]
 
-                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw_intensities_sqrt",
+                params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw_sqrt",
                                                        "use_smoothed_intensities": True, "data_subset": None,
                                                        "n_peaks_to_keep": 50, "max_intensity_value": 5000,
                                                        "max_mz_value": 5000, "charge": None, "normalize_data": True,
                                                        "include_molecular_weight_in_encoding": False,
                                                        "include_charge_in_encoding": False,
-                                                       "smoothness_params": {"smoothing_method": "lowess",
+                                                       "smoothness_params": {"smoothing_method": "spline",
                                                                              "smoothness_frac": frac,
+                                                                             "smoothness_spar": frac,
                                                                              "smoothness_sigma": 1,
                                                                              "smoothing_n_gaussians": 15}}
 
@@ -316,7 +318,8 @@ def param_search_smoothing_intensities():
                                 params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
                     params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
                 elif params["mass_spec_data_properties"]["peak_encoding"] == "raw" or \
-                                params["mass_spec_data_properties"]["peak_encoding"] == "raw_intensities_sqrt":
+                                params["mass_spec_data_properties"]["peak_encoding"] == "raw_intensities_sqrt" or \
+                                params["mass_spec_data_properties"]["peak_encoding"] == "raw_sqrt":
                     params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 2 + sum(
                         [params["mass_spec_data_properties"]["include_charge_in_encoding"],
                          params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
@@ -497,6 +500,9 @@ def update_basic_network_params(params):
     params["weights_initializer_params_encoder"] = [{"mean": 0, "stddev": 0.1}] * n_autoencoder_layers
     params["weights_initializer_params_decoder"] = [{"mean": 0, "stddev": 0.1}] * n_autoencoder_layers
     params["weights_initializer_params_discriminator"] = [{"mean": 0, "stddev": 0.1}] * n_discriminator_layers
+    params["activation_function_encoder"] = ['relu'] * (n_autoencoder_layers-1) + ['linear']
+    params["activation_function_decoder"] = ['sigmoid'] + ['relu'] * (n_autoencoder_layers-2) + ['linear']
+    params["activation_function_discriminator"] = ['relu'] * (n_discriminator_layers-1) + ['linear']
 
     return params
 
@@ -524,6 +530,16 @@ def testing():
     #   random_uniform_initializer: minval, maxval
     #   uniform_unit_scaling_initializer: factor: Float. A multiplicative factor by which the values will be scaled.
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
+
+    if False:
+        print("training MNIST")
+        params = get_default_parameters_mnist()
+        params["n_epochs"] = 6
+        params["summary_image_frequency"] = 5
+        params["results_path"] = get_result_path_for_selected_autoencoder("Supervised")
+        aae = SupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        return
 
     if False:
         # aae = init_aae_with_params_file("C:\\Users\\Telcontar\\Desktop\\interesting_results\\older_results\\2018-03-02_15_49_50_SVHN\\log\\params.txt", "Supervised")
