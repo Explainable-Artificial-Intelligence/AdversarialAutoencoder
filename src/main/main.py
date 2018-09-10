@@ -278,12 +278,13 @@ def param_search_smoothing_intensities():
     #     for n_neurons_of_hidden_layer_x_autoencoder in [[2000, 2000, 2000, 2000], [1000, 1000], [1000, 1000, 1000],
     #                                                     [1000, 1000, 1000, 1000], [2000, 2000], [2000, 2000, 2000],
     #                                                 [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
-            # for frac in [0.001, 0.1, 0.3, 0.5]:
-            for frac in [0.1]:
+            # for frac in [0.001, 0.005, 0.01, 0.05, 0.1]:
+            for frac in [0.0]:
+            # for frac in [0.1]:
 
                 params = get_default_parameters_mass_spec()
-                params["summary_image_frequency"] = 50
-                params["n_epochs"] = 10001
+                params["summary_image_frequency"] = 25
+                params["n_epochs"] = 201
 
                 # peak_encoding
                 ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
@@ -293,19 +294,18 @@ def param_search_smoothing_intensities():
                 ["identified", "unidentified", None]
 
                 # smoothing_method
-                ["lowess", "gaussian_filter", "spline"]
+                ["loess", "gaussian_filter", "spline"]
 
                 params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw_sqrt",
-                                                       "use_smoothed_intensities": True, "data_subset": None,
+                                                       "use_smoothed_intensities": False, "data_subset": None,
                                                        "n_peaks_to_keep": 50, "max_intensity_value": 5000,
                                                        "max_mz_value": 5000, "charge": None, "normalize_data": True,
                                                        "include_molecular_weight_in_encoding": False,
                                                        "include_charge_in_encoding": False,
-                                                       "smoothness_params": {"smoothing_method": "spline",
+                                                       "smoothness_params": {"smoothing_method": "loess",
                                                                              "smoothness_frac": frac,
                                                                              "smoothness_spar": frac,
-                                                                             "smoothness_sigma": 1,
-                                                                             "smoothing_n_gaussians": 15}}
+                                                                             "smoothness_sigma": 1}}
 
                 params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
                     [params["mass_spec_data_properties"]["include_charge_in_encoding"],
@@ -360,15 +360,13 @@ def param_search_smoothing_intensities():
                                                                      "values": [0.1, 0.01, 0.001, 0.0001]}
 
                 # for j in range(10):
-                for j in range(1):
+                for j in range(3):
 
                     aae = UnsupervisedAdversarialAutoencoder(params)
                     # aae = IncorporatingLabelInformationAdversarialAutoencoder(params)
 
                     aae.train(True)
                     aae.reset_graph()
-
-                    return
 
 
 def param_search_only_mz():
@@ -532,13 +530,79 @@ def testing():
     #   orthogonal_initializer: gain: Float. Multiplicative factor to apply to the orthogonal matrix
 
     if False:
-        print("training MNIST")
-        params = get_default_parameters_mnist()
-        params["n_epochs"] = 6
+        print("training only mz values")
+        params = get_params_from_params_file("D:/Results/mass_spec_data/only_mz_values/varying_z_dim_large_scale/network_architecture/2018-07-12_17_01_28_mass_spec/log/params.txt")
+        params["mass_spec_data_properties"]["max_mz_value"] = 5000
+        params["mass_spec_data_properties"]["charge"] = None
+        aae = UnsupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        return
+
+    if False:
+
+        default_params = get_default_parameters_svhn()
+        params = get_params_from_params_file("D:/Results/Supervised/svhn_varying_z_dim/varying_lr/2018-05-23_21_35_50_SVHN_good/log/params.txt")
+        # for key, value in params.items():
+        #     default_params[key] = value
+        #
+        # params = update_basic_network_params(default_params)
+        #
+        # for key, value in params.items():
+        #     default_params[key] = value
+
+        params["results_path"] = "../../results/Supervised"
+        params["n_epochs"] = 101
         params["summary_image_frequency"] = 5
-        params["results_path"] = get_result_path_for_selected_autoencoder("Supervised")
         aae = SupervisedAdversarialAutoencoder(params)
         aae.train(True)
+        aae.reset_graph()
+
+
+        return
+
+        print("training svhn")
+        params = get_default_parameters_svhn()
+        params["n_epochs"] = 101
+        params["summary_image_frequency"] = 10
+        params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
+        params["save_final_model"] = True
+        params["write_tensorboard"] = True
+        aae = UnsupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        aae.reset_graph()
+        return
+
+    if False:
+
+        # default_params = get_default_parameters_mnist()
+        # params = get_params_from_params_file("D:/Results/interesting_results/older_results/Unsupervised_MNIST_image_grid_weights/log/params.txt")
+        # for key, value in params.items():
+        #     default_params[key] = value
+        #
+        # params = update_basic_network_params(default_params)
+        #
+        # for key, value in params.items():
+        #     default_params[key] = value
+        #
+        # default_params["results_path"] = "../../results/Supervised"
+        # default_params["n_epochs"] = 101
+        # default_params["summary_image_frequency"] = 5
+        # aae = SupervisedAdversarialAutoencoder(default_params)
+        # aae.train(True)
+        # aae.reset_graph()
+
+        # default params
+        print("training MNIST")
+        params = get_default_parameters_mnist()
+        params["n_epochs"] = 1001
+        params["summary_image_frequency"] = 5
+        params["results_path"] = get_result_path_for_selected_autoencoder("Supervised")
+        params["save_final_model"] = True
+        params["write_tensorboard"] = True
+        aae = SupervisedAdversarialAutoencoder(params)
+        aae.train(True)
+        aae.reset_graph()
+
         return
 
     if False:
@@ -579,7 +643,6 @@ def testing():
     if False:
         try_mass_spec_parameter_combinations()
         return
-
 
     if True:
         # param_search_incorporating_label_information()

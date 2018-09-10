@@ -33,13 +33,13 @@ def get_default_parameters_mnist():
     returns the default parameters for the MNIST dataset
     :return: dictionary holding the parameters needed to create the Autoencoder
     """
-    return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 2, 'n_classes': 10,
+    return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 28, 'input_dim_y': 28, 'z_dim': 8, 'n_classes': 10,
             'color_scale': "gray_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
             'n_labeled': 1000,  # for semi-supervised
             'selected_dataset': "MNIST",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
-            'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
-            'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
+            'n_neurons_of_hidden_layer_x_autoencoder': [1000, 1000],  # 1000, 500, 250, 125
+            'n_neurons_of_hidden_layer_x_discriminator': [1000, 1000],  # 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
 
@@ -56,12 +56,9 @@ def get_default_parameters_mnist():
             'batch_normalization_discriminator_c': ["post_activation", "post_activation", "post_activation"],
             'batch_normalization_discriminator_g': ["post_activation", "post_activation", "post_activation"],
 
-            'bias_initializer_encoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
-                                         "zeros_initializer", "zeros_initializer"],
-            'bias_initializer_decoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
-                                         "zeros_initializer", "zeros_initializer"],
-            'bias_initializer_discriminator': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
-                                               "zeros_initializer"],
+            'bias_initializer_encoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
+            'bias_initializer_decoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
+            'bias_initializer_discriminator': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
             'bias_initializer_discriminator_c': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
             'bias_initializer_discriminator_g': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
 
@@ -72,34 +69,30 @@ def get_default_parameters_mnist():
             'bias_initializer_params_discriminator_g': [{}, {}, {}],
 
             'weights_initializer_encoder': ["truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer", "truncated_normal_initializer",
                                             "truncated_normal_initializer"],
             'weights_initializer_decoder': ["truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer", "truncated_normal_initializer",
                                             "truncated_normal_initializer"],
             'weights_initializer_discriminator': ["truncated_normal_initializer", "truncated_normal_initializer",
-                                                  "truncated_normal_initializer", "truncated_normal_initializer"],
+                                                  "truncated_normal_initializer"],
             'weights_initializer_discriminator_c': ["truncated_normal_initializer", "truncated_normal_initializer",
                                                     "truncated_normal_initializer"],
             'weights_initializer_discriminator_g': ["truncated_normal_initializer", "truncated_normal_initializer",
                                                     "truncated_normal_initializer"],
 
             'weights_initializer_params_encoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                    {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_decoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                    {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_discriminator': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                         {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}],
+                                                         {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_discriminator_c': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                            {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_discriminator_g': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                            {"mean": 0, "stddev": 0.1}],
 
-            'activation_function_encoder': ['relu', 'relu', 'relu', 'relu', 'linear'],
-            'activation_function_decoder': ['sigmoid', 'relu', 'relu', 'relu', 'linear'],
-            'activation_function_discriminator': ['relu', 'relu', 'relu', 'linear'],
+            'activation_function_encoder': ['relu', 'relu', 'linear'],
+            'activation_function_decoder': ['relu', 'relu', 'sigmoid'],
+            'activation_function_discriminator': ['relu', 'relu', 'linear'],
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
 
@@ -701,10 +694,10 @@ def get_default_parameters_mass_spec():
                                           "max_mz_value": 2000, "charge": None, "normalize_data": False,
                                           "include_molecular_weight_in_encoding": False,
                                           "include_charge_in_encoding": False,
-                                          "smoothness_params": {"smoothing_method": "lowess",
+                                          "smoothness_params": {"smoothing_method": "loess",
                                                                 "smoothness_frac": 0.3,
-                                                                "smoothness_sigma": 1,
-                                                                "smoothing_n_gaussians": 15}},
+                                                                "smoothness_spar": 0.3,
+                                                                "smoothness_sigma": 1}},
 
             'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125

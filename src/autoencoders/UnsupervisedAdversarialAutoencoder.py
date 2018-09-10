@@ -276,7 +276,11 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
 
         # use the default autoencoder loss
         else:
-            self.autoencoder_loss = tf.reduce_mean(tf.abs(self.X_target - self.decoder_output))
+            self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
+            #self.autoencoder_loss = tf.reduce_mean(tf.sqrt(tf.square(self.X_target - self.decoder_output)))
+
+        # TODO:
+        # self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
 
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(

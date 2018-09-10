@@ -1298,9 +1298,10 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         # in case the data is normalized, get the original values back
         if is_data_normalized:
-            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
-            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
-            mz_values = mz_values * std_dev + mean
+            # revert normalization for intensities
+            min_first_feature_vector, ptp_first_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            mz_values = mz_values * ptp_first_feature_vector + min_first_feature_vector
 
         intensities = mz_values.copy()
         intensities.fill(1000)
@@ -1310,9 +1311,10 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         # in case the data is normalized, get the original values back
         if is_data_normalized:
-            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
-            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
-            intensities = intensities * std_dev + mean
+            # revert normalization for intensities
+            min_first_feature_vector, ptp_first_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
 
         intensities = intensities ** 2
 
@@ -1327,9 +1329,10 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
 
         # in case the data is normalized, get the original values back
         if is_data_normalized:
-            mean = Storage.get_mass_spec_data_normalization_properties()["mean"]
-            std_dev = Storage.get_mass_spec_data_normalization_properties()["std_dev"]
-            intensities = intensities * std_dev + mean
+            # revert normalization for intensities
+            min_first_feature_vector, ptp_first_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
 
         # we want m/z values from 0 to 1500
         n_data_points = mass_spec_data.shape[0]

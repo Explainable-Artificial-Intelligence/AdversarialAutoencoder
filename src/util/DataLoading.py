@@ -371,11 +371,18 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     use_smoothed_intensities = mass_spec_data_properties.get("use_smoothed_intensities")    # True or False
 
     smoothness_params = mass_spec_data_properties.get("smoothness_params")      # holds the parameters for smoothing
-    smoothness_sigma = smoothness_params.get("smoothness_sigma")    # float or None
-    smoothing_n_gaussians = smoothness_params.get("smoothing_n_gaussians")    # int or None
-    smoothing_method = smoothness_params.get("smoothing_method")        # "lowess" or "gaussian_filter"
-    smoothness_frac = smoothness_params.get("smoothness_frac")          # None or float
-    smoothness_spar = smoothness_params.get("smoothness_spar")          # None or float
+    if smoothness_params:
+        smoothness_sigma = smoothness_params.get("smoothness_sigma")    # float or None
+        smoothing_n_gaussians = smoothness_params.get("smoothing_n_gaussians")    # int or None
+        smoothing_method = smoothness_params.get("smoothing_method")        # "loess" or "gaussian_filter"
+        smoothness_frac = smoothness_params.get("smoothness_frac")          # None or float
+        smoothness_spar = smoothness_params.get("smoothness_spar")          # None or float
+    else:       # we don't have any smoothness parameters
+        smoothness_sigma = None    # float or None
+        smoothing_n_gaussians = None    # int or None
+        smoothing_method = None        # "loess" or "gaussian_filter"
+        smoothness_frac = None          # None or float
+        smoothness_spar = None          # None or float
 
     data_subset = mass_spec_data_properties.get("data_subset")             # None, "identified", "unidentified"
 
@@ -633,8 +640,8 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         if smoothing_method == "gaussian_filter":
             input_file_name += "_gauss_filter_sigma_" + str(smoothness_sigma) + "_n_gauss_" \
                                + str(smoothing_n_gaussians)
-        elif smoothing_method == "lowess":
-            input_file_name += "_lowess_frac_" + str(smoothness_frac).replace(".", "_")
+        elif smoothing_method == "loess":
+            input_file_name += "_loess_frac_" + str(smoothness_frac).replace(".", "_")
         elif smoothing_method == "spline":
             input_file_name += "_spline_spar_" + str(smoothness_spar).replace(".", "_")
     input_file_name += ".txt"
@@ -781,16 +788,15 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                  "second_feature_vector": [min_second_feature_vector, ptp_second_feature_vector]})
 
         elif peak_encoding == "only_intensities" or peak_encoding == "only_mz" \
-                or peak_encoding == "only_mz_charge_label":
-            # standardization of the data
-            mean = np.mean(all_spectra[:, :feature_dim - n_special_features], axis=0)
-            std_dev = np.std(all_spectra[:, :feature_dim - n_special_features], axis=0)
-            all_spectra[:, :feature_dim - n_special_features] \
-                = (all_spectra[:, :feature_dim - n_special_features] - mean) / std_dev
+                or peak_encoding == "only_mz_charge_label" or peak_encoding == "only_intensities_distance":
+
+            # normalize m/z values
+            all_spectra[:, :feature_dim - n_special_features], min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(
+                all_spectra[:, :feature_dim - n_special_features])
 
             # save the respective minima and peak to peak distances in the storage class (so we can revert the
             # normalization later on)
-            Storage.set_mass_spec_data_normalization_properties({"mean": mean, "std_dev": std_dev})
+            Storage.set_mass_spec_data_normalization_properties({"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector]})
 
     train_images = all_spectra[:n_training_points]
     train_labels = all_spectra_labels[:n_training_points]
