@@ -166,11 +166,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.increment_global_step_op = tf.assign_add(self.global_step, 1)
 
         # learning rate for the different parts of the network
-        self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
-        self.learning_rate_discriminator = parameter_dictionary["learning_rate_discriminator"]
-        self.learning_rate_generator = parameter_dictionary["learning_rate_generator"]
-
-        # learning rate for the different parts of the network
         self.decaying_learning_rate_name_autoencoder = parameter_dictionary["decaying_learning_rate_name_autoencoder"]
         self.decaying_learning_rate_name_discriminator = \
             parameter_dictionary["decaying_learning_rate_name_discriminator"]
@@ -188,6 +183,9 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.results_path = parameter_dictionary["results_path"]
         if self.results_path is None:       # use default when no path is provided
             self.results_path = get_result_path_for_selected_autoencoder("Unsupervised")
+
+        self.mz_loss_factor = parameter_dictionary.get("mz_loss_factor")
+        self.intensity_loss_factor = parameter_dictionary.get("intensity_loss_factor")
 
         """
         placeholder variables 
@@ -272,15 +270,16 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             mz_values_loss = tf.square(mz_values_original - mz_values_reconstructed)
             intensities_loss = tf.square(intensities_original - intensities_reconstructed)
 
-            self.autoencoder_loss = tf.reduce_mean(mz_values_loss*5 + intensities_loss)
+            self.autoencoder_loss = tf.reduce_mean(mz_values_loss * self.mz_loss_factor
+                                                   + intensities_loss * self.intensity_loss_factor)
 
         # use the default autoencoder loss
         else:
             self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
             #self.autoencoder_loss = tf.reduce_mean(tf.sqrt(tf.square(self.X_target - self.decoder_output)))
 
-        # TODO:
-        # self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
+        # TODO: remove hard coded
+        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
 
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(
@@ -1303,22 +1302,18 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 mz_values_loss, intensities_loss \
                     = visualize_spectra_reconstruction(self, epoch=None, reconstructed_mass_spec=reconstructed_images,
                                                        original=real_images)
+                mz_values_loss_batch_list.append(mz_values_loss)
+                intensities_loss_batch_list.append(intensities_loss)
 
             # store loss in list
             autoencoder_loss_batch_list.append(autoencoder_loss)
             discriminator_loss_batch_list.append(discriminator_loss)
             generator_loss_batch_list.append(generator_loss)
-            if self.selected_dataset == "mass_spec":
-                mz_values_loss_batch_list.append(mz_values_loss)
-                intensities_loss_batch_list.append(intensities_loss)
 
         # calculate the avg loss
         autoencoder_loss_final = np.mean(autoencoder_loss_batch_list)
         discriminator_loss_final = np.mean(discriminator_loss_batch_list)
         generator_loss_final = np.mean(generator_loss_batch_list)
-        if self.selected_dataset == "mass_spec":
-            mz_values_final_loss = np.mean(mz_values_loss_batch_list)
-            intensities_final_loss = np.mean(intensities_loss_batch_list)
 
         # print the final losses
         if self.verbose:
@@ -1326,8 +1321,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             print("Discriminator Loss: {}".format(discriminator_loss_final))
             print("Generator Loss: {}".format(generator_loss_final))
             if self.selected_dataset == "mass_spec":
-                print("M/z Loss: {}".format(mz_values_final_loss))
-                print("Intensities Loss: {}".format(intensities_final_loss))
+                print("M/z Loss: {}".format(np.mean(mz_values_loss_batch_list)))
+                print("Intensities Loss: {}".format(np.mean(intensities_loss_batch_list)))
             print("#############    FINISHED TRAINING    #############")
 
         if log_path is not None:
@@ -1336,6 +1331,12 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                 log.write("Autoencoder Loss: {}\n".format(autoencoder_loss_final))
                 log.write("Discriminator Loss: {}\n".format(discriminator_loss_final))
                 log.write("Generator Loss: {}\n".format(generator_loss_final))
+
+            if self.selected_dataset == "mass_spec":
+                with open(log_path + '/log_mass_spec_reconstruction.txt', 'a') as log:
+                    log.write("Epoch: Final\n")
+                    log.write("M/Z values Loss: {}\n".format(np.mean(mz_values_loss_batch_list)))
+                    log.write("Intensities Loss: {}\n".format(np.mean(intensities_loss_batch_list)))
 
         # set the final performance
         self.final_performance = {"autoencoder_loss_final": autoencoder_loss_final,
