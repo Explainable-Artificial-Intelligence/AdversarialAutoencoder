@@ -183,13 +183,6 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         self.increment_global_step_op = tf.assign_add(self.global_step, 1)
 
         # initial learning rate for the different parts of the network
-        self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
-        self.learning_rate_discriminator_gaussian = parameter_dictionary["learning_rate_discriminator_gaussian"]
-        self.learning_rate_discriminator_categorical = parameter_dictionary["learning_rate_discriminator_categorical"]
-        self.learning_rate_generator = parameter_dictionary["learning_rate_generator"]
-        self.learning_rate_supervised_encoder = parameter_dictionary["learning_rate_supervised_encoder"]
-
-        # initial learning rate for the different parts of the network
         self.decaying_learning_rate_name_autoencoder = parameter_dictionary["decaying_learning_rate_name_autoencoder"]
         self.decaying_learning_rate_name_discriminator_gaussian = \
             parameter_dictionary["decaying_learning_rate_name_discriminator_gaussian"]

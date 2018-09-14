@@ -28,7 +28,8 @@ from util.VisualizationUtils import reshape_tensor_to_rgb_image, reshape_image_a
 class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, TransformerMixin):
     def __init__(self, parameter_dictionary):
 
-        self.distribution_to_sample = "swiss_roll"
+        # "gaussian" or "swiss_roll"
+        self.distribution_to_sample = "gaussian"
 
         # whether only the autoencoder and not the generative network should be trained
         self.only_train_autoencoder = False
@@ -159,11 +160,6 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
         # Create a variable to track the global step.
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         self.increment_global_step_op = tf.assign_add(self.global_step, 1)
-
-        # learning rate for the different parts of the network
-        self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
-        self.learning_rate_discriminator = parameter_dictionary["learning_rate_discriminator"]
-        self.learning_rate_generator = parameter_dictionary["learning_rate_generator"]
 
         # learning rate for the different parts of the network
         self.decaying_learning_rate_name_autoencoder = parameter_dictionary["decaying_learning_rate_name_autoencoder"]
@@ -816,12 +812,17 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
     def walk_along_latent_space(self, sess, op, epoch):
 
         nx, ny = 10, self.n_classes - 1
-        label_indices = [i for i in range(self.n_classes-1)] * nx
+        label_indices_for_x_axis_label = [i for i in range(self.n_classes-1)] * nx      # [0,1,2..,9,0,..,9,0,..,7,8,9]
 
         if self.distribution_to_sample == "gaussian":
-            points = walk_along_gaussian_mixture(nx, self.n_classes - 1)
+            # points = walk_along_gaussian_mixture(nx, self.n_classes - 1)
+            points = supervised_gaussian_mixture(batchsize=nx * ny, ndim=self.z_dim,
+                                                 label_indices=label_indices_for_x_axis_label,
+                                                 num_labels=self.n_classes - 1)
         else:
-            points = walk_along_swiss_roll(nx, self.n_classes - 1)
+            # points = walk_along_swiss_roll(nx, self.n_classes - 1)
+            points = supervised_swiss_roll(batchsize=nx * ny, ndim=self.z_dim, label_indices=label_indices_for_x_axis_label,
+                                           num_labels=self.n_classes - 1)
 
         # create the image grid
         plt.subplot()
@@ -854,7 +855,7 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
 
             # create the label x for the x axis
             if ax.is_last_row():
-                ax.set_xlabel(label_indices[i], fontsize=9)
+                ax.set_xlabel(label_indices_for_x_axis_label[i], fontsize=9)
 
         # save the created image grid
         plt.savefig(self.results_path + self.result_folder_name + '/Tensorboard/' + str(epoch) + "_gen_images" + '.png')
@@ -919,9 +920,6 @@ class IncorporatingLabelInformationAdversarialAutoencoder(BaseEstimator, Transfo
             # run the decoder
             x = sess.run(op, feed_dict={self.decoder_input: z, self.is_training: False})
             x = np.array(x).reshape(self.input_dim)
-
-            # TODO: check when normalize is necessary
-            # x = (x - np.min(x)) / (np.max(x) - np.min(x))
 
             ax = plt.subplot(g)
 

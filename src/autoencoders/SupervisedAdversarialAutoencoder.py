@@ -169,11 +169,6 @@ class SupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         self.increment_global_step_op = tf.assign_add(self.global_step, 1)
 
         # learning rate for the different parts of the network
-        self.learning_rate_autoencoder = parameter_dictionary["learning_rate_autoencoder"]
-        self.learning_rate_discriminator = parameter_dictionary["learning_rate_discriminator"]
-        self.learning_rate_generator = parameter_dictionary["learning_rate_generator"]
-
-        # learning rate for the different parts of the network
         self.decaying_learning_rate_name_autoencoder = parameter_dictionary["decaying_learning_rate_name_autoencoder"]
         self.decaying_learning_rate_name_discriminator = \
             parameter_dictionary["decaying_learning_rate_name_discriminator"]
