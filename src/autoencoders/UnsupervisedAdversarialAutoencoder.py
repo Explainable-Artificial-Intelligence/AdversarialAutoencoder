@@ -73,10 +73,19 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
             self.mass_spec_data_properties = None
 
         # load the data
-        if not Storage.get_all_input_data():
+        # TODO: noise and normalization as parameter
+        data_properties = {"selected_dataset": self.selected_dataset, "color_scale": self.color_scale,
+                           "data_normalized": False, "add_noise": False,
+                           "mass_spec_data_properties": self.mass_spec_data_properties}
+
+        # check if the data we need is already stored in the storage class..
+        if not Storage.get_data_properties() == data_properties:
+            # .. no; so we need to get it and store it in the storage class..
             data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
                                   add_noise=False,
                                   mass_spec_data_properties=self.mass_spec_data_properties)
+            Storage.set_selected_dataset(self.selected_dataset)
+            Storage.set_data_properties(data_properties)
             Storage.set_input_data(data)
 
         """
@@ -947,14 +956,8 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         latent_representations_current_epoch = []
         labels_current_epoch = []
 
-        # Get the data from the storage class, if we have any data stored
-        # TODO: data should be stored in the storage class all the time
-        # if Storage.get_all_input_data():
+        # get the data from the storage class
         data = Storage.get_all_input_data()
-        # else:
-        #     data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
-        #                           add_noise=False,
-        #                           mass_spec_data_properties=self.mass_spec_data_properties)
 
         autoencoder_epoch_losses, discriminator_epoch_losses, generator_epoch_losses = [], [], []
         epochs_completed = 0
@@ -1170,7 +1173,13 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
                         # generate the image grid for the latent space
                         generated_images = self.generate_image_grid(sess, op=self.decoder_output_real_dist, epoch=epoch,
                                                                     left_cell=left_cell,
-                                                                    points=latent_representations_current_epoch)
+                                                                    # points=latent_representations_current_epoch)
+                        points = None)      # TODO: previous points=latent_representations_current_epoch
+                        # TODO:
+
+
+
+
 
                         if self.selected_dataset == "mass_spec":
                             reconstruct_generated_mass_spec_data(self, generated_mass_spec_data=generated_images,

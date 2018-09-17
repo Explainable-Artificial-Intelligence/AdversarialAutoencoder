@@ -5,6 +5,7 @@ from scipy.stats import gaussian_kde
 import os
 # import readline         # workaround for bug related to rpy2 (https://github.com/ContinuumIO/anaconda-issues/issues/152)
 import rpy2.robjects as ro
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from . import DataLoading
 
@@ -65,13 +66,19 @@ def preprocess_mass_spec_file(input_filename, output_filename, organism_name, n_
                                             spar=smoothness_spar)
 
     if input_filename.endswith(".mgf"):
-        unprocessed_spectra = DataLoading.load_mgf_file(input_filename.replace(".txt", ".mgf"))
+        if use_smoothed_intensities:
+            spectra = DataLoading.load_mgf_file(output_filename.replace(".txt", ".mgf"))
+        else:
+            spectra = DataLoading.load_mgf_file(input_filename.replace(".txt", ".mgf"))
     else:
-        unprocessed_spectra = DataLoading.load_msp_file(input_filename.replace(".txt", ".msp"))
+        if use_smoothed_intensities:
+            spectra = DataLoading.load_msp_file(output_filename.replace(".txt", ".msp"))
+        else:
+            spectra = DataLoading.load_msp_file(input_filename.replace(".txt", ".msp"))
 
     # get the encoding for the peaks
     print("Encoding the data..")
-    peak_features = get_peaks_encoding(unprocessed_spectra, peak_encoding=peak_encoding,
+    peak_features = get_peaks_encoding(spectra, peak_encoding=peak_encoding,
                                        n_peaks_to_keep=n_peaks_to_keep, filter_on_charge=filter_on_charge,
                                        include_charge_in_encoding=include_charge_in_encoding,
                                        include_molecular_weight_in_encoding=include_molecular_weight_in_encoding,
@@ -864,8 +871,14 @@ def preprocess_smoothed_intensities(n_peaks_to_keep, n_gaussians, max_mz_value, 
 
     elif smoothing_method == "loess":
         # smooth using loess
-        smoothed_intensities = np.array([smooth_spectrum_with_loess(mz_values[i], intensities[i], span=0.3)
+        smoothed_intensities = np.array([smooth_spectrum_with_loess(mz_values[i], intensities[i], span=frac)
                                          for i in range(mz_values.shape[0])])
+
+    elif smoothing_method == "lowess":
+        # smooth using lowess
+        smoothed_intensities = np.array([lowess(intensities[i], mz_values[i], is_sorted=True, return_sorted=False,
+                                                frac=frac, it=0) for i in range(mz_values.shape[0])])
+
     elif smoothing_method == "spline":
         # smooth using splines
         smoothed_intensities = np.array([smooth_spectrum_with_splines(mz_values[i], intensities[i], spar=spar)

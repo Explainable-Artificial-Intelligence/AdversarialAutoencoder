@@ -1050,7 +1050,7 @@ def create_reconstruction_grid(aae_class, real_images, reconstructed_images, epo
         ax.set_aspect('auto')
 
     plt.savefig(aae_class.results_path + aae_class.result_folder_name + '/Tensorboard/'
-                + str(epoch) + "_" + "_reconstruction_grid" + '.png')
+                + str(epoch) + "_reconstruction_grid" + '.png')
 
     plt.close("all")
 
@@ -1394,11 +1394,11 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
                 Storage.get_mass_spec_data_normalization_properties()["second_feature_vector"]
             intensities = intensities * ptp_second_feature_vector + min_second_feature_vector
 
-            if peak_encoding == "raw_intensities_sqrt":
-                intensities = intensities ** 2
-            elif peak_encoding == "raw_sqrt":
-                mz_values = mz_values ** 2
-                intensities = intensities ** 2
+        if peak_encoding == "raw_intensities_sqrt":
+            intensities = intensities ** 2
+        elif peak_encoding == "raw_sqrt":
+            mz_values = mz_values ** 2
+            intensities = intensities ** 2
 
     else:
         raise ValueError(peak_encoding + " is invalid!")

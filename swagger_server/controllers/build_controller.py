@@ -85,7 +85,7 @@ def build_aae(selected_autoencoder, aae_parameters):
     return 'Error: parameters not in .json format', 415
 
 
-def load_trained_aae(selected_autoencoder, filepath):
+def load_aae(selected_autoencoder, filepath):
     """
     loads a trained autoencoder
     :param selected_autoencoder: autoencoder to load, e.g. Unsupervised, Supervised, etc.

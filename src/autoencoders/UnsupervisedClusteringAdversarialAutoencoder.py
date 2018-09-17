@@ -1185,12 +1185,8 @@ class UnsupervisedClusteringAdversarialAutoencoder(BaseEstimator, TransformerMix
         latent_representations_current_epoch = []
         labels_current_epoch = []
 
-        # Get the data from the storage class, we have data stored
-        if Storage.get_all_input_data():
-            data = Storage.get_all_input_data()
-        else:
-            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
-                                  mass_spec_data_properties=self.mass_spec_data_properties)
+        # get the data from the storage class
+        data = Storage.get_all_input_data()
 
         autoencoder_loss_final = 0
         discriminator_loss_g_final = 0

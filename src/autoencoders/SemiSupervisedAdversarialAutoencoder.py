@@ -69,6 +69,22 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         else:
             self.mass_spec_data_properties = None
 
+        # load the data
+        # TODO: noise and normalization as parameter
+        data_properties = {"selected_dataset": self.selected_dataset, "color_scale": self.color_scale,
+                           "data_normalized": False, "add_noise": False,
+                           "mass_spec_data_properties": self.mass_spec_data_properties}
+
+        # check if the data we need is already stored in the storage class..
+        if not Storage.get_data_properties() == data_properties:
+            # .. no; so we need to get it and store it in the storage class..
+            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
+                                  add_noise=False,
+                                  mass_spec_data_properties=self.mass_spec_data_properties)
+            Storage.set_selected_dataset(self.selected_dataset)
+            Storage.set_data_properties(data_properties)
+            Storage.set_input_data(data)
+
         """
         params for network topology
         """
@@ -1201,12 +1217,8 @@ class SemiSupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         latent_representations_current_epoch = []
         labels_current_epoch = []
 
-        # Get the data from the storage class, we have data stored
-        if Storage.get_all_input_data():
-            data = Storage.get_all_input_data()
-        else:
-            data = get_input_data(self.selected_dataset, color_scale=self.color_scale, data_normalized=False,
-                                  mass_spec_data_properties=self.mass_spec_data_properties)
+        # get the data from the storage class
+        data = Storage.get_all_input_data()
 
         autoencoder_loss_final = 0
         discriminator_loss_g_final = 0

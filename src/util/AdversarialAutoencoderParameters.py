@@ -96,13 +96,6 @@ def get_default_parameters_mnist():
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
 
-            'learning_rate_autoencoder': 0.0001,
-            'learning_rate_discriminator': 0.0001,
-            'learning_rate_generator': 0.0001,
-            'learning_rate_discriminator_gaussian': 0.0001,
-            'learning_rate_discriminator_categorical': 0.0001,
-            'learning_rate_supervised_encoder': 0.0001,
-
             'decaying_learning_rate_name_autoencoder': "static",
             'decaying_learning_rate_name_discriminator': "static",
             'decaying_learning_rate_name_generator': "static",
@@ -319,13 +312,6 @@ def get_default_parameters_svhn():
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
 
-            'learning_rate_autoencoder': 0.0001,
-            'learning_rate_discriminator': 0.0001,
-            'learning_rate_generator': 0.0001,
-            'learning_rate_discriminator_gaussian': 0.0001,
-            'learning_rate_discriminator_categorical': 0.0001,
-            'learning_rate_supervised_encoder': 0.0001,
-
             'decaying_learning_rate_name_autoencoder': "piecewise_constant",
             'decaying_learning_rate_name_discriminator': "piecewise_constant",
             'decaying_learning_rate_name_generator': "piecewise_constant",
@@ -532,13 +518,6 @@ def get_default_parameters_cifar10():
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
 
-            'learning_rate_autoencoder': 0.0001,
-            'learning_rate_discriminator': 0.0001,
-            'learning_rate_generator': 0.0001,
-            'learning_rate_discriminator_gaussian': 0.0001,
-            'learning_rate_discriminator_categorical': 0.0001,
-            'learning_rate_supervised_encoder': 0.0001,
-
             'decaying_learning_rate_name_autoencoder': "static",
             'decaying_learning_rate_name_discriminator': "static",
             'decaying_learning_rate_name_generator': "static",
@@ -688,6 +667,9 @@ def get_default_parameters_mass_spec():
             'n_labeled': 1000,  'only_train_autoencoder': True, 'selected_dataset': "mass_spec",
             'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
 
+            'mz_loss_factor': 1,
+            'intensity_loss_factor': 1,
+
             'mass_spec_data_properties': {"organism_name": "yeast", "peak_encoding": "only_intensities",
                                           "use_smoothed_intensities": True, "data_subset": None,
                                           "n_peaks_to_keep": 50, "max_intensity_value": 2000,
@@ -765,13 +747,6 @@ def get_default_parameters_mass_spec():
             'activation_function_discriminator': ['relu', 'relu', 'relu', 'linear'],
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
-
-            'learning_rate_autoencoder': 0.0001,
-            'learning_rate_discriminator': 0.0001,
-            'learning_rate_generator': 0.0001,
-            'learning_rate_discriminator_gaussian': 0.0001,
-            'learning_rate_discriminator_categorical': 0.0001,
-            'learning_rate_supervised_encoder': 0.0001,
 
             'decaying_learning_rate_name_autoencoder': "static",
             'decaying_learning_rate_name_discriminator': "static",
@@ -1295,7 +1270,6 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     bias_initializer_options = ["constant_initializer", "random_normal_initializer", "truncated_normal_initializer",
                            "random_uniform_initializer", "uniform_unit_scaling_initializer", "zeros_initializer",
                            "ones_initializer"]
-    # TODO "orthogonal_initializer" is not working!!
     bias_initializer_encoder = [random.choice(bias_initializer_options) for i in range(n_layers_autoencoder)]
     # bias_initializer_encoder = ["orthogonal_initializer"] * n_layers_autoencoder
     bias_initializer_decoder = [random.choice(bias_initializer_options) for i in range(n_layers_autoencoder)]
@@ -1334,14 +1308,6 @@ def get_randomized_parameters(*args, selected_autoencoder, selected_dataset, **k
     activation_function_discriminator = [random.choice(activation_function_options) for i in range(n_layers_discriminator)]
     activation_function_discriminator_c = [random.choice(activation_function_options) for i in range(n_layers_discriminator_c)]
     activation_function_discriminator_g = [random.choice(activation_function_options) for i in range(n_layers_discriminator_g)]
-
-    # initial learning rates
-    learning_rate_autoencoder = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
-    learning_rate_discriminator = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
-    learning_rate_generator = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
-    learning_rate_discriminator_gaussian = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
-    learning_rate_discriminator_categorical = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
-    learning_rate_supervised_encoder = draw_from_np_distribution(distribution_name="uniform", low=0.1, high=0.01, return_type="float")
 
     # decaying learning rates
     learning_rate_options = ["exponential_decay", "inverse_time_decay", "natural_exp_decay", "piecewise_constant",

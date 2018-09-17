@@ -14,7 +14,7 @@ paths:
   /Load/loadDataset:
     post:
       tags: [Load]
-      summary: "Load a data set"
+      summary: "Loads a data set"
       description: "Load the MNIST, the SVHN, the cifar10 or a custom dataset"
       operationId: load_data_set
       parameters:
@@ -81,7 +81,7 @@ paths:
     get:
       tags: [Load]
       operationId: get_single_image
-      summary: get a single image
+      summary: Returns a single image
       parameters:
         - name: image_id
           in: query
@@ -112,7 +112,7 @@ paths:
     get:
       tags: [Load]
       operationId: get_single_image_as_byte_string
-      summary: get a single image as byte string
+      summary: Returns a single image as byte string
       parameters:
         - name: image_id
           in: query
@@ -140,7 +140,7 @@ paths:
     get:
       tags: [Load]
       operationId: get_single_label
-      summary: get a single label
+      summary: Returns a single label
       parameters:
         - name: label_id
           in: query
@@ -172,7 +172,7 @@ paths:
     get:
       tags: [Load]
       operationId: get_data_batch
-      summary: get the next batch
+      summary: Returns the next batch
       parameters:
         - name: batch_size
           in: query
@@ -213,7 +213,7 @@ paths:
     get:
       tags: [Load]
       operationId: get_data_batch_as_byte_string
-      summary: get the next batch as byte string
+      summary: Returns the next batch as byte string
       parameters:
         - name: batch_size
           in: query
@@ -252,7 +252,7 @@ paths:
   /Build/buildAAE:
     post:
       tags: [Build]
-      summary: passes all learning and ANN parameters to the server
+      summary: Builds an AAE using the parameters provided
       description: Includes learning parameters and ANN topology
       operationId: build_aae
       parameters:
@@ -279,12 +279,12 @@ paths:
           description: "File parsing error"
       x-swagger-router-controller: "swagger_server.controllers.build_controller"
 
-  /Build/loadTrainedAAE:
+  /Build/loadAAE:
     post:
       tags: [Build]
-      summary: loads an already trained autoencoder
+      summary: Loads an (usually trained) autoencoder
       description: loads the trained autoencoder stored in the provided filepath
-      operationId: load_trained_aae
+      operationId: load_aae
       parameters:
         - in: "query"
           name: "selected_autoencoder"
@@ -313,7 +313,7 @@ paths:
   /Train/controlTraining:
     post:
       tags: [Train]
-      summary: starts and stops the training
+      summary: Starts and stops the training
       description: starts and stops the training of the adv autoencoder
       operationId: control_training
       parameters:
@@ -334,8 +334,8 @@ paths:
   /Train/getPerformance:
     get:
       tags: [Train]
-      summary: returns the performance for the adv. autoencoder
-      description: returns the losses (encoder, discriminator, generator) over time for the adv. autoencoder
+      summary: Returns the performance for the AAE
+      description: returns the losses (encoder, discriminator, generator) over time for the AAE
       operationId: get_performance_over_time
       responses:
         200:
@@ -408,8 +408,8 @@ paths:
   /Train/getLearningRates:
     get:
       tags: [Train]
-      summary: returns the learning rates for the adv. autoencoder
-      description: returns the learning rates (encoder, discriminator, generator) over time for the adv. autoencoder
+      summary: Returns the learning rates for the AAE
+      description: Returns the learning rates (encoder, discriminator, generator) over time for the AAE
       operationId: get_learning_rates
       responses:
         200:
@@ -456,7 +456,7 @@ paths:
       tags: [Train]
       operationId: reset_tensorflow_graph
       summary: Resets the tensorflow graph.
-      description: Resets the tensorflow graph for the current autoencoder.
+      description: Resets the tensorflow graph for the current AAE.
       responses:
         200:
           description: "Graph successfully reset."
@@ -467,7 +467,7 @@ paths:
   /Train/getMinibatchSummaryVars:
     get:
       tags: [Train]
-      summary: returns the variables for the minibatch summary
+      summary: Returns the variables for the minibatch summary
       description: returns the variables for the minibatch summary
       operationId: get_epoch_summary_vars
       responses:
@@ -553,7 +553,7 @@ paths:
   /Train/getSpectraOriginalAndReconstruction:
     get:
       tags: [Train]
-      summary: returns the original and reconstructed spectra
+      summary: Returns the original and reconstructed spectra
       description: returns the original and reconstructed spectra
       operationId: get_spectra_original_and_reconstruction
       responses:
@@ -585,7 +585,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_from_single_point
-      summary: generates the reconstructed image from a single point
+      summary: Generates an image from a single point on the latent space and returns it
       parameters:
         - name: single_point
           in: query
@@ -614,7 +614,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_from_single_point_as_byte_string
-      summary: generates the reconstructed image from a single point and returns the byte string of it
+      summary: Generates an image from a single point on the latent space and returns the byte string of it
       parameters:
         - name: single_point
           in: query
@@ -640,7 +640,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_from_single_point_and_single_label
-      summary: generates the reconstructed image from a single point
+      summary: Generates an image from a single point on the latent space and a single label and returns it
       parameters:
         - name: single_point
           in: query
@@ -673,7 +673,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_from_single_point_and_single_label_as_byte_string
-      summary: generates the reconstructed image from a single point and returns the byte string of it
+      summary: Generates an image from a single point on the latent space and a single label and returns the byte string of it
       parameters:
         - name: single_point
           in: query
@@ -703,7 +703,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_grid
-      summary: generates the image grid and returns the array of images
+      summary: Generates the image grid and returns the array of images
       responses:
         200:
           description: "success"
@@ -722,7 +722,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: generate_image_grid_as_byte_string
-      summary: generates the image grid and returns the array of images as array of byte strings
+      summary: Generates the image grid and returns the array of images as array of byte strings
       responses:
         200:
           description: "success"
@@ -740,7 +740,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: classify_single_image
-      summary: classify the provided image
+      summary: Classify the provided image
       parameters:
         - name: single_image
           in: query
@@ -766,7 +766,7 @@ paths:
     get:
       tags: [Visualize]
       operationId: get_biases_or_weights_for_layer
-      summary: returns the biases/weights for the specified layer
+      summary: Returns the biases/weights for the specified layer
       parameters:
         - name: bias_or_weights
           in: query
@@ -865,7 +865,7 @@ paths:
   /Tune/stopTuning:
       post:
         tags: [Tune]
-        summary: stops the tuning
+        summary: Stops the tuning
         description: stops the training of the adv autoencoder
         operationId: stop_tuning
         responses:
@@ -878,7 +878,7 @@ paths:
   /Tune/getTuningResults:
       post:
         tags: [Tune]
-        summary: returns the tuning results
+        summary: Returns the tuning results
         description: returns the tuning results ordered by their total loss
         operationId: get_tuning_results
         responses:

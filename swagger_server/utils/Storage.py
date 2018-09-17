@@ -22,6 +22,9 @@ class Storage(object):
     mass_spec_data_normalization_properties = {"first_feature_vector": None, "second_feature_vector": None,
                                                "third_feature_vector": None}
 
+    # dictionary which holds the properties of the data
+    data_properties = None
+
     # stores the data in this dictionary; default keys: train, test and validation
     # train images/labels can then be accessed like this: input_data.train.images/input_data.train.labels
     input_data = {}
@@ -85,6 +88,14 @@ class Storage(object):
     @classmethod
     def get_n_channels(cls):
         return cls.n_channels
+
+    @classmethod
+    def set_data_properties(cls, data_properties):
+        return cls.data_properties
+
+    @classmethod
+    def get_data_properties(cls):
+        return cls.data_properties
 
     @classmethod
     def set_tuning_results(cls, tuning_results):
