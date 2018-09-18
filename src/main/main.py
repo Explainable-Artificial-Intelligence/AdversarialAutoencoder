@@ -270,7 +270,7 @@ def try_mass_spec_parameter_combinations():
 
 def param_search_weight_bias_initializers():
 
-    for i in range(500):
+    for i in range(1):
 
         params = get_default_parameters_mass_spec()
 
@@ -354,7 +354,7 @@ def param_search_weight_bias_initializers():
 
         params["input_dim_x"] = 1
         params["n_classes"] = 2
-        params["z_dim"] = 15
+        params["z_dim"] = 5
 
         params["selected_dataset"] = "mass_spec"
 
@@ -391,13 +391,117 @@ def param_search_weight_bias_initializers():
             aae.reset_graph()
 
 
+def param_search_batch_normalization():
+
+    for i in range(1):
+
+        params = get_default_parameters_mass_spec()
+
+        params["summary_image_frequency"] = 100
+        params["n_epochs"] = 101
+
+        params["mz_loss_factor"] = 1
+        params["intensity_loss_factor"] = 1
+
+        # peak_encoding
+        ["only_mz", "only_intensities", "only_mz_charge_label", "distance", "location", "binned",
+         "only_intensities_distance", "raw", "raw_intensities_sqrt", "raw_sqrt"]
+
+        # datasubset:
+        ["identified", "unidentified", None]
+
+        # smoothing_method
+        ["loess", "gaussian_filter", "spline"]
+
+        params["mass_spec_data_properties"] = {"organism_name": "yeast", "peak_encoding": "raw_sqrt",
+                                               "use_smoothed_intensities": False, "data_subset": None,
+                                               "n_peaks_to_keep": 50, "max_intensity_value": 5000,
+                                               "max_mz_value": 5000, "charge": None, "normalize_data": True,
+                                               "include_molecular_weight_in_encoding": False,
+                                               "include_charge_in_encoding": False,
+                                               "smoothness_params": {"smoothing_method": "spline",
+                                                                     "smoothness_frac": 0.0,
+                                                                     "smoothness_spar": 0.1,
+                                                                     "smoothness_sigma": 1}}
+
+        params["n_neurons_of_hidden_layer_x_autoencoder"] = [250, 250, 250]
+
+        # activation functions
+        batch_normalization_options = [None, "post_activation", "pre_activation"]
+
+        n_layers_autoencoder = len(params["n_neurons_of_hidden_layer_x_autoencoder"]) + 1
+        batch_normalization_encoder = [np.random.choice(batch_normalization_options) for i in range(n_layers_autoencoder)]
+        batch_normalization_decoder = [np.random.choice(batch_normalization_options) for i in range(n_layers_autoencoder)]
+
+        params["batch_normalization_encoder"] = batch_normalization_encoder
+        params["batch_normalization_encoder"] = batch_normalization_decoder
+
+        params["activation_function_encoder"] = ['relu', 'relu6', 'softsign', 'linear']
+        params["activation_function_decoder"] = ['relu6', 'relu6', 'relu', 'sigmoid']
+
+        params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
+            [params["mass_spec_data_properties"]["include_charge_in_encoding"],
+             params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
+        if params["mass_spec_data_properties"]["peak_encoding"] == "binned":
+            params["input_dim_y"] = 1000
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "only_mz" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_mz_charge_label" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "only_intensities_distance":
+            params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"]
+        elif params["mass_spec_data_properties"]["peak_encoding"] == "raw" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "raw_intensities_sqrt" or \
+                        params["mass_spec_data_properties"]["peak_encoding"] == "raw_sqrt":
+            params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 2 + sum(
+                [params["mass_spec_data_properties"]["include_charge_in_encoding"],
+                 params["mass_spec_data_properties"]["include_molecular_weight_in_encoding"]])
+
+        params["input_dim_x"] = 1
+        params["n_classes"] = 2
+        params["z_dim"] = 15
+
+        params["selected_dataset"] = "mass_spec"
+
+        params["only_train_autoencoder"] = True
+
+        params["verbose"] = True
+        # params["selected_autoencoder"] = "IncorporatingLabelInformation"
+        # params["results_path"] = get_result_path_for_selected_autoencoder("IncorporatingLabelInformation")
+        params["selected_autoencoder"] = "Unsupervised"
+        params["results_path"] = get_result_path_for_selected_autoencoder("Unsupervised")
+
+        # update the parameters dependent on the network architecture
+        # params = update_basic_network_params(params)
+
+        params["AdamOptimizer_beta1_discriminator"] = 0.9
+        params["AdamOptimizer_beta1_autoencoder"] = 0.9
+        params["AdamOptimizer_beta1_generator"] = 0.9
+
+        params['decaying_learning_rate_name_autoencoder'] = "piecewise_constant"
+        params['decaying_learning_rate_name_discriminator'] = "piecewise_constant"
+        params['decaying_learning_rate_name_generator'] = "piecewise_constant"
+
+        params["decaying_learning_rate_params_autoencoder"] = {"boundaries": [500, 1500],
+                                                               "values": [0.0001, 1e-05, 1e-06]}
+
+        params["decaying_learning_rate_params_discriminator"] = {"boundaries": [500, 1500, 2500],
+                                                                 "values": [0.1, 0.01, 0.001, 0.0001]}
+        params["decaying_learning_rate_params_generator"] = {"boundaries": [500, 1500, 2500],
+                                                             "values": [0.1, 0.01, 0.001, 0.0001]}
+
+        for j in range(4):
+            aae = UnsupervisedAdversarialAutoencoder(params)
+            aae.train(True)
+            aae.reset_graph()
+
+
 def param_search_activation_functions():
 
     for i in range(1):
 
         params = get_default_parameters_mass_spec()
 
-        params["summary_image_frequency"] = 25
+        params["summary_image_frequency"] = 100
         params["n_epochs"] = 101
 
         params["mz_loss_factor"] = 1
@@ -440,8 +544,11 @@ def param_search_activation_functions():
         # params["activation_function_encoder"] = ['relu', 'relu6', 'softsign', 'linear']
         # params["activation_function_decoder"] = ['relu6', 'relu6', 'relu', 'sigmoid']
 
-        params["activation_function_encoder"] = ['elu', 'relu', 'tanh', 'sigmoid']
-        params["activation_function_decoder"] = ['relu6', 'linear', 'tanh', 'softplus']
+        # params["activation_function_encoder"] = ['relu', 'relu', 'relu', 'linear']
+        # params["activation_function_decoder"] = ['sigmoid', 'relu', 'relu', 'linear']
+
+        # params["activation_function_encoder"] = ['elu', 'relu', 'tanh', 'sigmoid']
+        # params["activation_function_decoder"] = ['relu6', 'linear', 'tanh', 'softplus']
 
         params["input_dim_y"] = params["mass_spec_data_properties"]["n_peaks_to_keep"] * 3 + sum(
             [params["mass_spec_data_properties"]["include_charge_in_encoding"],
@@ -507,12 +614,10 @@ def param_search_peak_encodings():
             #                                                     [1000, 1000, 1000, 1000], [2000, 2000], [2000, 2000, 2000],
             #                                                 [5000, 5000], [500, 500, 500, 500, 500, 500], [125, 125, 125, 125, 125, 125]]:
             # for frac in [0.001, 0.005, 0.01, 0.05, 0.1]:
-            for peak_encoding in ["only_mz", "only_intensities", "distance", "location",
-                 "raw", "raw_intensities_sqrt", "raw_sqrt"]:
+            # for peak_encoding in ["only_mz", "only_intensities", "distance", "location",
+            #      "raw", "raw_intensities_sqrt", "raw_sqrt"]:
+            for peak_encoding in ["binned"]:
                 # for frac in [0.1]:
-                # for frac in [0.1]:
-
-                # TODO: "binned"
 
                 params = get_default_parameters_mass_spec()
                 params["summary_image_frequency"] = 100

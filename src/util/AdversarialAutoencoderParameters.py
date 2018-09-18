@@ -681,7 +681,7 @@ def get_default_parameters_mass_spec():
                                                                 "smoothness_spar": 0.3,
                                                                 "smoothness_sigma": 1}},
 
-            'n_neurons_of_hidden_layer_x_autoencoder': [1000, 500, 250, 125],  # 1000, 500, 250, 125
+            'n_neurons_of_hidden_layer_x_autoencoder': [250, 250, 250],  # 1000, 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator': [500, 250, 125],  # 500, 250, 125
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
@@ -692,19 +692,17 @@ def get_default_parameters_mass_spec():
             'dropout_discriminator_c': [0.0, 0.0, 0.0],
             'dropout_discriminator_g': [0.0, 0.0, 0.0],
 
-            'batch_normalization_encoder': ["post_activation", "post_activation", "post_activation", "post_activation",
-                                            "post_activation"],
-            'batch_normalization_decoder': ["post_activation", "post_activation", "post_activation", "post_activation",
-                                            "post_activation"],
-            'batch_normalization_discriminator': [None, None, None, None, None],
+            'batch_normalization_encoder': [None, None, None, None],
+            'batch_normalization_decoder': [None, None, None, None],
+            'batch_normalization_discriminator': [None, None, None, None],
             # for semi-supervised:
             'batch_normalization_discriminator_c': ["post_activation", "post_activation", "post_activation"],
             'batch_normalization_discriminator_g': ["post_activation", "post_activation", "post_activation"],
 
             'bias_initializer_encoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
-                                         "zeros_initializer", "zeros_initializer"],
+                                         "zeros_initializer"],
             'bias_initializer_decoder': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
-                                         "zeros_initializer", "zeros_initializer"],
+                                         "zeros_initializer"],
             'bias_initializer_discriminator': ["zeros_initializer", "zeros_initializer", "zeros_initializer",
                                                "zeros_initializer"],
             'bias_initializer_discriminator_c': ["zeros_initializer", "zeros_initializer", "zeros_initializer"],
@@ -717,11 +715,9 @@ def get_default_parameters_mass_spec():
             'bias_initializer_params_discriminator_g': [{}, {}, {}],
 
             'weights_initializer_encoder': ["truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer"],
+                                            "truncated_normal_initializer", "truncated_normal_initializer"],
             'weights_initializer_decoder': ["truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer", "truncated_normal_initializer",
-                                            "truncated_normal_initializer"],
+                                            "truncated_normal_initializer", "truncated_normal_initializer"],
             'weights_initializer_discriminator': ["truncated_normal_initializer", "truncated_normal_initializer",
                                                   "truncated_normal_initializer", "truncated_normal_initializer"],
             'weights_initializer_discriminator_c': ["truncated_normal_initializer", "truncated_normal_initializer",
@@ -730,11 +726,9 @@ def get_default_parameters_mass_spec():
                                                     "truncated_normal_initializer"],
 
             'weights_initializer_params_encoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}],
+                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_decoder': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
-                                                   {"mean": 0, "stddev": 0.1}],
+                                                   {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_discriminator': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                          {"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1}],
             'weights_initializer_params_discriminator_c': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
@@ -742,8 +736,8 @@ def get_default_parameters_mass_spec():
             'weights_initializer_params_discriminator_g': [{"mean": 0, "stddev": 0.1}, {"mean": 0, "stddev": 0.1},
                                                            {"mean": 0, "stddev": 0.1}],
 
-            'activation_function_encoder': ['relu', 'relu', 'relu', 'relu', 'linear'],
-            'activation_function_decoder': ['sigmoid', 'relu', 'relu', 'relu', 'linear'],
+            'activation_function_encoder': ['relu', 'relu6', 'softsign', 'linear'],
+            'activation_function_decoder': ['relu6', 'relu6', 'relu', 'sigmoid'],
             'activation_function_discriminator': ['relu', 'relu', 'relu', 'linear'],
             'activation_function_discriminator_c': ['relu', 'relu', 'linear'],  # for semi-supervised
             'activation_function_discriminator_g': ['relu', 'relu', 'linear'],  # for semi-supervised
