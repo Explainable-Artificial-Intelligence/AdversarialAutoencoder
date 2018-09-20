@@ -252,25 +252,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # for mass spec data we pick the reconstruction loss for the spectra; so we need to reconstruct the spectra
         # from the feature vector first
         if self.selected_dataset == "mass_spec":
-            # original_images = self.X_target
-            # reconstructed_images = self.decoder_output
-            #
-            # # reconstruct spectra from featurer vector
-            # mz_values_original, intensities_original, charges_original, molecular_weights_original \
-            #     = reconstruct_spectrum_from_feature_vector(original_images, self.input_dim,
-            #                                                self.mass_spec_data_properties)
-            # mz_values_reconstructed, intensities_reconstructed, charges_reconstructed, molecular_weights_reconstructed \
-            #     = reconstruct_spectrum_from_feature_vector(reconstructed_images, self.input_dim,
-            #                                                self.mass_spec_data_properties)
-            #
-            # # calculate the average difference between original and reconstruction
-            # # self.mz_values_loss = tf.reduce_mean(tf.abs(mz_values_reconstructed - mz_values_original))
-            # # self.intensities_loss = tf.reduce_mean(tf.abs(intensities_reconstructed - intensities_original))
-            # self.mz_values_loss = tf.reduce_mean(tf.square(mz_values_reconstructed - mz_values_original))
-            # self.intensities_loss = tf.reduce_mean(tf.square(intensities_reconstructed - intensities_original))
-            # self.autoencoder_loss = self.mz_values_loss + self.intensities_loss
-
-            # TODO: depending on peak encoding; parameter for factor of loss
             mz_values_original = self.X_target[:, ::2]
             mz_values_reconstructed = self.decoder_output[:, ::2]
             intensities_original = self.X_target[:, 1::2]
@@ -285,10 +266,6 @@ class UnsupervisedAdversarialAutoencoder(BaseEstimator, TransformerMixin):
         # use the default autoencoder loss
         else:
             self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
-            #self.autoencoder_loss = tf.reduce_mean(tf.sqrt(tf.square(self.X_target - self.decoder_output)))
-
-        # TODO: remove hard coded
-        self.autoencoder_loss = tf.reduce_mean(tf.square(self.X_target - self.decoder_output))
 
         # Discriminator Loss
         discriminator_loss_pos_samples = tf.reduce_mean(

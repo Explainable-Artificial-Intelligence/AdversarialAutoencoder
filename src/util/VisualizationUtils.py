@@ -1013,7 +1013,8 @@ def create_reconstruction_grid(aae_class, real_images, reconstructed_images, epo
 
     nx, ny = 10, 10
     if aae_class.batch_size < 100:
-        nx, ny = np.floor(np.sqrt(aae_class.batch_size)) * 2
+        n_images = int(np.floor(np.sqrt(aae_class.batch_size)))
+        nx, ny = n_images, n_images
 
     plt.subplot()
     gs = gridspec.GridSpec(nx, ny, hspace=0.05, wspace=0.05)
@@ -1289,6 +1290,13 @@ def reconstruct_spectrum_from_feature_vector(mass_spec_data, feature_dim, mass_s
         intensities = reconstructed_mz_values[:, 1, :]
         charges = ["NaN"] * mass_spec_data.shape[0]
         molecular_weights = ["NaN"] * mass_spec_data.shape[0]
+
+        # in case the data is normalized, get the original values back
+        if is_data_normalized:
+            # revert normalization for intensities
+            min_first_feature_vector, ptp_first_feature_vector = \
+                Storage.get_mass_spec_data_normalization_properties()["first_feature_vector"]
+            intensities = intensities * ptp_first_feature_vector + min_first_feature_vector
 
     elif peak_encoding == "only_mz" or peak_encoding == "only_mz_charge_label" or peak_encoding == "only_mz_distance":
         if peak_encoding == "only_mz_distance":

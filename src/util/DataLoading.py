@@ -343,6 +343,11 @@ Read pre-processed mass spec data
 """
 
 
+def normalize_feature_vector(feature_vector):
+    return (feature_vector - np.min(feature_vector)) / np.ptp(feature_vector), np.min(feature_vector), \
+           np.ptp(feature_vector)
+
+
 def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, validation_size=1, dtype=dtypes.float32):
     """
     reads the mass spec data and return a Datasets object with the train, test and validation data
@@ -373,13 +378,11 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
     smoothness_params = mass_spec_data_properties.get("smoothness_params")      # holds the parameters for smoothing
     if smoothness_params:
         smoothness_sigma = smoothness_params.get("smoothness_sigma")    # float or None
-        smoothing_n_gaussians = smoothness_params.get("smoothing_n_gaussians")    # int or None
         smoothing_method = smoothness_params.get("smoothing_method")        # "loess" or "gaussian_filter"
         smoothness_frac = smoothness_params.get("smoothness_frac")          # None or float
         smoothness_spar = smoothness_params.get("smoothness_spar")          # None or float
     else:       # we don't have any smoothness parameters
         smoothness_sigma = None    # float or None
-        smoothing_n_gaussians = None    # int or None
         smoothing_method = None        # "loess" or "gaussian_filter"
         smoothness_frac = None          # None or float
         smoothness_spar = None          # None or float
@@ -431,7 +434,16 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         np.take(all_spectra, shuffled_indices, axis=0, out=all_spectra)
         np.take(all_spectra_labels, shuffled_indices, axis=0, out=all_spectra_labels)
 
-        n_training_points = 101
+        if mass_spec_data_properties["normalize_data"]:
+            all_spectra, min_first_feature_vector, ptp_first_feature_vector = normalize_feature_vector(all_spectra)
+
+            # save the respective minima and peak to peak distances in the storage class (so we can revert the
+            # normalization later on)
+            Storage.set_mass_spec_data_normalization_properties(
+                {"first_feature_vector": [min_first_feature_vector, ptp_first_feature_vector]})
+
+        # separate data in train and test data
+        n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
 
         train_images = all_spectra[:n_training_points]
         train_labels = all_spectra_labels[:n_training_points]
@@ -444,143 +456,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                                  train_images, train_labels, validation_size, rescale=False)
 
         return Datasets(train=train, validation=validation, test=test)
-
-    # if mass_spec_data_properties["peak_encoding"] == "only_mz":
-    #     input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_mz.txt"
-    #     identified_spectra = np.loadtxt(input_file_name)
-    #     identified_spectra_labels = [1] * identified_spectra.shape[0]
-    #
-    #     input_file_name = input_file_name.replace("identified", "unidentified")
-    #     unidentified_spectra = np.loadtxt(input_file_name)
-    #     unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
-    #
-    #     # combine identified and unidentified spectra into one array
-    #     all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
-    #     all_spectra_labels = np.concatenate((identified_spectra_labels, unidentified_spectra_labels))
-    #
-    #     # if we want to train on the (un-)identified data alone
-    #     if data_subset == "identified":
-    #         all_spectra = np.array(identified_spectra)
-    #         all_spectra_labels = np.array(identified_spectra_labels)
-    #     elif data_subset == "unidentified":
-    #         all_spectra = np.array(unidentified_spectra)
-    #         all_spectra_labels = np.array(unidentified_spectra_labels)
-    #
-    #     # shuffle the identified and unidentified spectra
-    #     shuffled_indices = np.random.rand(all_spectra.shape[0]).argsort()
-    #     np.take(all_spectra, shuffled_indices, axis=0, out=all_spectra)
-    #     np.take(all_spectra_labels, shuffled_indices, axis=0, out=all_spectra_labels)
-    #
-    #     # separate data in train and test data
-    #     n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
-    #
-    #     train_images = all_spectra[:n_training_points]
-    #     train_labels = all_spectra_labels[:n_training_points]
-    #
-    #     test_images = all_spectra[n_training_points:]
-    #     test_labels = all_spectra_labels[n_training_points:]
-    #
-    #     # create the dataset holding the test, train and validation data
-    #     test, train, validation = create_dataset(dtype, 2, one_hot, False, None, test_images, test_labels,
-    #                                              train_images, train_labels, validation_size, rescale=False)
-    #
-    #     return Datasets(train=train, validation=validation, test=test)
-
-    # if mass_spec_data_properties["peak_encoding"] == "only_intensities":
-    #     input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_intensities.txt"
-    #     identified_spectra = np.loadtxt(input_file_name)
-    #     identified_spectra_labels = [1] * identified_spectra.shape[0]
-    #
-    #     input_file_name = input_file_name.replace("identified", "unidentified")
-    #     unidentified_spectra = np.loadtxt(input_file_name)
-    #     unidentified_spectra_labels = [0] * unidentified_spectra.shape[0]
-    #
-    #     # combine identified and unidentified spectra into one array
-    #     all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
-    #     all_spectra_labels = np.concatenate((identified_spectra_labels, unidentified_spectra_labels))
-    #
-    #     # if we want to train on the (un-)identified data alone
-    #     if data_subset == "identified":
-    #         all_spectra = np.array(identified_spectra)
-    #         all_spectra_labels = np.array(identified_spectra_labels)
-    #     elif data_subset == "unidentified":
-    #         all_spectra = np.array(unidentified_spectra)
-    #         all_spectra_labels = np.array(unidentified_spectra_labels)
-    #
-    #     # shuffle the identified and unidentified spectra
-    #     shuffled_indices = np.random.rand(all_spectra.shape[0]).argsort()
-    #     np.take(all_spectra, shuffled_indices, axis=0, out=all_spectra)
-    #     np.take(all_spectra_labels, shuffled_indices, axis=0, out=all_spectra_labels)
-    #
-    #     # separate data in train and test data
-    #     n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
-    #
-    #     if mass_spec_data_properties["normalize_data"]:
-    #
-    #         # use gaussian normalization
-    #         mean = np.mean(all_spectra, axis=0)
-    #         std_dev = np.std(all_spectra, axis=0)
-    #         all_spectra = (all_spectra - mean) / std_dev
-    #
-    #         # save the respective minima and peak to peak distances in the storage class (so we can revert the
-    #         # normalization later on)
-    #         Storage.set_mass_spec_data_normalization_properties({"mean": mean, "std_dev": std_dev})
-    #
-    #     train_images = all_spectra[:n_training_points]
-    #     train_labels = all_spectra_labels[:n_training_points]
-    #
-    #     test_images = all_spectra[n_training_points:]
-    #     test_labels = all_spectra_labels[n_training_points:]
-    #
-    #     # create the dataset holding the test, train and validation data
-    #     test, train, validation = create_dataset(dtype, 2, one_hot, False, None, test_images, test_labels,
-    #                                              train_images, train_labels, validation_size, rescale=False)
-    #
-    #     return Datasets(train=train, validation=validation, test=test)
-
-    # if mass_spec_data_properties["peak_encoding"] == "only_mz_charge_label":
-    #     input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name \
-    #                       + "_identified_only_mz_charge_label.txt"
-    #     identified_spectra = np.loadtxt(input_file_name)
-    #     identified_spectra_labels = identified_spectra[:, -1].astype(int)   # get the charge as label
-    #     identified_spectra = identified_spectra[:, :-1]                     # remove the charge from the array
-    #
-    #     input_file_name = input_file_name.replace("identified", "unidentified")
-    #     unidentified_spectra = np.loadtxt(input_file_name)
-    #     unidentified_spectra_labels = unidentified_spectra[:, -1].astype(int)   # get the charge as label
-    #     unidentified_spectra = unidentified_spectra[:, :-1]                     # remove the charge from the array
-    #
-    #     # combine identified and unidentified spectra into one array
-    #     all_spectra = np.concatenate((identified_spectra, unidentified_spectra))
-    #     all_spectra_labels = np.concatenate((identified_spectra_labels, unidentified_spectra_labels))
-    #
-    #     # if we want to train on the (un-)identified data alone
-    #     if data_subset == "identified":
-    #         all_spectra = np.array(identified_spectra)
-    #         all_spectra_labels = np.array(identified_spectra_labels)
-    #     elif data_subset == "unidentified":
-    #         all_spectra = np.array(unidentified_spectra)
-    #         all_spectra_labels = np.array(unidentified_spectra_labels)
-    #
-    #     # shuffle the identified and unidentified spectra
-    #     shuffled_indices = np.random.rand(all_spectra.shape[0]).argsort()
-    #     np.take(all_spectra, shuffled_indices, axis=0, out=all_spectra)
-    #     np.take(all_spectra_labels, shuffled_indices, axis=0, out=all_spectra_labels)
-    #
-    #     # separate data in train and test data
-    #     n_training_points = int(all_spectra.shape[0] * 0.8)  # ratio of train and test data is 80-20
-    #
-    #     train_images = all_spectra[:n_training_points]
-    #     train_labels = all_spectra_labels[:n_training_points]
-    #
-    #     test_images = all_spectra[n_training_points:]
-    #     test_labels = all_spectra_labels[n_training_points:]
-    #
-    #     # create the dataset holding the test, train and validation data
-    #     test, train, validation = create_dataset(dtype, 4, one_hot, False, None, test_images, test_labels,
-    #                                              train_images, train_labels, validation_size, rescale=False)
-    #
-    #     return Datasets(train=train, validation=validation, test=test)
 
     if mass_spec_data_properties["peak_encoding"] == "only_intensities_distance":
         input_file_name = filepath + "/mass_spec_data/" + organism_name + "/" + organism_name + "_identified_only_intensities_distance_encoding.txt"
@@ -638,8 +513,7 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         input_file_name += "_max_int_" + str(max_intensity_value)
     if use_smoothed_intensities:
         if smoothing_method == "gaussian_filter":
-            input_file_name += "_gauss_filter_sigma_" + str(smoothness_sigma) + "_n_gauss_" \
-                               + str(smoothing_n_gaussians)
+            input_file_name += "_gauss_filter_sigma_" + str(smoothness_sigma).replace(".", "_")
         elif smoothing_method == "loess":
             input_file_name += "_loess_frac_" + str(smoothness_frac).replace(".", "_")
         elif smoothing_method == "spline":
@@ -668,7 +542,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                                     use_smoothed_intensities=use_smoothed_intensities,
                                                     smoothing_method=smoothing_method,
                                                     smoothness_sigma=smoothness_sigma, smoothness_frac=smoothness_frac,
-                                                    smoothing_n_gaussians=smoothing_n_gaussians,
                                                     smoothness_spar=smoothness_spar)
     else:
         print("File found!")
@@ -704,7 +577,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
                                                     use_smoothed_intensities=use_smoothed_intensities,
                                                     smoothing_method=smoothing_method,
                                                     smoothness_sigma=smoothness_sigma, smoothness_frac=smoothness_frac,
-                                                    smoothing_n_gaussians=smoothing_n_gaussians,
                                                     smoothness_spar=smoothness_spar)
 
     else:
@@ -746,10 +618,6 @@ def read_mass_spec_files(filepath, mass_spec_data_properties, one_hot=True, vali
         # them for normalizing the feature vectors
         n_special_features = sum([include_charge_in_encoding, include_molecular_weight_in_encoding])
         feature_dim = all_spectra.shape[1]
-
-        def normalize_feature_vector(feature_vector):
-            return (feature_vector - np.min(feature_vector)) / np.ptp(feature_vector), np.min(feature_vector), \
-                   np.ptp(feature_vector)
 
         if peak_encoding == "distance" or peak_encoding == "location":
             # every third value encodes the first feature; so we need to normalize only them (and ignore the special

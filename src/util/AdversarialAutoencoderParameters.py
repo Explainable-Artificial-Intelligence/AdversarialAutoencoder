@@ -662,10 +662,10 @@ def get_default_parameters_mass_spec():
     returns the default parameters for the MNIST dataset
     :return: dictionary holding the parameters needed to create the Autoencoder
     """
-    return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 1, 'input_dim_y': 150, 'z_dim': 2, 'n_classes': 2,
+    return {'batch_size': 100, 'n_epochs': 10, 'input_dim_x': 1, 'input_dim_y': 150, 'z_dim': 10, 'n_classes': 2,
             'color_scale': "gray_scale", 'verbose': True, 'save_final_model': False, 'write_tensorboard': False,
             'n_labeled': 1000,  'only_train_autoencoder': True, 'selected_dataset': "mass_spec",
-            'summary_image_frequency': 5,  # create a summary image of the learning process every 5 epochs
+            'summary_image_frequency': 15,  # create a summary image of the learning process every 5 epochs
 
             'mz_loss_factor': 1,
             'intensity_loss_factor': 1,
@@ -686,8 +686,8 @@ def get_default_parameters_mass_spec():
             'n_neurons_of_hidden_layer_x_discriminator_c': [1000, 1000],  # for semi-supervised
             'n_neurons_of_hidden_layer_x_discriminator_g': [1000, 1000],  # for semi-supervised
 
-            'dropout_encoder': [0.0, 0.0, 0.0, 0.0, 0.0],
-            'dropout_decoder': [0.0, 0.0, 0.0, 0.0, 0.0],
+            'dropout_encoder': [0.0, 0.0, 0.0, 0.0],
+            'dropout_decoder': [0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator': [0.0, 0.0, 0.0, 0.0],
             'dropout_discriminator_c': [0.0, 0.0, 0.0],
             'dropout_discriminator_g': [0.0, 0.0, 0.0],
